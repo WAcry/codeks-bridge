@@ -16,6 +16,7 @@ npm run check
 - 流：跨字节分块的 UTF-8、CR/LF、SSE 多行数据、结束标记、非法 JSON。
 - Responses 输出：先 added 后 delta/done、完整历史项、usage、reasoning carrier、消息 phase、明文多代理参数、重试提示、失败时不执行尚未提交的工具。
 - 后端与历史：各 API 的消息、工具、图片、reasoning、压缩及错误转换。专项测试与转换实现放在同一轮审查。
+- 压缩恢复：跨 GPT 目标优先使用原生结果；明确密文拒绝后一次摘要回退；按 thread/turn、目标配置和 checkpoint 隔离成功记录；输出后不重发；双压缩仍须完整成功。
 
 这些测试检查协议和客户端行为；假上游不会验证模型是否理解提示词，也不会验证真实服务的缓存命中率、容量和区域之间的密文兼容性。
 
@@ -43,15 +44,15 @@ CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts
 
 真实端点的配置、鉴权、请求与响应只保存在仓库外。公开测试数据必须是合成内容，不能复制真实密钥、端点、签名、密文、对话或账号信息。
 
-真实验证应区分：单次请求、工具回环、图片、切换模型后 reasoning 隔离、压缩后续接。Responses 的双重压缩还需要检查两个分支都成功后才提交结果；换端点或模型时使用可读摘要，同端点同模型时才恢复原生压缩内容。某一服务上的成功不代表另一服务也支持同样的字段。
+真实验证应区分：单次请求、工具回环、图片、切换模型后 reasoning 隔离、压缩后续接。Responses 的双重压缩还需要检查两个分支都成功后才提交结果；GPT 换端点或模型先重放原生结果，确认拒绝后使用可读摘要，并检查同 turn 的工具回环和下个 turn 的重新尝试。某一服务上的成功不代表另一服务也支持同样的字段。
 
 ### 本轮实测结果
 
-2026-10-17（America/Los_Angeles）最终检查通过：90 个测试全部通过（含 3 个真实 codeks 进程测试，无跳过），TypeScript 检查、构建和公开内容检查通过。完成了下列真实端点验证。结果是协议互操作证据，不是模型任务质量排名，也不代表其他端点默认兼容。
+2026-10-17（America/Los_Angeles）最终检查通过：115 个测试全部通过（含 3 个真实 codeks 进程测试，无跳过），TypeScript 检查、构建和公开内容检查通过。完成了下列真实端点验证。结果是协议互操作证据，不是模型任务质量排名，也不代表其他端点默认兼容。
 
 | 后端 | 已通过 |
 | --- | --- |
-| GPT Responses（两个云端连接） | reasoning 回放、跨连接切换、namespace 工具及结果、自定义 Lark 工具、图片识别、双压缩、同连接 native 与跨连接 summary 回放 |
+| GPT Responses（两个云端连接） | reasoning 回放、跨连接切换、namespace 工具及结果、自定义 Lark 工具、图片识别、双压缩、native 与 summary 回放 |
 | Claude Messages（Opus / Sonnet） | namespace 工具、工具图片、custom regex 工具、Opus → Sonnet → Opus reasoning 隔离与恢复、带签名 reasoning 的压缩及续接、Responses JSON Schema 转 Messages 结构化 JSON 输出 |
 | DeepSeek 官方 `deepseek-flash` | namespace 和 custom 工具、同模型 reasoning 工具循环、跨模型历史配空 reasoning 字段、用户/工具图片、完整文字 reasoning 重放 |
 
@@ -59,4 +60,8 @@ Claude 一次压缩输入 19,778 tokens，其中 19,541 命中缓存，约 98.8%
 
 HTTP 集成测试另外覆盖入口鉴权、响应校验、429/503/配额分类、`Retry-After`、失败时不释放工具、客户端断开取消上游，以及下游 keepalive 持续时上游依然会触发空闲超时。使用合成 checkpoint 验证过服务重启、跨后端与跨区域恢复。
 
-完整的真实 HTTP 路径也已验证：经 bridge 生成 GPT 双压缩 checkpoint，序列化后交给 Claude 和 DeepSeek 续聊，再切回原 GPT。跨模型请求实际使用文字摘要且不含原生密文；切回请求恢复原生 checkpoint 并过滤外来 reasoning。原 GPT 正确回答了只存在于 checkpoint、此前续聊明文未出现的第二个标记，原始 carrier 保持不变。
+完整的真实 HTTP 路径也已验证：经 bridge 生成 GPT 双压缩 checkpoint，序列化后交给 Claude 和 DeepSeek 续聊，再切回原 GPT。Claude 和 DeepSeek 请求实际使用文字摘要且不含原生密文；切回 GPT 请求恢复原生 checkpoint 并过滤外来 reasoning。原 GPT 正确回答了只存在于 checkpoint、此前续聊明文未出现的第二个标记，原始 carrier 保持不变。
+
+原生密文兼容性另外做了 9 次重放与 3 次摘要对照：AWS 连接上的 GPT checkpoint 在所测三个 GPT 模型之间成功复用；Azure 连接上的两个 GPT 模型之间，以及所测 AWS/Azure 双向切换，出现密文拒绝，改用摘要后成功。请求中分别指定两个 AWS 区域也成功，但这只证明请求设置被接受，不能证明实际推理落在不同物理区域。因此实现不维护按厂商、模型家族或区域推断的兼容性表。
+
+新恢复策略还经过实际 bridge HTTP 验证，6 次客户端请求产生 9 次真实上游请求：跨 GPT 模型直接使用原生结果；跨 provider 遇到密文 400 后自动使用摘要；同 turn、同目标直接摘要；新 turn 或切换模型重新尝试原生；同 turn 切回先前目标继续摘要。每次客户端均收到一条成功完成的响应，并正确恢复合成任务标记，内部拒绝没有泄漏为客户端失败事件。

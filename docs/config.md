@@ -39,7 +39,9 @@
 | `max_output_tokens` | 默认输出上限，客户端显式值优先 |
 | `options` | 覆盖上游级默认选项；模型路由、历史与流模式由 bridge 负责 |
 
-更改连接 ID、端点或模型会改变 reasoning/原生压缩身份。单纯改显示别名不会改变它。若同一 URL/模型通过 header 路由不同区域，请为每个区域建立不同 upstream ID。不要在不改 ID 的情况下将同一个配置换成不兼容的连接。
+更改连接 ID、端点或模型会改变 reasoning 身份。单纯改显示别名不会改变它。若同一 URL/模型通过 header 路由不同区域，请为每个区域建立不同 upstream ID，以隔离 reasoning。
+
+GPT 原生压缩优先跨目标复用；密文被拒绝后，成功使用摘要的记录按 turn、当前目标和 checkpoint 隔离。目标还包括静态 headers、上游 options 和模型 options，因此用选项表示的区域变化也会重新尝试。这个策略没有额外配置项，详见 [compaction.md](compaction.md)。
 
 ## 客户端
 

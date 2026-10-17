@@ -1,3 +1,4 @@
+import type { CompactionReplay } from "./compaction-replay.ts";
 import type { ResponseWriter, Usage } from "./writer.ts";
 
 export type Api = "responses" | "anthropic" | "chat";
@@ -48,6 +49,7 @@ export interface BackendContext {
   route: ResolvedModel;
   signal: AbortSignal;
   compacting?: boolean;
+  compactionReplay?: CompactionReplay;
 }
 export interface BackendResult {
   usage: Usage;

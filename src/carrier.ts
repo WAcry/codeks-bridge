@@ -57,7 +57,7 @@ export interface CompactionCarrier {
   v: 1;
   /** The prompt-based summary. Any model can read it. */
   summary: string;
-  /** The upstream's own compaction item, valid only for the same key. */
+  /** The upstream's own compaction item and its source identity. */
   native?: { key: string; item: Record<string, unknown> };
 }
 

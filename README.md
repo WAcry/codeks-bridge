@@ -2,7 +2,7 @@
 
 给 [codeks](https://github.com/WAcry/codeks) 使用的本地模型桥接器。对客户端提供 Responses API，可接 OpenAI Responses、Anthropic Messages 和 OpenAI 兼容 Chat Completions。当前重点支持 GPT、Claude 和 `deepseek-flash`。
 
-它转换工具、图片和流式响应；按模型与端点隔离 reasoning；压缩后仍能在不同模型之间切换。GPT 同时保存原生加密压缩和文字摘要，其他模型使用文字摘要。运行时只依赖 Node.js 内置模块。
+它转换工具、图片和流式响应；按模型与端点隔离 reasoning；压缩后仍能在不同模型之间切换。GPT 同时保存原生加密压缩和文字摘要，优先复用原生结果，被上游拒绝时回退到摘要；其他模型使用文字摘要。运行时只依赖 Node.js 内置模块。
 
 ## 本地使用
 

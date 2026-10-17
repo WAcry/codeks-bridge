@@ -279,7 +279,7 @@ test("native and portable checkpoints survive server restart and switches betwee
     assert.equal((await responseJson(response)).status, "completed");
     const upstream = f.seen.at(-1)!;
     const serialized = JSON.stringify(upstream.body);
-    if (model === "gpt") {
+    if (model === "gpt" || model === "gpt-region") {
       assert.equal(upstream.body.input[0].type, "compaction");
       assert.equal(upstream.body.input[0].encrypted_content, "native-checkpoint-synthetic");
       assert.equal(serialized.includes(summary), false);

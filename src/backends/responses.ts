@@ -1,5 +1,5 @@
 import { decodeReasoning, encodeReasoning } from "../carrier.ts";
-import { BridgeError } from "../errors.ts";
+import { BridgeError, isEncryptedContentRejection } from "../errors.ts";
 import { prepareHistory } from "../history.ts";
 import { parseJsonSse } from "../sse.ts";
 import { upstreamFetch } from "../upstream.ts";
@@ -7,11 +7,11 @@ import type { Backend, BackendContext } from "../types.ts";
 import type { Usage } from "../writer.ts";
 
 /** Replay complete content, never a server-side item reference. */
-export function responsesBody({ request, route, compacting }: BackendContext): Record<string, any> {
+export function responsesBody({ request, route, compacting, compactionReplay }: BackendContext, forceSummary = false): Record<string, any> {
   if (request.previous_response_id) {
     throw new BridgeError("previous_response_id is unsupported; send the complete conversation items");
   }
-  const input = prepareHistory(request.input, route).map((item) => {
+  const input = prepareHistory(request.input, route, forceSummary || compactionReplay?.useSummary).map((item) => {
     // An assistant message id can reference a reasoning item that was filtered
     // during a model switch or an agent fork. Full content needs neither id.
     delete item.id;
@@ -74,8 +74,8 @@ interface ItemState {
   done: boolean;
 }
 
-export const runResponses: Backend = async (context, writer) => {
-  const response = await upstreamFetch(context.route, "/responses", responsesBody(context), context.signal);
+const runAttempt: (context: BackendContext, writer: Parameters<Backend>[1], body: Record<string, any>) => ReturnType<Backend> = async (context, writer, body) => {
+  const response = await upstreamFetch(context.route, "/responses", body, context.signal);
   const states = new Map<number, ItemState>();
   const byId = new Map<string, ItemState>();
   const calls: Record<string, any>[] = [];
@@ -200,4 +200,20 @@ export const runResponses: Backend = async (context, writer) => {
     }
   }
   throw new BridgeError("The upstream stream ended before response.completed", "stream_error", 502);
+};
+
+/** Retry only checkpoint replay, before any output was published to the client. */
+export const runResponses: Backend = async (context, writer) => {
+  const body = responsesBody(context);
+  try {
+    return await runAttempt(context, writer, body);
+  } catch (error) {
+    const hasNative = body.input.some((item: any) => item.type === "compaction" || item.type === "compaction_summary");
+    if (!hasNative || writer.hasOutput || context.signal.aborted || !isEncryptedContentRejection(error)) throw error;
+    // Only replace compaction. Matching reasoning and the stored carrier stay intact.
+    const result = await runAttempt(context, writer, responsesBody(context, true));
+    context.signal.throwIfAborted();
+    context.compactionReplay?.rememberSummary();
+    return result;
+  }
 };

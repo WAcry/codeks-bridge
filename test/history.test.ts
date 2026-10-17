@@ -23,14 +23,15 @@ test("reasoning is selected per request and remains available when switching bac
   assert.deepEqual(input, original);
 });
 
-test("native compaction uses its source endpoint and portable text elsewhere", () => {
+test("Responses targets share native compaction and can explicitly replay its summary", () => {
   const native = { type: "compaction", id: "cmp_synthetic", encrypted_content: "native-cipher" };
   const input = [{ type: "compaction", encrypted_content: encodeCompaction({ v: 1, summary: "Keep the violet flag.", native: { key: route.key, item: native } }) }];
   const same = prepareHistory(input, route);
   assert.deepEqual(same, [native]);
   same[0].encrypted_content = "modified copy";
   assert.deepEqual(prepareHistory(input, route), [native]);
-  const other = prepareHistory(input, { ...route, key: "other" });
+  assert.deepEqual(prepareHistory(input, { ...route, key: "other" }), [native]);
+  const other = prepareHistory(input, { ...route, key: "other" }, true);
   assert.equal(other[0].role, "user");
   assert.match(other[0].content[0].text, /Keep the violet flag\.$/);
   assert(!JSON.stringify(other).includes("native-cipher"));

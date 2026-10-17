@@ -7,6 +7,7 @@ import { runResponses } from "./backends/responses.ts";
 import { runAnthropic } from "./backends/anthropic.ts";
 import { runChat } from "./backends/chat.ts";
 import { compact, isCompactionRequest } from "./compaction.ts";
+import { CompactionReplayCache } from "./compaction-replay.ts";
 import type { Backend, BridgeConfig, ResponsesRequest } from "./types.ts";
 
 const BACKENDS: Record<string, Backend> = { responses: runResponses, anthropic: runAnthropic, chat: runChat };
@@ -49,6 +50,7 @@ export function createBridgeServer(value: BridgeConfig): Server {
   if (config.token_env && !token) throw new BridgeError(`Missing bridge token environment variable: ${config.token_env}`);
   const host = config.host ?? "127.0.0.1";
   if (!["127.0.0.1", "::1", "localhost"].includes(host) && !token) throw new BridgeError("Set token_env when listening outside loopback");
+  const replayCache = new CompactionReplayCache();
   return createServer(async (req, res) => {
     const controller = new AbortController();
     const abort = () => { if (!res.writableEnded) controller.abort(new Error("Client disconnected")); };
@@ -67,7 +69,7 @@ export function createBridgeServer(value: BridgeConfig): Server {
       }
       const request = await readRequest(req);
       const route = resolveModel(config, request.model);
-      const context = { request, route, signal: controller.signal };
+      const context = { request, route, signal: controller.signal, compactionReplay: replayCache.forRequest(request, route) };
       const backend = BACKENDS[route.upstream.api];
       const streaming = request.stream === true;
       if (streaming) {

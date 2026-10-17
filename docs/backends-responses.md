@@ -29,6 +29,8 @@ input 和 output token 数必须存在且为非负安全整数；cached 和 reas
 
 HTTP 错误由共用请求层映射。流内 `response.failed` 保留错误码和重试提示；缺少完成事件的断流返回可重试错误。截断或 refusal 返回 `invalid_prompt`，避免把同一不可完成的请求反复执行。
 
+原生 checkpoint 跨 GPT 模型与连接优先复用。如果上游明确拒绝其密文，而且尚未产生输出，后端以 checkpoint 内已有摘要替换原生 item，再请求一次。只替换压缩项，匹配的 reasoning 继续保留。成功后的短期记录避免同一 turn、目标与 checkpoint 的重复拒绝；新 turn 或目标会重新尝试。限流、服务错误和普通输入错误不触发此路径。详见 [压缩恢复](compaction.md#拒绝后何时重新尝试)。
+
 ## 原生压缩
 
 带有尾项 `compaction_trigger` 的请求仍发送到 `/responses`，不改走独立的 compact 端点。原生输出 `compaction` item 直接交给压缩协调层。协调层等待原生压缩和通用摘要均成功后，再生成一个包含两者的 carrier；后端不会递归触发新的压缩。

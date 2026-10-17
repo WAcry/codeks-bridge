@@ -4,7 +4,7 @@ import { SUMMARY_PREFIX } from "./prompts.ts";
 import type { ResolvedModel, ResponsesRequest } from "./types.ts";
 
 /** Selects model-specific opaque state without changing the stored history. */
-export function prepareHistory(input: ResponsesRequest["input"], route: ResolvedModel): Record<string, any>[] {
+export function prepareHistory(input: ResponsesRequest["input"], route: ResolvedModel, useSummary = false): Record<string, any>[] {
   if (typeof input === "string") {
     return [{ type: "message", role: "user", content: [{ type: "input_text", text: input }] }];
   }
@@ -51,7 +51,7 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
       if (!carrier || carrier.v !== 1) {
         throw new BridgeError("This compaction item has no portable summary; start with history created through this bridge");
       }
-      if (carrier.native?.key === route.key && route.upstream.api === "responses") {
+      if (carrier.native && route.upstream.api === "responses" && !useSummary) {
         result.push(structuredClone(carrier.native.item));
       } else {
         result.push({

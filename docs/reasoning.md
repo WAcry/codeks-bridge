@@ -28,7 +28,7 @@ Multi-agent V2 的明文 `agent_message` 在 Responses 后端保留原格式；M
 
 ## 压缩是另一种状态
 
-reasoning 丢弃不会丢掉普通对话；压缩检查点却可能是早期对话的唯一副本。因此压缩使用独立的 `cxbc1:` carrier，其中始终有通用文本摘要，GPT 还包含原生压缩结果。切换到不匹配的路由时使用文本摘要，切回原路由可继续使用原生结果。详见 [compaction.md](compaction.md)。
+reasoning 丢弃不会丢掉普通对话；压缩检查点却可能是早期对话的唯一副本。因此压缩使用独立的 `cxbc1:` carrier，其中始终有通用文本摘要，GPT 还包含原生压缩结果。GPT 请求优先复用原生压缩，跨模型和连接也一样；密文被明确拒绝时才改用已有摘要。这个降级不改变 reasoning 的身份隔离，也不修改存储的 carrier。详见 [compaction.md](compaction.md)。
 
 从外部直接带入、没有通用摘要的原生压缩项会明确报错。桥接器不猜测密文归属，也不静默删除仅存的历史。只包含服务器引用的 `item_reference` 和 `previous_response_id` 同样不支持；请求必须携带完整历史内容。
 

@@ -8,7 +8,7 @@
 
 末尾 `response.completed` 带 ID、完整 output 和 usage。`end_turn: false` 保留需要继续生成的语义，例如 Messages `pause_turn`。失败使用 `response.failed`，错误码传给客户端决定重试：容量不足为 `server_is_overloaded`，限流为 `rate_limit_exceeded`，配额为 `insufficient_quota`，无效输入为 `invalid_prompt`，窗口超限为 `context_length_exceeded`，断流与网络问题为可重试错误。
 
-HTTP `Retry-After` 会进入 Responses error headers。bridge 不进行第二层重试，以免放大客户端的重试预算。取消下游请求会取消所有相关上游请求，包括双压缩的两条请求。
+HTTP `Retry-After` 会进入 Responses error headers。常规重试与退避由客户端控制。唯一的内部回退是原生压缩密文被明确拒绝时，在没有输出的前提下改用已有摘要请求一次；这不是对限流或服务故障叠加重试。取消下游请求会取消所有相关上游请求，包括双压缩的两条请求。
 
 ## Usage
 
