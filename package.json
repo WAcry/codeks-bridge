@@ -1,0 +1,38 @@
+{
+  "name": "@wacry/codeks-bridge",
+  "version": "0.0.0",
+  "description": "Local Responses API bridge that lets codeks use Anthropic Messages and OpenAI-compatible Chat Completions models.",
+  "license": "Apache-2.0",
+  "author": "David Zhang",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WAcry/codeks-bridge.git"
+  },
+  "type": "module",
+  "bin": {
+    "codeks-bridge": "dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "check": "node scripts/check.ts",
+    "dev": "node src/cli.ts serve"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "typescript": "^5.9.0"
+  }
+}
