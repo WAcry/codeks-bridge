@@ -1,0 +1,355 @@
+// Writes an OpenAI Responses SSE stream for codeks.
+//
+// Rules that codeks depends on (see docs/responses-stream.md):
+// - every item gets output_item.added before any delta, and output_item.done
+//   with the complete item; codeks records history from the done event;
+// - response.completed carries the response id and a complete usage object;
+// - errors go into response.failed, never into a bare "error" event.
+
+import { formatSse } from "./sse.ts";
+import { newId } from "./ids.ts";
+
+export interface Usage {
+  input_tokens: number;
+  cached_tokens?: number;
+  cache_write_tokens?: number;
+  output_tokens: number;
+  reasoning_tokens?: number;
+}
+
+export interface Sink {
+  write(chunk: string): void;
+}
+
+export interface FunctionCallItem {
+  call_id: string;
+  name: string;
+  namespace?: string;
+  arguments: string;
+}
+
+export interface CustomToolCallItem {
+  call_id: string;
+  name: string;
+  input: string;
+  namespace?: string;
+}
+
+type Phase = "commentary" | "final_answer";
+
+interface OpenMessage {
+  id: string;
+  outputIndex: number;
+  text: string;
+}
+
+interface OpenReasoning {
+  id: string;
+  outputIndex: number;
+  summary: string;
+  summaryOpen: boolean;
+}
+
+export function usageJson(usage: Usage): Record<string, unknown> {
+  const input = Math.max(0, Math.round(usage.input_tokens));
+  const output = Math.max(0, Math.round(usage.output_tokens));
+  const out: Record<string, unknown> = {
+    input_tokens: input,
+    input_tokens_details: {
+      cached_tokens: Math.max(0, Math.round(usage.cached_tokens ?? 0)),
+      ...(usage.cache_write_tokens ? { cache_write_tokens: Math.round(usage.cache_write_tokens) } : {}),
+    },
+    output_tokens: output,
+    total_tokens: input + output,
+  };
+  if (usage.reasoning_tokens !== undefined) {
+    out.output_tokens_details = { reasoning_tokens: Math.max(0, Math.round(usage.reasoning_tokens)) };
+  }
+  return out;
+}
+
+export class ResponseWriter {
+  readonly responseId: string;
+  private readonly sink: Sink;
+  private readonly model: string;
+  private readonly showSummary: boolean;
+  private seq = 0;
+  private nextOutputIndex = 0;
+  private readonly output: unknown[] = [];
+  private message: OpenMessage | undefined;
+  private reasoning: OpenReasoning | undefined;
+  // A finished message waits here until we know whether a tool call follows.
+  private pendingMessage: OpenMessage | undefined;
+  private readonly toolCalls: Array<Record<string, unknown>> = [];
+  private started = false;
+  private finished = false;
+
+  constructor(sink: Sink, opts: { model: string; showSummary?: boolean; responseId?: string }) {
+    this.sink = sink;
+    this.model = opts.model;
+    this.showSummary = opts.showSummary ?? true;
+    this.responseId = opts.responseId ?? newId("resp");
+  }
+
+  get outputItems(): readonly Record<string, any>[] {
+    return this.output as Record<string, any>[];
+  }
+
+  get isFinished(): boolean {
+    return this.finished;
+  }
+
+  get hasOutput(): boolean {
+    return this.nextOutputIndex > 0 || this.toolCalls.length > 0 || this.message !== undefined;
+  }
+
+  private emit(type: string, fields: Record<string, unknown>): void {
+    this.sink.write(formatSse({ type, sequence_number: this.seq++, ...fields }));
+  }
+
+  private responseObject(status: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      id: this.responseId,
+      object: "response",
+      created_at: Math.floor(Date.now() / 1000),
+      model: this.model,
+      status,
+      output: status === "in_progress" ? [] : this.output,
+      ...extra,
+    };
+  }
+
+  start(): void {
+    if (this.started) return;
+    this.started = true;
+    this.emit("response.created", { response: this.responseObject("in_progress") });
+  }
+
+  /** An event that codeks ignores but that resets its stream idle timer. */
+  keepalive(): void {
+    if (!this.started || this.finished) return;
+    this.emit("keepalive", {});
+  }
+
+  // Reasoning -----------------------------------------------------------
+
+  private openReasoning(): OpenReasoning {
+    if (this.reasoning) return this.reasoning;
+    this.closeMessage();
+    this.flushPendingMessage("commentary");
+    const r: OpenReasoning = { id: newId("rs"), outputIndex: this.nextOutputIndex++, summary: "", summaryOpen: false };
+    this.reasoning = r;
+    this.emit("response.output_item.added", {
+      output_index: r.outputIndex,
+      item: { type: "reasoning", id: r.id, summary: [], encrypted_content: null },
+    });
+    return r;
+  }
+
+  reasoningDelta(text: string): void {
+    const r = this.openReasoning();
+    if (!text || !this.showSummary) return;
+    if (!r.summaryOpen) {
+      r.summaryOpen = true;
+      this.emit("response.reasoning_summary_part.added", {
+        item_id: r.id,
+        output_index: r.outputIndex,
+        summary_index: 0,
+        part: { type: "summary_text", text: "" },
+      });
+    }
+    r.summary += text;
+    this.emit("response.reasoning_summary_text.delta", {
+      item_id: r.id,
+      output_index: r.outputIndex,
+      summary_index: 0,
+      delta: text,
+    });
+  }
+
+  /** Closes the open reasoning item (opening one if needed) with its carrier. */
+  endReasoning(encryptedContent: string | undefined, summaryText?: string): void {
+    const r = this.openReasoning();
+    const summary = summaryText ?? r.summary;
+    if (r.summaryOpen) {
+      this.emit("response.reasoning_summary_text.done", {
+        item_id: r.id,
+        output_index: r.outputIndex,
+        summary_index: 0,
+        text: r.summary,
+      });
+    }
+    const item = {
+      type: "reasoning",
+      id: r.id,
+      summary: this.showSummary && summary ? [{ type: "summary_text", text: summary }] : [],
+      encrypted_content: encryptedContent ?? null,
+    };
+    this.reasoning = undefined;
+    this.emit("response.output_item.done", { output_index: r.outputIndex, item });
+    this.output.push(item);
+  }
+
+  get reasoningOpen(): boolean {
+    return this.reasoning !== undefined;
+  }
+
+  // Messages ------------------------------------------------------------
+
+  textDelta(text: string): void {
+    if (!text) return;
+    if (this.reasoning) this.endReasoning(undefined);
+    if (!this.message) {
+      this.flushPendingMessage("commentary");
+      const m: OpenMessage = { id: newId("msg"), outputIndex: this.nextOutputIndex++, text: "" };
+      this.message = m;
+      this.emit("response.output_item.added", {
+        output_index: m.outputIndex,
+        item: { type: "message", id: m.id, role: "assistant", status: "in_progress", content: [] },
+      });
+      this.emit("response.content_part.added", {
+        item_id: m.id,
+        output_index: m.outputIndex,
+        content_index: 0,
+        part: { type: "output_text", text: "", annotations: [] },
+      });
+    }
+    this.message.text += text;
+    this.emit("response.output_text.delta", {
+      item_id: this.message.id,
+      output_index: this.message.outputIndex,
+      content_index: 0,
+      delta: text,
+    });
+  }
+
+  /** Ends the current text block. Its done event waits until the phase is known. */
+  closeMessage(): void {
+    if (!this.message) return;
+    this.flushPendingMessage("commentary");
+    this.pendingMessage = this.message;
+    this.message = undefined;
+  }
+
+  private flushPendingMessage(phase: Phase): void {
+    const m = this.pendingMessage;
+    if (!m) return;
+    this.pendingMessage = undefined;
+    const item = {
+      type: "message",
+      id: m.id,
+      role: "assistant",
+      status: "completed",
+      content: [{ type: "output_text", text: m.text, annotations: [] }],
+      phase,
+    };
+    this.emit("response.output_text.done", {
+      item_id: m.id,
+      output_index: m.outputIndex,
+      content_index: 0,
+      text: m.text,
+    });
+    this.emit("response.output_item.done", { output_index: m.outputIndex, item });
+    this.output.push(item);
+  }
+
+  // Tool calls (held until the upstream response finishes) ---------------
+
+  addFunctionCall(call: FunctionCallItem): void {
+    this.closeMessage();
+    if (this.reasoning) this.endReasoning(undefined);
+    const item: Record<string, unknown> = {
+      type: "function_call",
+      id: newId("fc"),
+      call_id: call.call_id,
+      name: call.name,
+      arguments: call.arguments,
+      encrypted_function_args: [],
+      status: "completed",
+    };
+    if (call.namespace) item.namespace = call.namespace;
+    this.toolCalls.push(item);
+  }
+
+  addCustomToolCall(call: CustomToolCallItem): void {
+    this.closeMessage();
+    if (this.reasoning) this.endReasoning(undefined);
+    this.toolCalls.push({
+      type: "custom_tool_call",
+      id: newId("ctc"),
+      call_id: call.call_id,
+      name: call.name,
+      input: call.input,
+      ...(call.namespace ? { namespace: call.namespace } : {}),
+      status: "completed",
+    });
+  }
+
+  get toolCallCount(): number {
+    return this.toolCalls.length;
+  }
+
+  /** Emits a complete item as-is (added and done together). */
+  addItem(item: Record<string, unknown>): void {
+    this.closeMessage();
+    this.flushPendingMessage("commentary");
+    if (this.reasoning) this.endReasoning(undefined);
+    const outputIndex = this.nextOutputIndex++;
+    this.emit("response.output_item.added", { output_index: outputIndex, item });
+    this.emit("response.output_item.done", { output_index: outputIndex, item });
+    this.output.push(item);
+  }
+
+  private flushAll(): void {
+    this.closeMessage();
+    if (this.reasoning) this.endReasoning(undefined);
+    this.flushPendingMessage(this.toolCalls.length > 0 ? "commentary" : "final_answer");
+    for (const item of this.toolCalls) {
+      const outputIndex = this.nextOutputIndex++;
+      const added: Record<string, unknown> = { ...item, status: "in_progress" };
+      if (item.type === "function_call") added.arguments = "";
+      else added.input = "";
+      this.emit("response.output_item.added", { output_index: outputIndex, item: added });
+      this.emit("response.output_item.done", { output_index: outputIndex, item });
+      this.output.push(item);
+    }
+    this.toolCalls.length = 0;
+  }
+
+  // Endings ---------------------------------------------------------------
+
+  complete(usage: Usage | undefined, endTurn?: boolean): void {
+    if (this.finished) return;
+    this.start();
+    this.flushAll();
+    this.finished = true;
+    const extra: Record<string, unknown> = {};
+    if (usage) extra.usage = usageJson(usage);
+    if (endTurn !== undefined) extra.end_turn = endTurn;
+    this.emit("response.completed", { response: this.responseObject("completed", extra) });
+  }
+
+  /** Fails the response. Tool calls that were not emitted yet are dropped. */
+  fail(code: string, message: string, headers?: Record<string, string>): void {
+    if (this.finished) return;
+    this.start();
+    this.toolCalls.length = 0;
+    this.finished = true;
+    this.emit("response.failed", {
+      response: this.responseObject("failed", { error: { code, message, ...(headers ? { headers } : {}) } }),
+    });
+  }
+
+  incomplete(reason: string, usage: Usage | undefined): void {
+    if (this.finished) return;
+    this.start();
+    this.toolCalls.length = 0;
+    this.closeMessage();
+    if (this.reasoning) this.endReasoning(undefined);
+    this.flushPendingMessage("final_answer");
+    this.finished = true;
+    const extra: Record<string, unknown> = { incomplete_details: { reason } };
+    if (usage) extra.usage = usageJson(usage);
+    this.emit("response.incomplete", { response: this.responseObject("incomplete", extra) });
+  }
+}
