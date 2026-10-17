@@ -4,6 +4,5 @@ Copyright 2026 David Zhang
 This product includes text from OpenAI Codex (https://github.com/openai/codex),
 licensed under the Apache License, Version 2.0:
 
-- src/prompts.ts contains text copied from:
-  codex-rs/prompts/templates/compact/prompt.md
+- src/prompts.ts contains a summary prefix copied from:
   codex-rs/prompts/templates/compact/summary_prefix.md
