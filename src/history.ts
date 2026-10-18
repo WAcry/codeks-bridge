@@ -1,6 +1,7 @@
 import { decodeCompaction, decodeReasoning } from "./carrier.ts";
 import { BridgeError } from "./errors.ts";
 import { SUMMARY_PREFIX } from "./prompts.ts";
+import { translateToolHistory } from "./tool-history.ts";
 import type { ResolvedModel, ResponsesRequest } from "./types.ts";
 
 /** Selects model-specific opaque state without changing the stored history. */
@@ -71,5 +72,5 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
     }
     result.push(item);
   }
-  return result;
+  return route.profile.api === "responses" ? result : translateToolHistory(result);
 }

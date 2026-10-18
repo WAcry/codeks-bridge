@@ -36,7 +36,9 @@ Claude 和 DeepSeek 从 GPT-6.1 Sol 的完整条目开始，只做各自 JSON �
 
 依据：[Claude 模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[Messages 必填参数](https://platform.claude.com/docs/en/api/messages/create)、[DeepSeek 模型规格](https://api-docs.deepseek.com/quick_start/pricing/)。这些是第三方精调的依据，`source` 仍记录 Codex 模板来源。
 
-Claude 的默认 effort 为 `medium`，DeepSeek 为 `high`；`none` 用于请求关闭 thinking，具体支持由上游裁决。`ultra` 保留 Codex 的自动分工提示词和档位说明：Opus 5.5 使用原生 `xhigh`，Sonnet 5.5 与 DeepSeek Flash 使用 `max`；各条目的 `multi_agent_reasoning_effort` 与映射一致。
+Claude 的默认 effort 为 `medium`，DeepSeek 为 `high`。DeepSeek 的 `none` 请求关闭 thinking；Claude 两个条目从 `low` 开始：Opus 5.5 始终启用 thinking，Sonnet 5.5 的最低模式 `between_tools` 仍保留工具之间的思考，因此不能用 `none` 表示。需要 Sonnet 的这一模式时，使用 [Messages 原生 options](../docs/backends-anthropic.md#历史与-thinking) 显式配置。目录列出的档位应与已审阅模型匹配；未列出的显式请求值仍交给上游裁决。[Claude thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)
+
+`ultra` 保留 Codex 的自动分工提示词和档位说明：Opus 5.5 使用原生 `xhigh`，Sonnet 5.5 与 DeepSeek Flash 使用 `max`；各条目的 `multi_agent_reasoning_effort` 与映射一致。
 
 这些源模型都明确设置 `supports_search_tool: true`，本目录保持原值。Code Mode Only 如何暴露工具由客户端源码决定，不能因为没有独立的外层 `tool_search` 就把此字段改为 false。网页搜索和图片生成有各自的客户端设置，不通过这个字段控制。
 

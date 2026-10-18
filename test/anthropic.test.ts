@@ -93,6 +93,19 @@ test("Messages preserves reminders between an assistant reply and the next user 
   assert.deepEqual(body.messages[2].content.map((b: any) => b.text), ["<system-reminder>\nNew constraint.\n</system-reminder>", "Next."]);
 });
 
+test("Messages represents empty tool results without content or placeholder text", () => {
+  for (const output of ["", [], [{ type: "input_text", text: "" }]]) {
+    for (const type of ["function_call_output", "custom_tool_call_output"]) {
+      const { body } = buildAnthropicRequest(context({ input: [{ type, call_id: "empty_result", output }] }));
+      const result = body.messages[0].content[0];
+      assert.equal(result.type, "tool_result");
+      assert.equal(result.tool_use_id, "empty_result");
+      assert.equal(Object.hasOwn(result, "content"), false);
+      assert.deepEqual(body.messages[0].content.map((block: any) => block.type), ["tool_result"]);
+    }
+  }
+});
+
 test("Messages round trips Lite namespaced tools and consumes declarations without reminders", async () => {
   const custom = { type: "custom", name: "exec", format: { type: "grammar", syntax: "lark", definition: 'start: "hello"' } };
   const ctx = context({ tool_choice: { type: "custom", name: "exec" }, input: [
@@ -327,6 +340,24 @@ test("Messages maps stream overload and refuses truncated completion", async () 
   }
 });
 
+test("Messages maps context window exhaustion without delivering buffered tools", async () => {
+  const stream = events(start, ...textEvents("Partial response."),
+    { type: "content_block_start", index: 1, content_block: { type: "tool_use", id: "call", name: "lookup", input: { q: "sample" } } },
+    { type: "content_block_stop", index: 1 }, ...finish("model_context_window_exceeded"));
+  await withUpstream(stream, async (base) => {
+    let accepted = false;
+    const capture = writerCapture();
+    await assert.rejects(runAnthropic({
+      ...context({ tools: [tool] }),
+      route: { ...route, upstream: { ...route.upstream, base_url: base } },
+      onAccepted: () => { accepted = true; },
+    }, capture.writer), { code: "context_length_exceeded" });
+    assert.equal(accepted, true);
+    assert.equal(capture.writer.toolCallCount, 0);
+    assert.equal(capture.output().some((event) => event.item?.type === "function_call"), false);
+  });
+});
+
 test("Messages rejects missing, nonnumeric, or negative usage without emitting tools", async () => {
   const done = { type: "message_stop" };
   const delta = { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 5 } };
@@ -423,4 +454,27 @@ test("Messages summary display follows the request without disabling thinking or
     assert.deepEqual(body.thinking, { type: "adaptive", display: summary && summary !== "none" ? "summarized" : "omitted" });
     assert.deepEqual(body.messages[1].content[0], thinking);
   }
+});
+
+test("Messages signed thinking and tools retain their exact interleaved replay order", async () => {
+  const blocks = [
+    { type: "thinking", thinking: "Before the first call.", signature: "synthetic_a" },
+    { type: "tool_use", id: "call_a", name: "lookup", input: { q: "first" } },
+    { type: "thinking", thinking: "Before the second call.", signature: "synthetic_b" },
+    { type: "tool_use", id: "call_b", name: "lookup", input: { q: "second" } },
+  ];
+  const stream = events(start, ...blocks.flatMap((content_block, index) => [
+    { type: "content_block_start", index, content_block }, { type: "content_block_stop", index },
+  ]), ...finish("tool_use"));
+  await withUpstream(stream, async (base) => {
+    const capture = writerCapture();
+    const ctx = { ...context({ tools: [tool] }), route: { ...route, upstream: { ...route.upstream, base_url: base } } };
+    const result = await runAnthropic(ctx, capture.writer);
+    assert.deepEqual(capture.output().filter((event) => event.type === "response.output_item.done").map((event) => event.item.type), ["reasoning"]);
+    capture.writer.complete(result.usage, result.endTurn);
+    const input = [...capture.writer.outputItems];
+    assert.deepEqual(input.map((item) => item.type), ["reasoning", "function_call", "reasoning", "function_call"]);
+    const replay = buildAnthropicRequest({ ...ctx, request: { model: ctx.request.model, tools: [tool], input } });
+    assert.deepEqual(replay.body.messages[0].content, blocks);
+  });
 });

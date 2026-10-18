@@ -224,3 +224,26 @@ test("third-party defaults retain the Codex role and provide model-specific Ultr
     assert.equal(build({ ...ctx, request: { ...ctx.request, max_output_tokens: 500000 } }).body.max_tokens, 500000);
   }
 });
+
+test("Claude 5.5 catalogs offer thinking efforts and permit an explicit Sonnet native mode", () => {
+  const c = validateConfig({
+    upstreams: { anthropic: { base_url: "https://example.com/v1" } },
+    models: {
+      opus: { upstream: "anthropic", catalog: "claude-opus-5-5", model: "opus-deployment" },
+      sonnet: { upstream: "anthropic", catalog: "claude-sonnet-5-5", model: "sonnet-deployment", options: {
+        thinking: { type: "between_tools" }, output_config: { effort: "low" },
+      } },
+    },
+  });
+  for (const entry of buildCatalog(c).models) {
+    assert.deepEqual(entry.supported_reasoning_levels.map((level: any) => level.effort), ["low", "medium", "high", "xhigh", "max", "ultra"]);
+    assert.equal(entry.default_reasoning_level, "medium");
+  }
+  const route = resolveModel(c, "sonnet");
+  const { body } = buildAnthropicRequest({
+    route, request: { model: "sonnet", input: "Hello", reasoning: { effort: "max", summary: "auto" } },
+    signal: new AbortController().signal,
+  });
+  assert.deepEqual(body.thinking, { type: "between_tools" });
+  assert.deepEqual(body.output_config, { effort: "low" });
+});

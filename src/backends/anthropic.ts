@@ -82,7 +82,8 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
         input: item.type === "custom_tool_call" ? { input: item.input } : parseArguments(item.arguments),
       }]);
     } else if (item.type === "function_call_output" || item.type === "custom_tool_call_output") {
-      append("user", [{ type: "tool_result", tool_use_id: safeCallId(item.call_id), content: contentBlocks(item.output) }]);
+      const content = contentBlocks(item.output);
+      append("user", [{ type: "tool_result", tool_use_id: safeCallId(item.call_id), ...(content.length ? { content } : {}) }]);
     } else if (item.type === "message" || item.role) {
       const blocks = contentBlocks(item.content);
       if (item.role === "developer" || item.role === "system") {
@@ -167,6 +168,7 @@ function validateUsage(value: any, required: string[]): void {
 export const runAnthropic: Backend = async (context, writer) => {
   const { body, tools } = buildAnthropicRequest(context);
   const response = await upstreamFetch(context.route, "/messages", body, context.signal);
+  context.onAccepted?.(response.headers);
   if (!response.body) throw new BridgeError("Messages returned an empty stream.", "upstream_error", 502);
   const blocks = new Map<number, { value: Block; json: string }>();
   let rawUsage: Block = {};
@@ -174,7 +176,6 @@ export const runAnthropic: Backend = async (context, writer) => {
   let finalUsage = false;
   let stopReason: string | undefined;
   let stopped = false;
-  const calls: Block[] = [];
   for await (const { json: event } of parseJsonSse(response.body)) {
     if (event.type === "error") throw upstreamError(undefined, event, response.headers);
     if (event.type === "ping") { writer.keepalive(); continue; }
@@ -211,7 +212,13 @@ export const runAnthropic: Backend = async (context, writer) => {
         writer.endReasoning(encodeReasoning({ source: context.route.origin, format: context.route.profile.reasoning_format, data: block.value }));
       } else if (block.value.type === "tool_use") {
         if (block.json) block.value.input = parseArguments(block.json);
-        calls.push(block.value);
+        const call = block.value;
+        const tool = tools.resolve(call.name);
+        if (!tool) throw new BridgeError(`Messages called an unknown tool: ${String(call.name)}.`);
+        if (tool.kind === "custom") {
+          if (typeof call.input?.input !== "string") throw new BridgeError("A custom tool call needs a string input.");
+          writer.addCustomToolCall({ call_id: call.id, name: tool.name, namespace: tool.namespace, input: call.input.input });
+        } else writer.addFunctionCall({ call_id: call.id, name: tool.name, namespace: tool.namespace, arguments: JSON.stringify(call.input ?? {}) });
       } else if (block.value.type === "text") writer.closeMessage();
       blocks.delete(event.index);
     } else if (event.type === "message_delta") {
@@ -223,6 +230,9 @@ export const runAnthropic: Backend = async (context, writer) => {
   }
   if (!started || !stopped || blocks.size || !stopReason) {
     throw new BridgeError("Messages stream ended before the message was complete.", "upstream_error", 502);
+  }
+  if (stopReason === "model_context_window_exceeded") {
+    throw new BridgeError("Messages reached the model context window before completing the response.", "context_length_exceeded");
   }
   if (stopReason === "max_tokens" || stopReason === "refusal") {
     throw new BridgeError(stopReason === "max_tokens" ? "Messages reached max_tokens before completing the response." : "Messages refused the request.");
@@ -238,14 +248,6 @@ export const runAnthropic: Backend = async (context, writer) => {
     output_tokens: tokenCount(rawUsage.output_tokens),
     ...(rawUsage.output_tokens_details?.thinking_tokens != null ? { reasoning_tokens: rawUsage.output_tokens_details.thinking_tokens } : {}),
   };
-  for (const call of calls) {
-    const tool = tools.resolve(call.name);
-    if (!tool) throw new BridgeError(`Messages called an unknown tool: ${String(call.name)}.`);
-    if (tool.kind === "custom") {
-      if (typeof call.input?.input !== "string") throw new BridgeError("A custom tool call needs a string input.");
-      writer.addCustomToolCall({ call_id: call.id, name: tool.name, namespace: tool.namespace, input: call.input.input });
-    } else writer.addFunctionCall({ call_id: call.id, name: tool.name, namespace: tool.namespace, arguments: JSON.stringify(call.input ?? {}) });
-  }
   return {
     usage,
     endTurn: stopReason !== "tool_use" && stopReason !== "pause_turn",

@@ -49,7 +49,7 @@
 | `upstreams` | 上游连接配置表 |
 | `models` | 客户端模型别名表 |
 
-监听非 loopback 地址时必须配置 `token_env`，客户端也要设置同一个变量。它是 bridge 入口鉴权，不是上游 API key。HTTP 请求体最多 64 MiB，包含所有图片编码；入口没有 CORS。`GET /health`、`GET /v1/models` 和 `POST /v1/responses` 使用同一鉴权。
+监听非 loopback 地址时必须配置 `token_env`，客户端也要设置同一个变量。它是 bridge 入口鉴权，不是上游 API key。HTTP 请求体最多 64 MiB，包含所有图片编码；入口没有 CORS。携带 `Origin` 的请求必须使用配置好的 bridge token，即使监听 loopback 也一样，避免网页的简单 POST 在无法读取响应时仍触发上游调用。没有 `Origin` 的 codeks 请求保持原行为。`GET /health`、`GET /v1/models` 和 `POST /v1/responses` 使用同一鉴权。
 
 ## 上游连接
 
@@ -98,7 +98,7 @@
 }
 ```
 
-`effort_map` 的键是 codeks 可选档位，值是发给上游的原生值。提供映射时完整替换目录条目的默认映射；`default_effort` 必须出现在映射中。未指定默认档位时，保留映射中仍存在的条目默认值，否则选映射第一项。`none` 映射为原生 `none` 时，Claude/DeepSeek 关闭 thinking。
+`effort_map` 的键是 codeks 可选档位，值是发给上游的原生值。提供映射时完整替换目录条目的默认映射；`default_effort` 必须出现在映射中。未指定默认档位时，保留映射中仍存在的条目默认值，否则选映射第一项。映射为原生 `none` 时，Messages/DeepSeek adapter 发送 `thinking.type: "disabled"`，是否接受由上游决定。Claude 5.5 目录不提供这个档位；Sonnet 的 `between_tools` 模式可通过显式 options 选择，含义和配置见 [Messages](backends-anthropic.md)。
 
 请求没有 effort 时使用配置默认值；有映射则转换，未列出的显式 effort 直接透传，交给上游判断。catalog 与实际请求使用同一份配置；通过原生 `options` 再覆盖 thinking/effort 时，应同时调整这里的展示设置。
 
@@ -166,7 +166,7 @@ provider 显示名为 `Local bridge`，并显式声明 `[model_providers.bridge.
 
 bridge 使用 HTTP/SSE。已核对 Codex `0.163.0` 的 `codex-rs/model-provider-info/src/lib.rs` 与 `codex-rs/core/src/client.rs`：自定义 provider 的 `supports_websockets` 默认为 `false`，生成的片段沿用该默认值；目录中的 `prefer_websockets: true` 保留源条目原值，不会越过 provider 的能力开关。若将片段合并到已有 provider 配置，应确认没有遗留的 `supports_websockets = true`。今后接入 WebSocket 时需实现相应传输契约，而不只是修改目录偏好。
 
-目录响应带 `ETag`，普通响应带同值的 `x-models-etag`。服务配置修改后重启 bridge，新内容的标记会让客户端刷新模型目录；客户端也有定时缓存刷新。当前 Codex 的目录请求限制为 1 MiB、5 秒且不跟随重定向。每个别名都包含完整提示词，大量窗口或部署别名会增大响应。
+目录响应带 `ETag`，普通响应带同值的 `x-models-etag`。服务配置修改后重启 bridge，新内容的标记会让客户端刷新模型目录；客户端也有定时缓存刷新。当前 Codex 的目录请求限制为 1 MiB、5 秒且不跟随重定向。每个别名都包含完整提示词，大量窗口或部署别名会增大响应。超过 1 MiB 时，HTTP 目录返回明确的 413 错误，不删减条目；模型请求和静态目录导出仍可用。可减少别名，或使用下方的静态 `model_catalog_json` 方案。这是客户端接口的固定限制，不是上游模型能力预检。
 
 顶层 `model_catalog_json` 的优先级高于 HTTP 目录。若已有该配置，迁移时移除它，再重载客户端配置。
 

@@ -76,6 +76,8 @@ export interface BackendContext {
   compacting?: boolean;
   /** Transport mode received from the client, including tool-free Lite requests. */
   responsesLite?: boolean;
+  /** Called after the upstream accepts the HTTP request, before consuming its body. */
+  onAccepted?: (headers?: Headers) => void;
 }
 export interface BackendResult {
   usage: Usage;

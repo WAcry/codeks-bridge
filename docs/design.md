@@ -22,7 +22,7 @@ flowchart LR
 
 优先匹配最新 Codex 的 GPT 默认行为，以 OpenAI 订阅、AWS 和 Azure 的使用场景为基准。当前已审阅模型目录使用 Responses Lite，保留 `use_responses_lite: true`、Code Mode Only 和多代理字段。目录固定到明确的 Codex 源码版本，不随用户本机二进制或订阅账号变化。
 
-Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于历史中的 `additional_tools` 项，普通函数和 custom 工具归入默认 `functions` namespace。GPT 路径保留这些声明的位置、顺序、schema 和 grammar，并发送 `x-openai-internal-codex-responses-lite: true`。Claude/DeepSeek 只在各自协议转换入口提取声明，组合为原生工具表；声明不会变成 user reminder，其余消息保持原顺序。
+Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于历史中的 `additional_tools` 项，普通函数和 custom 工具归入默认 `functions` namespace。GPT 路径保留这些声明的位置、顺序、schema 和 grammar，并发送 `x-openai-internal-codex-responses-lite: true`。Claude/DeepSeek 只在各自协议转换入口提取声明，组合为原生工具表；声明不会变成 user reminder。中途提醒保留所在对话位置；若插在一次完整的工具交换内，则移至该批结果之后，以满足目标协议的配对要求。
 
 已核对 Codex `0.163.0`：Lite 设置 `reasoning.context: "all_turns"` 和 `parallel_tool_calls: false`。bridge 保留客户端传入值，原生 options 仍可按配置覆盖普通参数。reasoning 的来源筛选与服务端 context 语义是两件事：前者决定发送哪些载荷，后者决定 GPT 如何使用它们。双压缩的原生与文字分支都延续同一 Lite 工具前缀及 transport 标记。
 
@@ -60,7 +60,7 @@ bridge 检查自身必须维持的不变量：配置引用存在、历史能转�
 
 上游负责判定模型能力：effort、thinking、强制工具选择、schema、图片以及允许复用的密文是否可接受。bridge 不预先维护这些能力的限制列表，也不在失败后自动移除 reasoning、关闭 thinking、换端点或改压缩模式。原生参数可通过 options 显式覆盖。
 
-HTTP 和流内失败保留原始上游内容及可得的状态码，同时规范为 codeks 可识别的错误分类。重试和退避由客户端控制，bridge 不叠加第二层重试。详见 [Responses 流](responses-stream.md)。
+GPT 原生 HTTP 失败保留 status、body 和诊断 header，流内失败保留 error 对象。下游 HTTP 200 推迟到上游接受请求后，避免把 HTTP 失败变成 SSE 错误而改变 codeks 的重试判断；等待响应头期间没有 keepalive，是这一选择的明确代价。Claude/DeepSeek 只在协议转换边界映射错误分类。重试和退避由客户端控制，bridge 不叠加第二层重试。详见 [Responses 流](responses-stream.md)。
 
 ## 压缩的生成和恢复分开
 
@@ -72,6 +72,8 @@ HTTP 和流内失败保留原始上游内容及可得的状态码，同时规范
 
 客户端发送完整 Responses Lite 历史。Responses 后端保留 namespace 与 grammar；Claude/DeepSeek 将它们转换成普通函数并恢复调用身份。Lark/regex 只转换为描述约束，不追加特定工具的提示词。
 
-后端在完整成功前缓存工具调用，Responses writer 统一交付历史项和 usage。Reasoning item 的载荷必须出现在 `output_item.done`，确保 codeks 可以保存。远程 V2 压缩也由同一个 writer 返回，客户端继续执行自己的历史保留规则。
+Responses 后端保留原生事件及 response envelope，其他后端由 writer 生成 Responses 协议。writer 从第一个工具起缓存全部后续事件，成功后按原顺序交付，失败时整体丢弃；代价是工具之后的文字也暂时不能显示。Reasoning item 的载荷必须出现在 `output_item.done`，确保 codeks 可以保存。远程 V2 压缩也由同一个 writer 返回，客户端继续执行自己的历史保留规则。
+
+Codex 的命名通知可以没有 `call_id`，Code Mode 的多次 `notify()` 也可以复用同一个调用 ID。非 Responses 目标将无配对通知及追加结果转成带身份的 user 消息，保留文字和图片，不补造工具调用或改写此前结果。转换只影响当前出站请求；规则和边界见[工具转换](tools.md)。
 
 设计参考了现有 Responses、Messages 和 Chat 转换实践，没有复制其他项目的运行时代码。文字压缩使用完整的交接摘要提示词；摘要恢复前缀逐字来自 Apache-2.0 许可的 OpenAI Codex，出处列在 `NOTICE`。

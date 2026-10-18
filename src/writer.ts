@@ -8,6 +8,7 @@
 
 import { formatSse } from "./sse.ts";
 import { newId } from "./ids.ts";
+import { BridgeError } from "./errors.ts";
 
 export interface Usage {
   input_tokens: number;
@@ -35,19 +36,24 @@ export interface CustomToolCallItem {
   namespace?: string;
 }
 
-type Phase = "commentary" | "final_answer";
+type Phase = "commentary" | "partial_answer" | "final_answer";
 
 interface OpenMessage {
   id: string;
   outputIndex: number;
   text: string;
+  phase?: Phase;
+}
+
+interface SummaryPart {
+  text: string;
+  done: boolean;
 }
 
 interface OpenReasoning {
   id: string;
   outputIndex: number;
-  summary: string;
-  summaryOpen: boolean;
+  summary: Map<number, SummaryPart>;
 }
 
 export function usageJson(usage: Usage): Record<string, unknown> {
@@ -69,7 +75,7 @@ export function usageJson(usage: Usage): Record<string, unknown> {
 }
 
 export class ResponseWriter {
-  readonly responseId: string;
+  private id: string;
   private readonly sink: Sink;
   private readonly model: string;
   private readonly showSummary: boolean;
@@ -80,7 +86,12 @@ export class ResponseWriter {
   private reasoning: OpenReasoning | undefined;
   // A finished message waits here until we know whether a tool call follows.
   private pendingMessage: OpenMessage | undefined;
-  private readonly toolCalls: Array<Record<string, unknown>> = [];
+  private calls = 0;
+  // Once a tool appears, preserve its entire ordered suffix until success.
+  private suffix: Array<{ event: Record<string, any>; native: boolean }> | undefined;
+  private suffixOutputStart = 0;
+  private native = false;
+  private nativeEnd: Record<string, any> | undefined;
   private started = false;
   private finished = false;
 
@@ -88,8 +99,12 @@ export class ResponseWriter {
     this.sink = sink;
     this.model = opts.model;
     this.showSummary = opts.showSummary ?? true;
-    this.responseId = opts.responseId ?? newId("resp");
+    this.id = opts.responseId ?? newId("resp");
   }
+
+  get responseId(): string { return this.id; }
+
+  get nativeResponse(): Record<string, any> | undefined { return this.nativeEnd?.response; }
 
   get outputItems(): readonly Record<string, any>[] {
     return this.output as Record<string, any>[];
@@ -100,11 +115,41 @@ export class ResponseWriter {
   }
 
   get hasOutput(): boolean {
-    return this.nextOutputIndex > 0 || this.toolCalls.length > 0 || this.message !== undefined;
+    return this.nextOutputIndex > 0 || this.calls > 0 || this.message !== undefined;
+  }
+
+  private write(event: Record<string, any>, native = false): void {
+    this.sink.write(formatSse(native ? event : { sequence_number: this.seq++, ...event }));
+  }
+
+  private send(event: Record<string, any>, native = false): void {
+    if (this.suffix) this.suffix.push({ event, native });
+    else this.write(event, native);
   }
 
   private emit(type: string, fields: Record<string, unknown>): void {
-    this.sink.write(formatSse({ type, sequence_number: this.seq++, ...fields }));
+    this.send({ type, ...fields });
+  }
+
+  private holdSuffix(): void {
+    if (this.suffix) return;
+    this.suffix = [];
+    this.suffixOutputStart = this.output.length;
+  }
+
+  private releaseSuffix(): void {
+    const suffix = this.suffix;
+    this.suffix = undefined;
+    for (const { event, native } of suffix ?? []) this.write(event, native);
+  }
+
+  private discardSuffix(): void {
+    if (this.suffix) this.output.length = this.suffixOutputStart;
+    this.suffix = undefined;
+    this.message = undefined;
+    this.reasoning = undefined;
+    this.pendingMessage = undefined;
+    this.calls = 0;
   }
 
   private responseObject(status: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -122,13 +167,49 @@ export class ResponseWriter {
   start(): void {
     if (this.started) return;
     this.started = true;
-    this.emit("response.created", { response: this.responseObject("in_progress") });
+    if (!this.native) this.emit("response.created", { response: this.responseObject("in_progress") });
   }
 
   /** An event that codeks ignores but that resets its stream idle timer. */
   keepalive(): void {
     if (!this.started || this.finished) return;
-    this.emit("keepalive", {});
+    // Heartbeats bypass an ordered suffix while the upstream is still working.
+    this.write({ type: "keepalive" }, this.native);
+  }
+
+  /** Native Responses events retain their own ids, envelopes and metadata. */
+  useNativeResponses(): void { this.native = true; }
+
+  nativeEvent(event: Record<string, any>): void {
+    if (this.finished) return;
+    if (typeof event.response?.id === "string") this.id = event.response.id;
+    if (event.type === "response.completed") {
+      this.nativeEnd = event;
+      return;
+    }
+    if (["response.output_item.added", "response.output_item.done"].includes(event.type)) {
+      if (["function_call", "custom_tool_call"].includes(event.item?.type)) this.holdSuffix();
+      if (event.type === "response.output_item.done") this.output.push(event.item);
+      this.nextOutputIndex = Math.max(this.nextOutputIndex, Number(event.output_index ?? 0) + 1);
+    }
+    this.send(event, true);
+  }
+
+  nativeFailed(response: Record<string, any>, event: Record<string, any> = {}): void {
+    this.nativeFailure("response.failed", response, event);
+  }
+
+  nativeIncomplete(response: Record<string, any>, event: Record<string, any> = {}): void {
+    this.nativeFailure("response.incomplete", response, event);
+  }
+
+  private nativeFailure(type: string, response: Record<string, any>, event: Record<string, any>): void {
+    if (this.finished) return;
+    this.discardSuffix();
+    this.finished = true;
+    if (typeof response.id === "string") this.id = response.id;
+    this.nativeEnd = { ...event, type, response };
+    this.write(this.nativeEnd, true);
   }
 
   // Reasoning -----------------------------------------------------------
@@ -137,7 +218,7 @@ export class ResponseWriter {
     if (this.reasoning) return this.reasoning;
     this.closeMessage();
     this.flushPendingMessage("commentary");
-    const r: OpenReasoning = { id: newId("rs"), outputIndex: this.nextOutputIndex++, summary: "", summaryOpen: false };
+    const r: OpenReasoning = { id: newId("rs"), outputIndex: this.nextOutputIndex++, summary: new Map() };
     this.reasoning = r;
     this.emit("response.output_item.added", {
       output_index: r.outputIndex,
@@ -146,43 +227,70 @@ export class ResponseWriter {
     return r;
   }
 
-  reasoningDelta(text: string): void {
+  startReasoningSummary(summaryIndex = 0): void {
+    const r = this.openReasoning();
+    if (!this.showSummary || r.summary.has(summaryIndex)) return;
+    r.summary.set(summaryIndex, { text: "", done: false });
+    this.emit("response.reasoning_summary_part.added", {
+      item_id: r.id,
+      output_index: r.outputIndex,
+      summary_index: summaryIndex,
+      part: { type: "summary_text", text: "" },
+    });
+  }
+
+  reasoningDelta(text: string, summaryIndex = 0): void {
     const r = this.openReasoning();
     if (!text || !this.showSummary) return;
-    if (!r.summaryOpen) {
-      r.summaryOpen = true;
-      this.emit("response.reasoning_summary_part.added", {
-        item_id: r.id,
-        output_index: r.outputIndex,
-        summary_index: 0,
-        part: { type: "summary_text", text: "" },
-      });
-    }
-    r.summary += text;
+    this.startReasoningSummary(summaryIndex);
+    const part = r.summary.get(summaryIndex)!;
+    if (part.done) throw new BridgeError("The upstream changed a completed reasoning summary", "stream_error", 502);
+    part.text += text;
     this.emit("response.reasoning_summary_text.delta", {
       item_id: r.id,
       output_index: r.outputIndex,
-      summary_index: 0,
+      summary_index: summaryIndex,
       delta: text,
     });
   }
 
-  /** Closes the open reasoning item (opening one if needed) with its carrier. */
-  endReasoning(encryptedContent: string | undefined, summaryText?: string): void {
+  endReasoningSummary(summaryIndex = 0, text?: string): void {
     const r = this.openReasoning();
-    const summary = summaryText ?? r.summary;
-    if (r.summaryOpen) {
-      this.emit("response.reasoning_summary_text.done", {
-        item_id: r.id,
-        output_index: r.outputIndex,
-        summary_index: 0,
-        text: r.summary,
-      });
+    if (!this.showSummary) return;
+    this.startReasoningSummary(summaryIndex);
+    const part = r.summary.get(summaryIndex)!;
+    if (text !== undefined) {
+      if (!text.startsWith(part.text)) {
+        throw new BridgeError("The upstream changed already streamed reasoning summary", "stream_error", 502);
+      }
+      this.reasoningDelta(text.slice(part.text.length), summaryIndex);
     }
+    if (part.done) return;
+    part.done = true;
+    this.emit("response.reasoning_summary_text.done", {
+      item_id: r.id,
+      output_index: r.outputIndex,
+      summary_index: summaryIndex,
+      text: part.text,
+    });
+    this.emit("response.reasoning_summary_part.done", {
+      item_id: r.id,
+      output_index: r.outputIndex,
+      summary_index: summaryIndex,
+      part: { type: "summary_text", text: part.text },
+    });
+  }
+
+  /** Closes the open reasoning item (opening one if needed) with its carrier. */
+  endReasoning(encryptedContent: string | undefined, summary?: Array<{ type: "summary_text"; text: string }>): void {
+    const r = this.openReasoning();
+    for (const [index, part] of (summary ?? []).entries()) this.endReasoningSummary(index, part.text);
+    for (const index of r.summary.keys()) this.endReasoningSummary(index);
     const item = {
       type: "reasoning",
       id: r.id,
-      summary: this.showSummary && summary ? [{ type: "summary_text", text: summary }] : [],
+      summary: [...r.summary.entries()].sort(([a], [b]) => a - b)
+        .map(([, part]) => ({ type: "summary_text", text: part.text })),
       encrypted_content: encryptedContent ?? null,
     };
     this.reasoning = undefined;
@@ -196,16 +304,17 @@ export class ResponseWriter {
 
   // Messages ------------------------------------------------------------
 
-  textDelta(text: string): void {
+  textDelta(text: string, phase?: Phase): void {
+    if (this.message && phase !== undefined) this.message.phase = phase;
     if (!text) return;
     if (this.reasoning) this.endReasoning(undefined);
     if (!this.message) {
       this.flushPendingMessage("commentary");
-      const m: OpenMessage = { id: newId("msg"), outputIndex: this.nextOutputIndex++, text: "" };
+      const m: OpenMessage = { id: newId("msg"), outputIndex: this.nextOutputIndex++, text: "", phase };
       this.message = m;
       this.emit("response.output_item.added", {
         output_index: m.outputIndex,
-        item: { type: "message", id: m.id, role: "assistant", status: "in_progress", content: [] },
+        item: { type: "message", id: m.id, role: "assistant", status: "in_progress", content: [], ...(phase !== undefined ? { phase } : {}) },
       });
       this.emit("response.content_part.added", {
         item_id: m.id,
@@ -224,8 +333,9 @@ export class ResponseWriter {
   }
 
   /** Ends the current text block. Its done event waits until the phase is known. */
-  closeMessage(): void {
+  closeMessage(phase?: Phase): void {
     if (!this.message) return;
+    if (phase !== undefined) this.message.phase = phase;
     this.flushPendingMessage("commentary");
     this.pendingMessage = this.message;
     this.message = undefined;
@@ -241,7 +351,7 @@ export class ResponseWriter {
       role: "assistant",
       status: "completed",
       content: [{ type: "output_text", text: m.text, annotations: [] }],
-      phase,
+      phase: m.phase ?? phase,
     };
     this.emit("response.output_text.done", {
       item_id: m.id,
@@ -268,13 +378,13 @@ export class ResponseWriter {
       status: "completed",
     };
     if (call.namespace) item.namespace = call.namespace;
-    this.toolCalls.push(item);
+    this.addTool(item);
   }
 
   addCustomToolCall(call: CustomToolCallItem): void {
     this.closeMessage();
     if (this.reasoning) this.endReasoning(undefined);
-    this.toolCalls.push({
+    this.addTool({
       type: "custom_tool_call",
       id: newId("ctc"),
       call_id: call.call_id,
@@ -285,8 +395,22 @@ export class ResponseWriter {
     });
   }
 
+  private addTool(item: Record<string, unknown>): void {
+    this.flushPendingMessage("commentary");
+    this.holdSuffix();
+    this.calls++;
+    const outputIndex = this.nextOutputIndex++;
+    const added: Record<string, unknown> = { ...item, status: "in_progress" };
+    if (item.type === "function_call") added.arguments = "";
+    else added.input = "";
+    this.emit("response.output_item.added", { output_index: outputIndex, item: added });
+    this.emit("response.output_item.done", { output_index: outputIndex, item });
+    this.output.push(item);
+  }
+
   get toolCallCount(): number {
-    return this.toolCalls.length;
+    return this.output.slice(0, this.suffix ? this.suffixOutputStart : undefined)
+      .filter((item: any) => ["function_call", "custom_tool_call"].includes(item.type)).length;
   }
 
   /** Emits a complete item as-is (added and done together). */
@@ -300,20 +424,10 @@ export class ResponseWriter {
     this.output.push(item);
   }
 
-  private flushAll(): void {
+  private flushAll(endTurn?: boolean): void {
     this.closeMessage();
     if (this.reasoning) this.endReasoning(undefined);
-    this.flushPendingMessage(this.toolCalls.length > 0 ? "commentary" : "final_answer");
-    for (const item of this.toolCalls) {
-      const outputIndex = this.nextOutputIndex++;
-      const added: Record<string, unknown> = { ...item, status: "in_progress" };
-      if (item.type === "function_call") added.arguments = "";
-      else added.input = "";
-      this.emit("response.output_item.added", { output_index: outputIndex, item: added });
-      this.emit("response.output_item.done", { output_index: outputIndex, item });
-      this.output.push(item);
-    }
-    this.toolCalls.length = 0;
+    this.flushPendingMessage(endTurn === false || this.calls > 0 ? "commentary" : "final_answer");
   }
 
   // Endings ---------------------------------------------------------------
@@ -321,7 +435,15 @@ export class ResponseWriter {
   complete(usage: Usage | undefined, endTurn?: boolean): void {
     if (this.finished) return;
     this.start();
-    this.flushAll();
+    if (this.nativeEnd) {
+      this.releaseSuffix();
+      this.finished = true;
+      this.write(this.nativeEnd, true);
+      return;
+    }
+    if (this.native) throw new BridgeError("The upstream stream ended before response.completed", "stream_error", 502);
+    this.flushAll(endTurn);
+    this.releaseSuffix();
     this.finished = true;
     const extra: Record<string, unknown> = {};
     if (usage) extra.usage = usageJson(usage);
@@ -330,20 +452,20 @@ export class ResponseWriter {
   }
 
   /** Fails the response. Tool calls that were not emitted yet are dropped. */
-  fail(code: string, message: string, headers?: Record<string, string>, upstream?: unknown): void {
+  fail(error: Record<string, unknown>): void {
     if (this.finished) return;
     this.start();
-    this.toolCalls.length = 0;
+    this.discardSuffix();
     this.finished = true;
     this.emit("response.failed", {
-      response: this.responseObject("failed", { error: { code, message, ...(headers ? { headers } : {}), ...(upstream ? { upstream } : {}) } }),
+      response: this.responseObject("failed", { error }),
     });
   }
 
   incomplete(reason: string, usage: Usage | undefined): void {
     if (this.finished) return;
     this.start();
-    this.toolCalls.length = 0;
+    if (this.suffix) this.discardSuffix();
     this.closeMessage();
     if (this.reasoning) this.endReasoning(undefined);
     this.flushPendingMessage("final_answer");

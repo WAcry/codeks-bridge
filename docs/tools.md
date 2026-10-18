@@ -42,6 +42,14 @@ codeks V2 多代理工具的 task/message 是明文，历史中的 `agent_messag
 
 文本结果按对应 API 的 tool result 形式传递。Messages 可以把图片放进 `tool_result`；Chat 的工具结果只放文本，图片在同组所有工具结果之后组成 user 消息，并标注来源 call ID，避免打断并行调用的结果序列。
 
-输出调用先缓存，只有上游完整成功后才发送 `output_item.done`。截断、容量错误和断流不会释放部分调用。
+Responses 允许主动工具通知和一次调用的多次输出，而 Messages/Chat 要求明确配对的调用与结果。转换只作用于当前非 GPT 请求副本：
+
+- 没有 `call_id` 的命名 `function_call_output` 转成 user 通知，标出原 `namespace`、`name`，保留文字和图片。
+- 同一 `call_id` 的第一条输出作为工具结果；后续输出转成带调用身份的 user 通知。这样 Code Mode 的 `notify()` 与最终输出都能到达模型，后续通知不会覆盖或拼接进先前已发送的结果。
+- 完整工具批次中夹入的 user/developer 提醒与 agent 消息，在该批全部结果之后按原次序发送。这包括图片缩放提醒。Messages 的同一 user 消息里所有 `tool_result` 必须在文字之前，Chat 的工具结果也必须保持相邻。
+
+归一化只整理完整的配对批次，不补造缺失调用或结果，不跨过后续 assistant 步骤修复不完整交换。GPT 仍收到原生输出项。规则集中在 `src/tool-history.ts`，会话文件中的历史保持不变。
+
+从第一个输出工具调用开始，bridge 按原顺序缓存该调用及之后的输出，只有上游完整成功后才交给客户端。这样保留 thinking、文字与调用的交错顺序，后续回放不会改变签名前缀。截断、容量错误和断流不会释放部分调用；代价是工具之后的进度文字也要等响应成功后才显示。
 
 Messages/Chat 不提供 hosted web search、image generation 等工具。默认定义中出现这些项时不放入上游工具表；显式 `tool_choice` 选择不支持的工具会报错。生成的客户端配置关闭 web search 和 image generation。当前不转换历史搜索/图片生成结果，遇到这类不支持的历史项会提示错误。

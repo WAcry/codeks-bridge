@@ -4,13 +4,33 @@
 
 ## 事件与交付
 
-每项输出先发 `response.output_item.added`，随后发 delta，最后发包含完整内容的 `response.output_item.done`。客户端从 done 项持久化历史，因此 reasoning carrier 必须出现在完整项中。工具调用等整个响应成功才一起交付；工具前的 assistant 文字 phase 为 `commentary`，最后回答为 `final_answer`。
+每项输出先发 `response.output_item.added`，随后发 delta，最后发包含完整内容的 `response.output_item.done`。客户端从 done 项持久化历史，因此 reasoning carrier 必须出现在完整项中。
 
-末尾 `response.completed` 带 ID、完整 output 和 usage。`end_turn: false` 保留需要继续生成的语义，例如 Claude `pause_turn`。缺少完整终止信号、输出截断、拒绝或无效工具结果都返回错误，不伪装成成功。
+GPT 保留原生事件、response ID、时间、usage 分项和额外元数据，只转换模型别名、reasoning carrier 和客户端需要的缺省字段。完整 JSON 响应或仅带最终输出的流会补齐 item 事件；不把完整摘要伪造成上游曾发送的 delta。Claude/DeepSeek 由 writer 生成 Responses 事件。
+
+从第一个工具调用开始，writer 缓存它和此后的全部输出，整个响应成功后按原顺序释放。此前的文字仍可流式显示；之后的文字和 reasoning 会延迟。这样既不提前执行工具，也不会把原本穿插在文字之间的调用挪到末尾。失败时丢弃整个未交付后缀，keepalive 不受缓冲影响。
+
+GPT 消息优先保留原生 `phase`，包括 `partial_answer`。缺省时，后面还有输出或工具调用的文字为 `commentary`；最后一条文字在 `end_turn: false` 时也为 `commentary`，其他情况为 `final_answer`。没有工具调用不等于当前 turn 已结束。
+
+GPT 同一 reasoning item 内的摘要保留各段 `summary_index`，对应的 part、text delta/done 与最终 `item.summary` 结构一致。Claude 和 DeepSeek 没有这种分段协议时，继续使用单段摘要；不同 reasoning item 各自从索引 0 开始。
+
+末尾 `response.completed` 带 ID、完整 output 和 usage。`end_turn: false` 保留需要继续生成的语义，例如 Claude `pause_turn`。缺少终止信号或无效工具结果返回错误，不伪装成成功。
+
+GPT 的 `response.incomplete` 保留原类型、原因和 usage，不改成通用错误。已核对 Codex `0.163.0`：`interrupted` 表示继续当前 turn；`content_filter` 使用内容过滤提示；`max_output_tokens` 等其他原因结束当前生成并记录已有用量。未完成的工具后缀仍不交付。Claude/DeepSeek 没有同样的 Responses 事件时，继续按各自停止原因转换。
 
 ## 上游错误
 
-错误同时保留两层信息：`code` 供 codeks 判断如何处理，`upstream` 记录上游原始错误体和可得的 HTTP 状态码。例如：
+### GPT 原生错误
+
+流式入口等上游成功响应头到达后，才发送下游 HTTP 200 并开始 SSE。上游 HTTP 失败保留 status、body 内容和诊断 header，包括 `Retry-After`；不解析后重新包装错误体。fetch 已解压响应体，因此去掉原 `Content-Encoding`、`Content-Length`，以及只适用于当前连接的传输 header。
+
+上游流内错误保留完整 error 对象，放入 `response.failed.response.error`；上游提供完整 response envelope 时也一并保留。`code`、`type`、`misalignment`、`plan_type`、`resets_at` 等字段不改写，也不按 GPT 错误码白名单分类。只有 error 中缺少 `retry-after` 而上游 HTTP header 提供了它时，才补入 `error.headers`。非流式客户端收到相同原生错误，HTTP 状态为 502；它不能恢复已经成功建立的上游流的 HTTP 错误状态。成功响应另保留上游的 `x-request-id`、`request-id`，便于关联诊断；双压缩有两个请求，不选取其中一个冒充整体请求 ID。
+
+这是保留客户端行为的协议边界。已核对 Codex `0.163.0` 的 `codex-rs/codex-api/src/api_bridge.rs` 与 `sse/responses_error.rs`：HTTP 和 SSE 使用不同的错误处理路径，部分专用提示依赖原错误字段，未知 SSE code 则会进入可重试分支。把 HTTP 400 改成 200 + SSE，或把原生策略错误改名为 `upstream_error`，都可能把原本会停止的请求变成重试。bridge 因此接受等待响应头期间没有心跳的代价，不自行维护另一套 GPT 重试分类。
+
+### Claude 与 DeepSeek 的协议转换
+
+非 Responses 协议仍需要转换为客户端能识别的错误。`code` 供 codeks 判断如何处理，`upstream` 记录原始错误体和可得的 HTTP 状态码。例如：
 
 ```json
 {
@@ -24,7 +44,7 @@
 }
 ```
 
-SSE 中位于 `response.failed.response.error`；非流式 HTTP 响应位于顶层 `error`，Retry-After 使用 HTTP header。流内错误没有独立 HTTP 失败状态时，`upstream` 只包含原始事件内容。非 JSON 的 HTTP 错误体按原文本保存。
+HTTP 失败发生在建立下游流之前，响应体使用顶层 `error`，Retry-After 使用 HTTP header；建立流后的失败放入 `response.failed.response.error`。流内错误没有独立 HTTP 失败状态时，`upstream` 只包含原始事件内容。非 JSON 的 HTTP 错误体按原文本保存。
 
 | 分类 | codeks 错误码 |
 | --- | --- |
@@ -35,18 +55,20 @@ SSE 中位于 `response.failed.response.error`；非流式 HTTP 响应位于顶�
 | 无效输入、鉴权或权限错误 | `invalid_prompt` |
 | 断流、传输等其他失败 | `stream_error` 或 `upstream_error` |
 
-原始错误体保留厂商 code/type 和其他诊断，规范分类不覆盖这些内容。网络错误保留可用的原因链，凭据命令的 stdout/stderr 不外传。
+原始错误体保留厂商 code/type 和其他诊断。这个转换表只适用于非 Responses 上游，不用于改写 GPT 原生错误。网络错误保留可用的原因链。缺少凭据、凭据命令失败、输出为空或多行均返回 HTTP 400 + `invalid_prompt`，保持原本的终止语义；命令的 stdout/stderr 不外传。
 
 bridge 不重试、不替换端点，也不因错误移除 reasoning、关闭 thinking 或改用文字压缩。客户端决定重试预算和退避。下游取消会取消相关上游请求，包括双压缩的两条请求。
 
 ## Usage
 
-GPT 使用上游 input/output；DeepSeek 使用 prompt/completion 与 cache hit；Claude 将普通 input、cache read、cache creation 相加得到完整 input。总数只计算 input + output；reasoning 作为输出分项，不重复叠加。双压缩 usage 是两条实际请求之和，不是后续上下文大小。
+GPT 保留原始 usage，包括提供的 cache write 等分项；DeepSeek 使用 prompt/completion 与 cache hit；Claude 将普通 input、cache read、cache creation 相加得到完整 input。转换后的总数只计算 input + output；reasoning 作为输出分项，不重复叠加。双压缩 usage 是两条实际请求之和，不是后续上下文大小。
 
-usage 缺失或无效时返回错误，不使用零值影响客户端压缩判断。
+成功响应的必需 usage 缺失或无效时返回错误，不使用零值影响客户端压缩判断。原生失败或 incomplete 保留上游提供的用量，不以 usage 校验覆盖原始终止原因。
 
 ## Keepalive 与超时
 
-等待期间每 15 秒发送 JSON `keepalive` 事件，客户端忽略内容并刷新流空闲计时。SSE 注释不能提供同样效果。
+等待上游响应头期间不发送下游响应头或 keepalive。上游接受请求后，每 15 秒发送 JSON `keepalive` 事件，客户端忽略内容并刷新流空闲计时。SSE 注释不能提供同样效果。
 
-上游空闲超时独立控制，默认 300 秒，可设置 `upstreams.<id>.stream_idle_timeout_ms`。只有上游字节重置它，下游 keepalive 不延长它。因此慢压缩可以保持客户端连接，卡住的上游仍会超时报错。
+双压缩须等两条请求都收到成功响应头，才建立下游流；生成完成前只发送 keepalive，不交付任一分支的部分内容。如果一条已进入 SSE 的分支先失败，另一条还在等待响应头，则取消另一条，并以原生 SSE 错误结束下游请求。这保持已经发生的错误所属的协议路径，不伪造 HTTP 失败。
+
+上游空闲超时独立控制，默认 300 秒，可设置 `upstreams.<id>.stream_idle_timeout_ms`，也覆盖等待响应头和读取错误体的阶段。只有上游字节重置它，下游 keepalive 不延长它。因此已接受的慢压缩可以保持客户端连接，卡住的上游仍会超时报错。

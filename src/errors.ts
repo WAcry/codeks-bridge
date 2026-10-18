@@ -3,6 +3,46 @@ export interface UpstreamFailure {
   body: unknown;
 }
 
+/** Native Responses HTTP failures retain their transport-level meaning. */
+export class UpstreamHttpError extends Error {
+  readonly status: number;
+  readonly body: string;
+  readonly headers: Headers;
+  constructor(status: number, body: string, headers: Headers) {
+    super(`Upstream returned HTTP ${status}`);
+    this.name = "UpstreamHttpError";
+    this.status = status;
+    this.body = body;
+    this.headers = headers;
+  }
+}
+
+/** A Responses failure belongs to the SSE protocol, not HTTP classification. */
+export class ResponsesStreamError extends Error {
+  readonly error: Record<string, unknown>;
+  readonly response?: Record<string, any>;
+  readonly event?: Record<string, any>;
+  constructor(error: Record<string, unknown>, response?: Record<string, any>, event?: Record<string, any>) {
+    super(typeof error.message === "string" ? error.message : "The upstream response failed");
+    this.name = "ResponsesStreamError";
+    this.error = error;
+    this.response = response;
+    this.event = event;
+  }
+}
+
+/** An incomplete response has its own client termination and usage semantics. */
+export class ResponsesIncompleteError extends Error {
+  readonly response: Record<string, any>;
+  readonly event?: Record<string, any>;
+  constructor(response: Record<string, any>, event?: Record<string, any>) {
+    super(`The upstream response is incomplete: ${String(response.incomplete_details?.reason ?? "unknown")}`);
+    this.name = "ResponsesIncompleteError";
+    this.response = response;
+    this.event = event;
+  }
+}
+
 /** Client retry classification is separate from the unmodified upstream failure. */
 export class BridgeError extends Error {
   readonly code: string;
@@ -31,7 +71,20 @@ function retryAfter(value: unknown): string | undefined {
   return undefined;
 }
 
-/** HTTP failures and SSE error events use the same classification and metadata. */
+/** Keep native fields; only supplement missing retry advice from HTTP headers. */
+export function responsesStreamError(payload: unknown, headers?: Headers, event?: Record<string, any>): ResponsesStreamError {
+  const envelope = record(payload);
+  const response = envelope?.error !== undefined && (envelope.object === "response" || typeof envelope.status === "string" ||
+    (event?.type === "response.failed" && event.response !== undefined)) ? envelope : undefined;
+  let error = record(envelope?.error ?? payload) ?? {};
+  const delay = retryAfter(headers);
+  if (delay !== undefined && retryAfter(error.headers) === undefined) {
+    error = { ...error, headers: { ...record(error.headers), "retry-after": delay } };
+  }
+  return new ResponsesStreamError(error, response ? { ...response, error } : undefined, event);
+}
+
+/** Translate non-Responses protocols into errors understood by the client. */
 export function upstreamError(status: number | undefined, payload: unknown, headers?: Headers): BridgeError {
   const envelope = record(payload);
   const raw = envelope?.error ?? payload;

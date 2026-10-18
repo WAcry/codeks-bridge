@@ -1,5 +1,5 @@
 import { encodeReasoning } from "../carrier.ts";
-import { BridgeError, upstreamError } from "../errors.ts";
+import { BridgeError, ResponsesIncompleteError, responsesStreamError } from "../errors.ts";
 import { prepareHistory } from "../history.ts";
 import { reasoningEffort } from "../profiles.ts";
 import { parseJsonSse } from "../sse.ts";
@@ -56,145 +56,153 @@ function usageFrom(value: any): Usage {
   };
   const cached = value?.input_tokens_details?.cached_tokens;
   const reasoning = value?.output_tokens_details?.reasoning_tokens;
+  const cacheWrite = value?.input_tokens_details?.cache_write_tokens;
   return {
     input_tokens: count(value?.input_tokens, "input_tokens"),
     output_tokens: count(value?.output_tokens, "output_tokens"),
     ...(cached !== undefined ? { cached_tokens: count(cached, "input_tokens_details.cached_tokens") } : {}),
+    ...(cacheWrite !== undefined ? { cache_write_tokens: count(cacheWrite, "input_tokens_details.cache_write_tokens") } : {}),
     ...(reasoning !== undefined ? { reasoning_tokens: count(reasoning, "output_tokens_details.reasoning_tokens") } : {}),
   };
 }
 
-interface ItemState {
-  item: Record<string, any>;
-  text: string;
-  summary: string;
-  done: boolean;
-}
-
+/** Transform only bridge-owned fields; native events keep their original shape. */
 export const runResponses: Backend = async (context, writer) => {
+  writer.useNativeResponses();
   const response = await upstreamFetch(context.route, "/responses", responsesBody(context), context.signal,
     context.responsesLite ? { "x-openai-internal-codex-responses-lite": "true" } : undefined);
-  const states = new Map<number, ItemState>();
-  const byId = new Map<string, ItemState>();
-  const calls: Record<string, any>[] = [];
+  context.onAccepted?.(response.headers);
+  const states = new Map<number, { item: Record<string, any>; added: boolean; done: boolean }>();
+  const phases = new Map<number, string>();
+  let pendingPhase: { index: number; item: Record<string, any> } | undefined;
+  let held: Record<string, any>[] = [];
 
-  function stateFor(event: any): ItemState {
-    const index = Number(event.output_index ?? 0);
-    let state = event.item_id ? byId.get(event.item_id) : states.get(index);
-    if (!state) {
-      state = { item: event.item ?? {}, text: "", summary: "", done: false };
-      states.set(index, state);
+  function itemFor(item: Record<string, any>, index: number): Record<string, any> {
+    const result = { ...item };
+    if (item.type === "reasoning" && typeof item.encrypted_content === "string" && item.encrypted_content) {
+      result.encrypted_content = encodeReasoning({
+        source: context.route.origin, format: context.route.profile.reasoning_format, data: item.encrypted_content,
+      });
     }
-    if (event.item?.id) byId.set(event.item.id, state);
-    return state;
+    if (item.type === "function_call") {
+      if (item.encrypted_function_args?.length) {
+        throw new BridgeError("Encrypted tool arguments are unsupported; use plaintext client tools");
+      }
+      result.encrypted_function_args ??= [];
+    }
+    if (item.type === "message" && item.phase === undefined) {
+      const phase = phases.get(index) ?? states.get(index)?.item.phase;
+      if (phase !== undefined) result.phase = phase;
+    }
+    return result;
   }
 
-  function finishItem(item: any, state: ItemState): void {
-    if (state.done) return;
-    state.done = true;
+  function responseFor(value: Record<string, any>): Record<string, any> {
+    return {
+      ...value, model: context.request.model,
+      ...(Array.isArray(value.output) ? { output: value.output.map(itemFor) } : {}),
+    };
+  }
+
+  function releasePhase(phase?: string): void {
+    if (pendingPhase && phase !== undefined) {
+      pendingPhase.item.phase = phase;
+      phases.set(pendingPhase.index, phase);
+    }
+    pendingPhase = undefined;
+    const events = held;
+    held = [];
+    for (const event of events) writer.nativeEvent(event);
+  }
+
+  function emit(event: Record<string, any>): void {
+    if (event.type === "response.output_item.added" || event.type === "response.output_item.done") {
+      const index = event.output_index ?? 0;
+      if (pendingPhase && index !== pendingPhase.index && event.item.type !== "reasoning") releasePhase("commentary");
+      if (event.type === "response.output_item.done" && event.item.type === "message" && event.item.phase === undefined) {
+        pendingPhase = { index, item: event.item };
+      }
+    }
+    if (pendingPhase) held.push(event);
+    else writer.nativeEvent(event);
+  }
+
+  function outputEvent(event: Record<string, any>): void {
+    const index = event.output_index ?? 0;
+    const item = itemFor(event.item, index);
+    const state = states.get(index) ?? { item, added: false, done: false };
+    if (event.type === "response.output_item.done" && !state.added) {
+      emit({ type: "response.output_item.added", output_index: index, item });
+      state.added = true;
+    }
     state.item = item;
-    switch (item.type) {
-      case "reasoning": {
-        const summary = (item.summary ?? []).filter((part: any) => part.type === "summary_text")
-          .map((part: any) => part.text ?? "").join("\n\n");
-        if (!state.summary && summary) writer.reasoningDelta(summary);
-        const content = typeof item.encrypted_content === "string" && item.encrypted_content
-          ? encodeReasoning({ source: context.route.origin, format: context.route.profile.reasoning_format, data: item.encrypted_content }) : undefined;
-        writer.endReasoning(content, summary || state.summary);
-        break;
-      }
-      case "message": {
-        const content = Array.isArray(item.content) ? item.content : [];
-        if (content.some((part: any) => part.type === "refusal")) {
-          throw new BridgeError("The upstream refused the request", "invalid_prompt");
-        }
-        const text = content.filter((part: any) => part.type === "output_text")
-          .map((part: any) => part.text ?? "").join("");
-        if (!text.startsWith(state.text)) throw new BridgeError("The upstream changed already streamed text", "stream_error", 502);
-        writer.textDelta(text.slice(state.text.length));
-        writer.closeMessage();
-        break;
-      }
-      case "function_call":
-      case "custom_tool_call":
-        calls.push(item);
-        break;
-      case "compaction":
-      case "compaction_summary":
-        // The compaction coordinator wraps this native item only after both
-        // the native request and the portable summary request have succeeded.
-        writer.addItem(item);
-        break;
-      default:
-        throw new BridgeError(`Unsupported upstream output item: ${String(item.type)}`);
-    }
+    state.added ||= event.type === "response.output_item.added";
+    state.done ||= event.type === "response.output_item.done";
+    states.set(index, state);
+    emit({ ...event, item });
   }
 
-  function finishResponse(result: any): { usage: Usage; endTurn: boolean } {
-    if (result?.status === "failed" || result?.error) throw upstreamError(undefined, result, response.headers);
-    if (result?.status === "incomplete") {
-      throw new BridgeError(`The upstream response is incomplete: ${String(result.incomplete_details?.reason ?? "unknown")}`, "invalid_prompt");
+  function terminal(event: Record<string, any>): { usage: Usage; endTurn: boolean } {
+    const result = event.response;
+    if (event.type === "response.failed" || result?.status === "failed" || result?.error) {
+      releasePhase();
+      throw responsesStreamError(responseFor(result), response.headers, event);
+    }
+    if (event.type === "response.incomplete" || result?.status === "incomplete") {
+      releasePhase();
+      throw new ResponsesIncompleteError(responseFor(result), event);
     }
     if (result?.status !== "completed") {
       throw new BridgeError("The upstream did not return a completed response", "stream_error", 502);
     }
     const usage = usageFrom(result.usage);
+    // A whole JSON response, or a terminal-only stream, still needs item events
+    // because codeks persists the history from output_item.done.
     for (const [index, item] of (result.output ?? []).entries()) {
-      const state = (item.id && byId.get(item.id)) || states.get(index) || stateFor({ output_index: index, item });
-      finishItem(item, state);
+      if (!states.get(index)?.done) outputEvent({ type: "response.output_item.done", output_index: index, item });
     }
     for (const state of states.values()) {
       if (!state.done) throw new BridgeError("The upstream completed with an unfinished output item", "stream_error", 502);
     }
-    for (const call of calls) {
-      if (call.type === "function_call") {
-        if (call.encrypted_function_args?.length) {
-          throw new BridgeError("Encrypted tool arguments are unsupported; use plaintext client tools");
-        }
-        writer.addFunctionCall({
-          call_id: call.call_id,
-          namespace: call.namespace,
-          name: call.name,
-          arguments: call.arguments,
-        });
-      } else {
-        writer.addCustomToolCall({ call_id: call.call_id, namespace: call.namespace, name: call.name, input: call.input });
-      }
+    const hasCalls = [...states.values()].some(({ item }) => ["function_call", "custom_tool_call"].includes(item.type));
+    const endTurn = result.end_turn ?? !hasCalls;
+    if (pendingPhase) {
+      releasePhase(result.output?.[pendingPhase.index]?.phase ?? (endTurn ? "final_answer" : "commentary"));
     }
-    return { usage, endTurn: result.end_turn ?? calls.length === 0 };
+    writer.nativeEvent({ ...event, response: { ...responseFor(result), end_turn: endTurn } });
+    return { usage, endTurn };
   }
 
   if (response.headers.get("content-type")?.includes("application/json")) {
-    return finishResponse(await response.json());
+    const result = await response.json() as Record<string, any>;
+    if (result.status === "completed" || result.status === "incomplete") {
+      writer.nativeEvent({ type: "response.created", response: { ...result, model: context.request.model, status: "in_progress", output: [] } });
+    }
+    if (result.status === "incomplete") {
+      // An interrupted whole response has no earlier item events. Publish its
+      // partial history before the terminal event, still withholding any tool suffix.
+      for (const [index, item] of (result.output ?? []).entries()) {
+        outputEvent({ type: "response.output_item.done", output_index: index, item });
+      }
+    }
+    return terminal({ type: result.status === "incomplete" ? "response.incomplete" : "response.completed", response: result });
   }
   if (!response.body) throw new BridgeError("The upstream returned an empty response", "stream_error", 502);
   for await (const { json: event } of parseJsonSse(response.body)) {
     switch (event.type) {
       case "response.output_item.added":
-        stateFor(event);
-        break;
-      case "response.reasoning_summary_text.delta": {
-        const state = stateFor(event);
-        state.summary += String(event.delta ?? "");
-        writer.reasoningDelta(String(event.delta ?? ""));
-        break;
-      }
-      case "response.output_text.delta": {
-        const state = stateFor(event);
-        state.text += String(event.delta ?? "");
-        writer.textDelta(String(event.delta ?? ""));
-        break;
-      }
       case "response.output_item.done":
-        finishItem(event.item, stateFor(event));
+        outputEvent(event);
         break;
       case "response.completed":
-        return finishResponse(event.response);
       case "response.failed":
-      case "error":
-        throw upstreamError(undefined, event.response ?? event, response.headers);
       case "response.incomplete":
-        throw new BridgeError(`The upstream response is incomplete: ${String(event.response?.incomplete_details?.reason ?? "unknown")}`, "invalid_prompt");
+        return terminal(event);
+      case "error":
+        releasePhase();
+        throw responsesStreamError(event.error ?? event, response.headers, event);
+      default:
+        emit(event.response ? { ...event, response: responseFor(event.response) } : event);
     }
   }
   throw new BridgeError("The upstream stream ended before response.completed", "stream_error", 502);
