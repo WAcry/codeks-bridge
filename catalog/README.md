@@ -21,7 +21,7 @@
 - `adjustments`：相对于源条目的精调说明，供审阅和更新时核对。
 - `adapter`：协议转换实现。
 - `effort_map`：第三方模型显式提供的客户端档位到原生参数映射；GPT 从原始模型条目推导，不重复填写。
-- `max_output_tokens`：上游生成请求的默认输出预算；配置和请求可以覆盖，不是 bridge 强制执行的上限。
+- `max_output_tokens`：为上游必填输出参数提供的默认预算；配置和请求可以覆盖。
 - `model`：完整的 Codex 模型条目，包括提示词和工具元数据。
 
 `model` 是运行时的唯一模板来源。运行时只展开别名与用户的明确覆盖，不重新生成这些精调内容，也不维护第二套完整上游副本。
@@ -32,9 +32,9 @@
 
 Claude 和 DeepSeek 从 GPT-6.1 Sol 的完整条目开始，只做各自 JSON 中列出的修改：底层模型与展示信息、工作窗口、reasoning 档位，以及当前 adapter 尚未转换的参数和 GPT 专属的服务展示信息。提示词仅将首句的 `based on GPT-6` 换成 `based on Claude` 或 `based on DeepSeek`；`You are Codex`、`As Codex` 和其余客户端指令保留。`default_reasoning_summary` 保持源条目的 `none`，由用户在 codeks 中选择摘要展示方式。
 
-三个第三方条目的 `context_window` 与 `max_context_window` 均为 `1000000`。Claude Opus 5.5 与 Sonnet 5.5 的默认输出预算为 `128000`，DeepSeek Flash 为 `393216`。这些值依据模型的标准容量设置，部署配置和请求可以覆盖；bridge 不据此拒绝更大的显式请求。
+窗口字段沿用 GPT-6.1 Sol 的结构：三个第三方条目的 `context_window` 与 `max_context_window` 均为 `1000000`。压缩阈值保留模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 要求 `max_tokens`，因此两个 Claude 条目提供 `128000` 默认预算；GPT 和 DeepSeek 的输出预算由请求、用户配置或上游默认值决定。
 
-容量依据：[Claude Sonnet 5.5 官方概览](https://platform.claude.com/docs/en/models/sonnet-5-5/overview) 列出 Opus 5.5 与 Sonnet 5.5 的 1M 上下文和 128K 标准输出；[Claude 官方请求示例](https://platform.claude.com/docs/en/build-with-claude/task-budgets) 使用 `max_tokens=128000`；[DeepSeek Chat API](https://api-docs.deepseek.com/api/create-chat-completion/) 明确将 384K 输出记为 `393216`。这些是第三方精调的依据，`source` 仍记录 Codex 模板来源。
+依据：[Claude 模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[Messages 必填参数](https://platform.claude.com/docs/en/api/messages/create)、[DeepSeek 模型规格](https://api-docs.deepseek.com/quick_start/pricing/)。这些是第三方精调的依据，`source` 仍记录 Codex 模板来源。
 
 Claude 的默认 effort 为 `medium`，DeepSeek 为 `high`；`none` 用于请求关闭 thinking，具体支持由上游裁决。`ultra` 保留 Codex 的自动分工提示词和档位说明：Opus 5.5 使用原生 `xhigh`，Sonnet 5.5 与 DeepSeek Flash 使用 `max`；各条目的 `multi_agent_reasoning_effort` 与映射一致。
 

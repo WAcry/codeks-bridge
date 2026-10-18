@@ -9,7 +9,7 @@
   "adjustments": [
     "以 GPT-6.1 Sol 的完整条目为起点；保留 Code Mode Only、Responses Lite、多代理和工具元数据。",
     "将模型标识和展示信息改为 Claude Opus 5.5；instructions_template 仅将 based on GPT-6 改为 based on Claude，保留 Codex 代理身份和其余客户端提示词。",
-    "context_window 和 max_context_window 设为 1000000；目录提供 max_output_tokens 默认值 128000，部署配置和请求可明确覆盖。",
+    "context_window 和 max_context_window 设为 1000000；Messages API 必填 max_tokens，因此目录提供 max_output_tokens 默认值 128000，部署配置和请求可明确覆盖。",
     "使用 claude-messages 的现有 effort 映射，默认 medium；none 关闭 thinking，未列出的显式请求值继续由上游裁决。",
     "关闭尚未转换的 verbosity 和 original image detail 声明；保留普通图片输入。",
     "清空 GPT 专属的服务优先级、速度档位、推广和升级提示。",

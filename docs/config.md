@@ -80,7 +80,7 @@
 | `compaction` | 本目标如何生成压缩，以及是否接收原生压缩 |
 | `options` | 原生请求参数，覆盖上游级 options |
 
-不设置窗口时，原条目的两个窗口字段各自保留。当前 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；Opus 5.5、Sonnet 5.5 和 DeepSeek Flash 的两个字段均为 `1000000`。Claude 的目录默认输出预算为 `128000`，DeepSeek Flash 为 `393216`（384K）；输出预算保存在 bridge 目录条目的外层元数据中，Codex 的模型元数据没有对应字段。请求、模型配置和原生 options 可以调整预算，实际限制由部署端点裁决。
+不设置窗口时，原条目的两个窗口字段各自保留。当前 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；Opus 5.5、Sonnet 5.5 和 DeepSeek Flash 的两个字段均为 `1000000`。压缩阈值沿用模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 必须提供 `max_tokens`，对应目录外层默认预算为 `128000`；GPT 和 DeepSeek 使用请求、模型配置或上游提供的默认值。原生 options 也可调整预算，实际限制由部署端点裁决。
 
 请求先由 adapter 转换，再浅层合并 `upstream.options`、`model.options`；后者优先，嵌套对象整体替换。例如模型 `options.output_config` 会替换推导值和上游同名对象。由此可以显式调整 thinking budget、原生 effort 或端点专有字段。
 

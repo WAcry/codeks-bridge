@@ -19,7 +19,6 @@
     "gpt": {
       "upstream": "openai",
       "model": "gpt-6.1-sol",
-      "max_output_tokens": 16384,
       "catalog": "gpt-6.1-sol"
     },
     "claude": {

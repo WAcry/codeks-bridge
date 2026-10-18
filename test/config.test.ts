@@ -197,7 +197,7 @@ test("third-party defaults retain the Codex role and provide model-specific Ultr
   for (const [key, vendor, ultra, output] of [
     ["claude-opus-5-5", "Claude", "xhigh", 128000],
     ["claude-sonnet-5-5", "Claude", "max", 128000],
-    ["deepseek-flash", "DeepSeek", "max", 393216],
+    ["deepseek-flash", "DeepSeek", "max", undefined],
   ] as const) {
     const c = validateConfig({ upstreams: { a: { base_url: "https://example.com/v1" } }, models: {
       selected: { catalog: key, upstream: "a", model: "deployment" },
