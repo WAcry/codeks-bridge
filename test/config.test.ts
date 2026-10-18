@@ -187,6 +187,7 @@ test("client snippets use the HTTP catalog by default and permit a static catalo
   assert.match(remote, /env_key = "SYNTHETIC_BRIDGE_TOKEN"/);
   assert.match(remote, /remote_compaction = "v2"/);
   assert.match(remote, /web_search = "disabled"/);
+  assert.match(remote, /\n\[features\.multi_agent_v2\]\ntool_namespace = "agents"\n\n/);
   const local = configSnippet(c, "/tmp/catalog.json");
   assert.match(local, /model_catalog_json = "\/tmp\/catalog.json"/);
   assert.doesNotMatch(local, /model_catalog_url/);
