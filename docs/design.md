@@ -20,7 +20,7 @@ flowchart LR
 
 ## 客户端协议跟随 Codex
 
-优先匹配最新 Codex 的 GPT 默认行为，以 OpenAI 订阅、AWS 和 Azure 的使用场景为基准。bridge 统一采用 Responses Lite，生成的模型目录设置 `use_responses_lite: true`；模板中的客户端指令、Code Mode 和多代理信息继续来自本机 codeks，而不是维护静态副本。
+优先匹配最新 Codex 的 GPT 默认行为，以 OpenAI 订阅、AWS 和 Azure 的使用场景为基准。当前已审阅模型目录使用 Responses Lite，保留 `use_responses_lite: true`、Code Mode Only 和多代理字段。目录固定到明确的 Codex 源码版本，不随用户本机二进制或订阅账号变化。
 
 Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于历史中的 `additional_tools` 项，普通函数和 custom 工具归入默认 `functions` namespace。GPT 路径保留这些声明的位置、顺序、schema 和 grammar，并发送 `x-openai-internal-codex-responses-lite: true`。Claude/DeepSeek 只在各自协议转换入口提取声明，组合为原生工具表；声明不会变成 user reminder，其余消息保持原顺序。
 
@@ -28,13 +28,21 @@ Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于
 
 该版本最新 OpenAI GPT 目录启用 Lite，但原生 AWS Bedrock 目录仍主动关闭 Lite 和 Code Mode。统一启用是本项目的明确选择，不能把它描述为所有官方 provider 当前完全相同的默认值。上游是否接受请求由端点裁决，错误直接返回；bridge 不自动转回另一种协议。升级时复核 `core/src/client.rs`、`tools/src/tool_spec.rs`、`core/src/context/world_state/top_level_tools.rs` 和 provider 的模型目录处理。
 
+## 有限目录与显式精调
+
+项目只支持明确列出的模型。`catalog/` 保存每个模型的完整条目及来源；GPT 分别使用 Codex 源码中各自的版本，保留提示词、默认 effort、摘要、窗口和工具元数据的差异。Claude 与 DeepSeek 从 GPT-6.1 Sol 模板开始，精调身份、参数和确有差异的能力，每项改动记录在条目的 `adjustments`。
+
+导入脚本只生成独立候选文件，供人或 Agent 对比审阅。运行时使用已提交的完整条目，不自动导入、不猜测未知模型，也不从 ChatGPT 订阅获取目录。这样更新仍有工具辅助，同时提示词和能力变化可审查、可追踪。来源及更新步骤见[模型目录](../catalog/README.md)。
+
 ## 配置表达策略，adapter 负责协议
 
-`upstreams` 只包含连接与鉴权，`models.adapter` 明确选择方言。实际模型名可以是云端部署别名，不参与方言推断。模型窗口、输入模态、effort 映射、状态复用范围和压缩模式都在配置中表达。
+`models.catalog` 选择条目；`upstreams` 只包含连接与鉴权；别名和真实部署名独立。目录条目决定 adapter，实际模型名不参与方言推断。模型窗口、输入模态、effort 映射、状态复用范围和压缩模式可由配置覆盖。
 
-`src/profiles.ts` 是三个 adapter 的格式与默认值来源。配置覆盖后的 profile 同时用于 catalog 和出站请求，避免界面显示一套 effort、实际发送另一套。客户端指令、code mode 和多代理元数据仍取自当前 codeks 的 bundled catalog。
+`src/profiles.ts` 将目录与配置组合为运行时 profile，同时用于客户端目录和出站请求，避免界面显示一套 effort、实际发送另一套。未覆盖字段保留原模型差异，不能用一套通用默认值改写所有 GPT。来源身份继续取连接、adapter 与实际部署，不因提示词更新或窗口预设改变。
 
-底层 Chat 负责消息、工具、图片和 SSE；DeepSeek 方言只负责 thinking 参数、reasoning 字段和 usage。新增方言时复用稳定的协议部分，把差异留在对应 adapter。协议相同的模型版本可共用 adapter，参数差异先用配置；真正改变载荷结构时再增加转换代码和格式版本。当前实现三类 adapter，不为尚未接入的模型维护空接口或版本矩阵。
+`GET /v1/models` 提供 Codex 原生目录响应，CLI 默认生成显式 `model_catalog_url`；也可导出静态文件。服务启动时展开配置，目录与普通响应通过 ETag 关联，客户端看到新版本后刷新。目录只包含客户端需要的公开模型元数据，不包含连接或凭据配置。
+
+底层 Chat 负责消息、工具、图片和 SSE；DeepSeek 方言只负责 thinking 参数、reasoning 字段和 usage。新增方言时复用稳定的协议部分，把差异留在对应 adapter。协议相同的模型版本可共用 adapter，参数差异先在新的目录条目中表达；真正改变载荷结构时再增加转换代码和格式版本。当前实现三类 adapter，不为尚未接入的模型维护空接口或版本矩阵。
 
 ## 历史保存事实，配置决定恢复
 

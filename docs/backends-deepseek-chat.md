@@ -1,6 +1,6 @@
 # DeepSeek Chat
 
-模型设置 `adapter: "deepseek-chat"`，请求发送到 `<base_url>/chat/completions`。这个 adapter 明确使用 DeepSeek 方言：`reasoning_content`、thinking 参数和对应 usage。实际模型可以是 `deepseek-flash` 或第三方部署名称，bridge 不按名字猜测规则。
+模型设置 `catalog: "deepseek-flash"`，条目指定 `deepseek-chat` adapter，请求发送到 `<base_url>/chat/completions`。这个 adapter 明确使用 DeepSeek 方言：`reasoning_content`、thinking 参数和对应 usage。实际模型可以是 `deepseek-flash` 或第三方部署名称，bridge 不按名字猜测规则。
 
 ```json
 {
@@ -13,7 +13,7 @@
   "models": {
     "flash": {
       "upstream": "deepseek",
-      "adapter": "deepseek-chat",
+      "catalog": "deepseek-flash",
       "model": "deepseek-flash",
       "context_window": 131072,
       "max_output_tokens": 16384
@@ -70,7 +70,7 @@ reasoning 不重复加到总量中。压缩只生成文字摘要，仍由客户�
 
 ## 扩展方言
 
-[`src/backends/chat.ts`](../src/backends/chat.ts) 负责 Chat 消息、工具和流转换，定义小型 `ChatDialect` 接口；[`src/backends/deepseek.ts`](../src/backends/deepseek.ts) 提供 DeepSeek 的 reasoning 字段、thinking 参数、usage 和特殊结束原因。配置中选择的是 `deepseek-chat`，由后者调用前者。
+[`src/backends/chat.ts`](../src/backends/chat.ts) 负责 Chat 消息、工具和流转换，定义小型 `ChatDialect` 接口；[`src/backends/deepseek.ts`](../src/backends/deepseek.ts) 提供 DeepSeek 的 reasoning 字段、thinking 参数、usage 和特殊结束原因。`deepseek-flash` 目录条目选择 `deepseek-chat` adapter，由后者调用前者。
 
 当前 Chat 转换层按单个文本字段读写 reasoning，包括为没有 reasoning 的 assistant 历史写入空字符串。这是现有 DeepSeek 路径需要的行为；接入其他模型时须按其协议决定能否复用。参数差异优先使用 profile 和 options；如果 reasoning 改为内容块或其他结构，再调整转换边界。当前没有其他 Chat 方言实现。
 

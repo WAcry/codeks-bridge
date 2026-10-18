@@ -1,6 +1,6 @@
 # Claude Messages
 
-模型设置 `adapter: "claude-messages"`，请求转换为 `POST <base_url>/messages`。官方端点的 `base_url` 为 `https://api.anthropic.com/v1`；默认使用 `x-api-key` 和 `anthropic-version: 2023-06-01`，可通过连接配置覆盖。
+模型选择 `catalog: "claude-opus-5-5"` 或 `"claude-sonnet-5-5"`，条目指定 `claude-messages` adapter，请求转换为 `POST <base_url>/messages`。官方端点的 `base_url` 为 `https://api.anthropic.com/v1`；默认使用 `x-api-key` 和 `anthropic-version: 2023-06-01`，可通过连接配置覆盖。
 
 ## 历史与 thinking
 

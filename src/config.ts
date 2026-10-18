@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { modelProfile, PROFILES } from "./profiles.ts";
+import { modelProfile } from "./profiles.ts";
+import { getCatalogEntry } from "./model-catalog.ts";
 import type { BridgeConfig, ModelConfig, ResolvedModel, StateOrigin } from "./types.ts";
 import { BridgeError } from "./errors.ts";
 
@@ -16,7 +17,8 @@ const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(valu
 /** Record provenance, never policy or credentials, in portable history. */
 function origin(config: BridgeConfig, model: ModelConfig): StateOrigin {
   const connection = hash([model.upstream, config.upstreams[model.upstream].base_url.replace(/\/+$/, "")]);
-  return { connection, model: model.model, adapter: model.adapter, id: hash([connection, model.adapter, model.model]) };
+  const { adapter } = getCatalogEntry(model.catalog);
+  return { connection, model: model.model, adapter, id: hash([connection, adapter, model.model]) };
 }
 
 export function validateConfig(value: unknown): BridgeConfig {
@@ -40,7 +42,7 @@ export function validateConfig(value: unknown): BridgeConfig {
   }
   for (const [slug, model] of Object.entries(value.models)) {
     if (!slug || !object(model) || typeof model.model !== "string" || !model.model || typeof model.upstream !== "string" || !Object.hasOwn(value.upstreams, model.upstream)) fail(`model ${slug}: model and an existing upstream are required`);
-    if (typeof model.adapter !== "string" || !Object.hasOwn(PROFILES, model.adapter)) fail(`model ${slug}: choose gpt-responses, claude-messages or deepseek-chat`);
+    if (typeof model.catalog !== "string" || !model.catalog) fail(`model ${slug}: catalog is required`);
     for (const field of ["context_window", "max_output_tokens"]) {
       if (model[field] !== undefined && (!Number.isSafeInteger(model[field]) || model[field] <= 0)) fail(`model ${slug}: ${field} must be a positive integer`);
     }

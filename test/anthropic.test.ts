@@ -12,9 +12,9 @@ import { ResponseWriter } from "../src/writer.ts";
 const config = validateConfig({
   upstreams: { messages: { base_url: "https://api.example.com/v1" } },
   models: {
-    "messages-model": { upstream: "messages", model: "claude-sonnet-5-5", adapter: "claude-messages" },
-    other: { upstream: "messages", model: "other", adapter: "claude-messages" },
-    shared: { upstream: "messages", model: "shared", adapter: "claude-messages", replay: { reasoning_from: ["messages-model"] } },
+    "messages-model": { upstream: "messages", model: "claude-sonnet-5-5", catalog: "claude-sonnet-5-5" },
+    other: { upstream: "messages", model: "other", catalog: "claude-sonnet-5-5" },
+    shared: { upstream: "messages", model: "shared", catalog: "claude-sonnet-5-5", replay: { reasoning_from: ["messages-model"] } },
   },
 });
 const route = resolveModel(config, "messages-model");

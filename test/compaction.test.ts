@@ -15,7 +15,7 @@ const checkpoint = { type: "compaction", id: "cmp_synthetic", encrypted_content:
 function context(adapter: AdapterId = "gpt-responses", signal = new AbortController().signal, compaction?: ModelConfig["compaction"]): BackendContext {
   const config = validateConfig({
     upstreams: { example: { base_url: "https://api.example.com/v1" } },
-    models: { "example-model": { upstream: "example", model: "example-model", adapter, compaction } },
+    models: { "example-model": { upstream: "example", model: "example-model", catalog: { "gpt-responses": "gpt-6.1-sol", "claude-messages": "claude-sonnet-5-5", "deepseek-chat": "deepseek-flash" }[adapter], compaction } },
   });
   return {
     request: {

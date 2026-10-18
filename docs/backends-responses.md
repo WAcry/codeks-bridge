@@ -1,6 +1,6 @@
 # GPT Responses
 
-模型设置 `adapter: "gpt-responses"`，bridge 向连接的 `/responses` 发请求。`base_url` 包含版本前缀，例如 `https://api.openai.com/v1`。实际模型名可以是任意部署别名，转换不依赖名称前缀。
+模型选择 GPT 目录 key，例如 `catalog: "gpt-6.1-sol"`，条目指定 `gpt-responses` adapter，bridge 向连接的 `/responses` 发请求。`base_url` 包含版本前缀，例如 `https://api.openai.com/v1`。实际模型名可以是任意部署别名，转换不依赖名称前缀。
 
 ## 请求与参数
 

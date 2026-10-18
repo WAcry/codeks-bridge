@@ -8,6 +8,12 @@
 
 增量声明只包含新增或变更的成员，按 namespace 与工具名覆盖旧定义，保留未变的其他成员和已分配的上游名字。工具移除的 developer 通知保留原位置，不从提示词文字推断删工具。codeks 将默认 `functions` namespace、空 namespace 和省略 namespace 视为同一身份，因此历史调用和显式工具选择均按此规则查找；返回调用保留声明中的原 namespace。
 
+## 工具发现与网页搜索
+
+`supports_search_tool` 表示客户端的工具发现能力，与网页搜索不同。当前源目录的 GPT 条目显式设为 `true`，bridge 保留它。是否出现独立 `tool_search` 还取决于客户端工具模式和功能开关，不能只从目录字段推断。
+
+当前目录采用 Code Mode Only：大多数工具通过 `exec` 中的函数调用，模型从 `ALL_TOOLS` 读取目录；外层不会因此增加一个独立搜索工具。网页搜索对应 `web_search`，由客户端配置单独关闭；图片生成也有独立开关，均不通过 `supports_search_tool` 控制。
+
 ## 名字
 
 普通函数保留原名。namespace 中的工具使用 `namespace__name`；namespace 已以 `_` 结尾时直接拼接名字。名字规范化为字母、数字、`_` 和 `-`。只有两个不同工具的规范化结果实际冲突时，才为后来的名字加 `_2`、`_3` 等后缀。返回调用通过该请求的映射恢复原 name/namespace。

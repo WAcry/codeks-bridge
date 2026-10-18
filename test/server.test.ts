@@ -34,6 +34,7 @@ async function fixture(t: TestContext, handler: Handler, patch: Partial<BridgeCo
       if (!res.destroyed) { res.writeHead(500); res.end(); }
     }
   });
+  t.after(async () => close(upstream));
   const origin = await listen(upstream);
   const config: BridgeConfig = {
     upstreams: {
@@ -43,17 +44,17 @@ async function fixture(t: TestContext, handler: Handler, patch: Partial<BridgeCo
       chat: { base_url: `${origin}/chat` },
     },
     models: {
-      gpt: { adapter: "gpt-responses", upstream: "native", model: "gpt-example" },
-      "gpt-region": { adapter: "gpt-responses", upstream: "alternate", model: "gpt-example" },
-      claude: { adapter: "claude-messages", upstream: "messages", model: "claude-example", max_output_tokens: 1024 },
-      flash: { adapter: "deepseek-chat", upstream: "chat", model: "deepseek-flash", max_output_tokens: 1024 },
+      gpt: { catalog: "gpt-6.1-sol", upstream: "native", model: "gpt-example" },
+      "gpt-region": { catalog: "gpt-6.1-sol", upstream: "alternate", model: "gpt-example" },
+      claude: { catalog: "claude-sonnet-5-5", upstream: "messages", model: "claude-example", max_output_tokens: 1024 },
+      flash: { catalog: "deepseek-flash", upstream: "chat", model: "deepseek-flash", max_output_tokens: 1024 },
     },
     ...patch,
   };
   configure?.(config);
   let bridge = createBridgeServer(config);
   let url = await listen(bridge);
-  t.after(async () => { await close(bridge); await close(upstream); });
+  t.after(async () => close(bridge));
   return {
     seen,
     config,
@@ -120,12 +121,61 @@ test("HTTP entry authentication protects health, models and requests", async (t)
   assert.equal((await fetch(`${f.url}/health`, { headers })).status, 200);
   const response = await fetch(`${f.url}/v1/models`, { headers });
   assert.equal(response.status, 200);
-  assert.deepEqual((await responseJson(response)).data.map((m: any) => m.id), ["gpt", "gpt-region", "claude", "flash"]);
+  assert.deepEqual((await responseJson(response)).models.map((m: any) => m.slug), ["gpt", "gpt-region", "claude", "flash"]);
   assert.equal((await fetch(`${f.url}/missing`, { headers })).status, 404);
   assert.equal(f.seen.length, 0);
   const result = await post(f.url, { model: "gpt", input: "Hello" }, { headers });
   assert.equal(result.status, 200);
   assert.equal((await responseJson(result)).output[0].content[0].text, "Hello");
+});
+
+test("HTTP model catalogs expose reviewed client metadata without connection or credential details", async (t) => {
+  const f = await fixture(t, () => assert.fail("Catalog reads must not call upstream"), {}, (config) => {
+    config.upstreams.native.headers = { "x-synthetic-auth": "synthetic-secret-value" };
+    config.upstreams.native.api_key_command = [process.execPath, "-e", "throw new Error('catalog-must-not-run-auth')"];
+    config.models.gpt.model = "synthetic-private-deployment";
+    config.models.gpt.options = { custom_flag: "synthetic-private-option" };
+  });
+  const response = await fetch(`${f.url}/v1/models?client_version=0.163.0`);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /application\/json/);
+  const body = await response.text();
+  const catalog = JSON.parse(body);
+  assert.deepEqual(Object.keys(catalog), ["models"]);
+  assert.deepEqual(catalog.models.map((model: any) => model.slug), ["gpt", "gpt-region", "claude", "flash"]);
+  assert(catalog.models.every((model: any) => model.model_messages.instructions_template.length > 100));
+  assert(catalog.models.every((model: any) => model.tool_mode === "code_mode_only" && model.use_responses_lite));
+  for (const value of [
+    f.config.upstreams.native.base_url, "synthetic-secret-value", "synthetic-private-deployment",
+    "synthetic-private-option", "catalog-must-not-run-auth", "api_key_command", "x-synthetic-auth",
+  ]) assert(!body.includes(value), `Client catalog leaked ${value}`);
+  assert.equal(f.seen.length, 0);
+});
+
+test("catalog ETags identify the same metadata on reads and both response transports", async (t) => {
+  const f = await fixture(t, (_body, _req, res) => nativeSuccess(res, [message("Hello")]));
+  const first = await fetch(`${f.url}/v1/models`);
+  const etag = first.headers.get("etag");
+  assert(etag);
+  const initial = await responseJson(first);
+  assert.equal((await fetch(`${f.url}/v1/models?client_version=0.163.0`)).headers.get("etag"), etag);
+  for (const stream of [false, true]) {
+    const response = await post(f.url, { model: "gpt", input: "Hello", stream });
+    assert.equal(response.headers.get("x-models-etag"), etag);
+    await response.text();
+  }
+  f.config.models.gpt.context_window = 128000;
+  await f.restart();
+  const updated = await fetch(`${f.url}/v1/models`);
+  const newEtag = updated.headers.get("etag");
+  assert(newEtag);
+  assert.notEqual(newEtag, etag);
+  const catalog = await responseJson(updated);
+  assert.equal(catalog.models[0].context_window, 128000);
+  assert.notDeepEqual(catalog, initial);
+  const response = await post(f.url, { model: "gpt", input: "Hello" });
+  assert.equal(response.headers.get("x-models-etag"), newEtag);
+  await response.text();
 });
 
 test("HTTP validates requests before opening an SSE stream or calling upstream", async (t) => {
@@ -441,7 +491,7 @@ test("replay policy changes apply to saved state independently and only in the c
 
   // A third target accepting the second does not implicitly accept the first.
   f.config.models.third = {
-    upstream: "alternate", adapter: "gpt-responses", model: "gpt-third",
+    upstream: "alternate", catalog: "gpt-6.1-sol", model: "gpt-third",
     replay: { reasoning_from: ["gpt-region"], native_compaction_from: ["gpt-region"] },
   };
   await f.restart();

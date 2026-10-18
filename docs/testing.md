@@ -16,7 +16,8 @@ npm run check
 - Lite：工具声明原位传给 GPT；Claude/DeepSeek 提取增量 schema，保留原历史与默认 namespace 身份；header、all-turns 和双压缩前缀保持。
 - 流：跨字节分块的 UTF-8、CR/LF、SSE 多行数据、结束标记、非法 JSON。
 - Responses 输出：先 added 后 delta/done、完整历史项、usage、reasoning carrier、消息 phase、明文多代理参数、重试提示、失败时不执行尚未提交的工具。
-- 配置与目录：显式 adapter、部署别名、effort 映射和默认值、catalog 与出站参数一致、options 覆盖顺序。
+- 配置与目录：有限 key、原始 GPT 条目保留、第三方精调、别名与部署名分离、窗口覆盖、effort 映射及默认值、catalog 与出站参数一致、options 覆盖顺序。
+- 目录发现：Codex 专用 `/models` 响应、入口鉴权、ETag 与响应版本标记、连接及凭据配置不进入目录。
 - 状态：reasoning 与原生压缩的独立允许来源、定向非传递关系、配置改变后恢复已有 carrier、身份与显示别名分离、输入历史不变。
 - 压缩：生成模式与 native replay 独立、双分支成功才交付、失败取消另一分支、上游拒绝时原错误直传。
 - 后端与历史：各 API 的消息、工具、图片、schema、thinking、usage 与错误转换。错误测试检查原始 status/body 和重试提示，验证没有额外请求或自动降级。
@@ -25,10 +26,10 @@ npm run check
 
 ## 使用真实 codeks 二进制
 
-可选集成测试启动已经安装的 codeks，并让它通过桥接器访问本地假 Chat 上游。指定要验证的二进制即可，测试不会下载或编译 codeks：
+可选集成测试启动已经安装的 codeks，并让它通过桥接器访问本地假上游。指定要验证的二进制即可，测试不会下载或编译 codeks：
 
 ```sh
-CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts
+CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/catalog-e2e.test.ts
 ```
 
 未设置 `CODEKS_BIN` 时，这些测试自动跳过。它们为每个场景创建独立的 `CODEX_HOME` 和工作目录，监听随机的回环端口。临时目录路径会写入测试输出，保留会话和进程输出便于复查。退出时关闭本轮创建的服务器。
@@ -41,9 +42,20 @@ CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts
 | Code Mode 与多代理 V2 | 自定义 `exec` 执行；namespace 工具回传；明文 `spawn_agent` 创建真实子代理；子代理收到任务，父代理收到最终答复 |
 | 远程压缩 V2 | 高 usage 触发 `compaction_trigger`；桥接器生成可回放摘要；codeks 替换旧工具历史；退出后 resume 仍读到摘要 |
 
-模型目录来自被测二进制的 `debug models --bundled`，启用 `use_responses_lite: true`；Code Mode 与多代理 V2 属性继续由原目录提供。测试观察真实客户端 HTTP 请求，断言 Lite header、`additional_tools` 中的完整 schema、`reasoning.context: "all_turns"`、`parallel_tool_calls: false` 和省略顶层 tools。测试不依赖其他 namespace 的固定拼写。
+当前测试使用仓库内已审阅目录。协议测试检查 Lite header、`additional_tools` 中的完整 schema、`reasoning.context: "all_turns"`、`parallel_tool_calls: false` 和省略顶层 tools；普通工具测试可显式覆盖工具模式，以单独检查直接调用契约。目录集成测试通过 HTTP 发现目录，检查默认 Code Mode Only 下的 `exec`、`ALL_TOOLS` 和 MCP 调用，不依赖其他 namespace 的固定拼写。
 
 最新正式版 `@openai/codex@0.163.0` 的现成二进制另外通过普通工具/图片及压缩/resume 两项测试。它用于核对最新客户端 Lite 契约；明文多代理由上述 codeks fork 二进制验证，不将原生客户端验证等同于 fork 补丁验证。
+
+### 已审阅目录与 HTTP 发现验证
+
+2026-10-18（America/Los_Angeles），`@wacry/codeks@0.162.1-codeks.10` 与 `@openai/codex@0.163.0` 的现成二进制分别通过新增目录场景。客户端是真实进程，模型上游与 MCP 服务是本地测试服务器：
+
+- 从 bridge 的 HTTP 目录发现两个窗口别名，保留各自窗口、提示词和工具元数据，并把目录与 ETag 写入客户端缓存。
+- 使用配置片段中的公开鉴权标记进入 API key 发现流程；模型别名与实际部署名不同，出站路由仍正确。
+- 保持 `supports_search_tool: true` 和 Code Mode Only。外层没有独立 `tool_search` 或 MCP 工具，`exec` 描述也没有内嵌延迟 MCP 的 schema。
+- 模型通过 `ALL_TOOLS` 按描述找到延迟 MCP 工具，再调用 `tools[name]`。真实客户端执行 MCP 请求并把结果回传模型上游。
+
+同轮 codeks 二进制还重新通过了上表中的普通工具/图片、明文多代理 V2、远程压缩/resume 三个场景。TypeScript 检查、122 项普通测试、构建与打包解包后的 CLI 检查通过；包中包含全部八个目录文件。这里验证客户端协议与包的完整性，不代表新增了真实模型端点或缓存时长的实测。
 
 ## 真实上游验证
 
