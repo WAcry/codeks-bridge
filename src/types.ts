@@ -1,8 +1,8 @@
 import type { ResponseWriter, Usage } from "./writer.ts";
 
 export type Api = "responses" | "anthropic" | "chat";
+export type AdapterId = "gpt-responses" | "claude-messages" | "deepseek-chat";
 export interface UpstreamConfig {
-  api: Api;
   base_url: string;
   api_key_env?: string;
   /** An argv array. The command writes a short-lived credential to stdout. */
@@ -15,8 +15,13 @@ export interface UpstreamConfig {
 export interface ModelConfig {
   upstream: string;
   model: string;
+  adapter: AdapterId;
   context_window?: number;
   max_output_tokens?: number;
+  input_modalities?: ("text" | "image")[];
+  reasoning?: { default_effort?: string; effort_map?: Record<string, string> };
+  replay?: { reasoning_from?: string[]; native_compaction_from?: string[] };
+  compaction?: { mode?: "dual" | "summary"; native_replay?: boolean };
   options?: Record<string, unknown>;
 }
 export interface BridgeConfig {
@@ -26,12 +31,31 @@ export interface BridgeConfig {
   upstreams: Record<string, UpstreamConfig>;
   models: Record<string, ModelConfig>;
 }
+export interface ModelProfile {
+  id: AdapterId;
+  api: Api;
+  reasoning_format: string;
+  native_compaction_format?: string;
+  default_effort: string;
+  multi_agent_effort?: string;
+  effort_map: Record<string, string>;
+  input_modalities: ("text" | "image")[];
+}
+export interface StateOrigin {
+  /** Stable source fingerprint, independent of aliases and replay policy. */
+  id: string;
+  connection: string;
+  model: string;
+  adapter: AdapterId;
+}
 export interface ResolvedModel {
   slug: string;
   config: ModelConfig;
   upstream: UpstreamConfig;
-  /** Identifies the upstream configuration, endpoint, API, and actual model, never a display alias. */
-  key: string;
+  profile: ModelProfile;
+  origin: StateOrigin;
+  replay: { reasoning: ReadonlySet<string>; native_compaction: ReadonlySet<string> };
+  compaction: { mode: "dual" | "summary"; native_replay: boolean };
 }
 export interface ResponsesRequest {
   model: string;

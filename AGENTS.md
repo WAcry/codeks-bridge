@@ -1,6 +1,6 @@
 # codeks-bridge
 
-codeks-bridge 是给 codeks（openai/codex 的自用 fork）用的本地模型桥接器。它对 codeks 提供 OpenAI Responses 接口，把请求转发或转换到 OpenAI Responses、Anthropic Messages 和 OpenAI 兼容的 Chat Completions 上游。
+codeks-bridge 是给 codeks（openai/codex 的自用 fork）用的本地模型桥接器。它对 codeks 提供 Responses 接口，通过显式 adapter 接入 GPT Responses、Claude Messages 和 DeepSeek Chat 上游。配置表达连接、模型参数和状态复用策略，adapter 负责协议转换。
 
 动手前先读：
 
@@ -15,5 +15,7 @@ codeks-bridge 是给 codeks（openai/codex 的自用 fork）用的本地模型�
 - 真实上游的地址、密钥和测试配置只放在仓库外（例如 `~/.config/codeks-bridge/`）。测试数据里的 id、签名和密文要换成合成值。
 - 运行时零依赖，只用 Node 内置模块。开发依赖只有 TypeScript 和 Node 类型定义。
 - 发给上游模型的提示词里不写本项目、codeks 或厂商的名字，只写模型完成任务需要的内容。
+- 配置优先表达模型参数和复用策略；模型名不承担协议检测。共享协议代码只处理共同结构，方言差异归对应 adapter。
+- 保留上游错误和诊断，由客户端决定重试。检查转换与完整交付所需的不变量，模型能力由上游裁决。
 - 改了转换规则、配置项或协议假设，同步更新 `docs/` 里对应的文档。
 - 代码注释用英文，文档用中文。

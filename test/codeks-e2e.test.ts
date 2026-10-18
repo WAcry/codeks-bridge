@@ -7,6 +7,7 @@ import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 import { promisify } from "node:util";
 import { formatSse } from "../src/sse.ts";
+import { SUMMARIZATION_PROMPT } from "../src/prompts.ts";
 import { buildCatalog, readBundledCatalog } from "../src/catalog.ts";
 import type { BridgeConfig } from "../src/types.ts";
 
@@ -73,8 +74,8 @@ async function fixture(t: TestContext, template: string, respond: (body: any, in
   t.after(() => stop(upstream));
   const { createBridgeServer } = await import("../src/server.ts");
   const config: BridgeConfig = {
-    upstreams: { fake: { api: "chat", base_url: upstreamUrl } },
-    models: { "test-model": { upstream: "fake", model: "test-model", context_window: 272_000, max_output_tokens: 4096 } },
+    upstreams: { fake: { base_url: upstreamUrl } },
+    models: { "test-model": { adapter: "deepseek-chat", upstream: "fake", model: "test-model", context_window: 272_000, max_output_tokens: 4096 } },
   };
   const bridge = createBridgeServer(config);
   const bridgeUrl = await listen(bridge);
@@ -210,7 +211,7 @@ test("real codeks: remote compaction V2 replaces history and survives resume", {
   let normal = 0;
   let summaries = 0;
   const { requests, invoke } = await fixture(t, "gpt-5.5", (body) => {
-    if (body.tool_choice === "none" && JSON.stringify(body.messages).includes("CONTEXT CHECKPOINT COMPACTION")) {
+    if (body.tool_choice === "none" && body.messages.some((message: any) => message.content === SUMMARIZATION_PROMPT)) {
       summaries++;
       assert.ok(toolReply(body, "call_before_compact"));
       assert.ok(body.tools.length > 0, "Summary requests keep the tool prefix");

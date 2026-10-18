@@ -3,26 +3,38 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { once } from "node:events";
 import test from "node:test";
-import { buildChatRequest, runChat } from "../src/backends/chat.ts";
-import { decodeJsonPayload, decodeReasoning, encodeJsonPayload, encodeReasoning } from "../src/carrier.ts";
+import { buildDeepSeekRequest, runDeepSeek } from "../src/backends/deepseek.ts";
+import { resolveModel, validateConfig } from "../src/config.ts";
+import { decodeReasoning, encodeReasoning } from "../src/carrier.ts";
 import { ResponseWriter } from "../src/writer.ts";
-import type { BackendContext } from "../src/types.ts";
+import type { BackendContext, ResolvedModel } from "../src/types.ts";
 
 const toolDefinitions = [
   { type: "namespace", name: "agents", tools: [{ type: "function", name: "spawn_agent", parameters: { type: "object", properties: { prompt: { type: "string", encrypted: true } } } }] },
   { type: "custom", name: "apply_patch", description: "Edit files.", format: { type: "grammar", syntax: "lark", definition: 'start: "hello"' } },
 ];
 
+function modelConfig() {
+  return validateConfig({
+    upstreams: { test: { base_url: "http://127.0.0.1:1" }, other: { base_url: "http://127.0.0.1:2" } },
+    models: {
+      flash: { upstream: "test", model: "deployment-a", adapter: "deepseek-chat", max_output_tokens: 2048 },
+      other: { upstream: "other", model: "deployment-b", adapter: "deepseek-chat" },
+      shared: { upstream: "test", model: "deployment-c", adapter: "deepseek-chat", replay: { reasoning_from: ["other"] } },
+    },
+  });
+}
+
 function context(input: any = "Hello"): BackendContext {
   return {
     request: { model: "flash", input, tools: toolDefinitions, reasoning: { effort: "high" } },
-    route: { slug: "flash", key: "chat/test/deepseek-flash", config: { upstream: "test", model: "deepseek-flash", max_output_tokens: 2048 }, upstream: { api: "chat", base_url: "http://127.0.0.1:1" } },
+    route: resolveModel(modelConfig(), "flash"),
     signal: new AbortController().signal,
   };
 }
 
-function reasoning(key: string, text: string) {
-  return { type: "reasoning", encrypted_content: encodeReasoning(key, encodeJsonPayload({ type: "chat", text })) };
+function reasoning(route: ResolvedModel, text: string) {
+  return { type: "reasoning", encrypted_content: encodeReasoning({ source: route.origin, format: route.profile.reasoning_format, data: text }) };
 }
 
 const delta = (value: any, finish: string | null = null) => ({ choices: [{ index: 0, delta: value, finish_reason: finish }] });
@@ -47,7 +59,7 @@ async function exchange(ctx: BackendContext, chunks: any[], callback: (events: a
   const writer = new ResponseWriter({ write: (line) => events.push(JSON.parse(line.slice(line.indexOf("data: ") + 6).trim())) }, { model: "flash" });
   writer.start();
   try {
-    const result = await runChat(ctx, writer);
+    const result = await runDeepSeek(ctx, writer);
     assert.equal(events.some((event) => event.type === "response.completed"), false);
     writer.complete(result.usage);
     callback(events, body, result);
@@ -61,14 +73,14 @@ test("Chat combines matching reasoning, assistant text and parallel tool calls i
   const ctx = context();
   ctx.request.input = [
     { type: "message", role: "user", content: "Do two tasks." },
-    reasoning(ctx.route.key, "I will delegate."),
+    reasoning(ctx.route, "I will delegate."),
     { type: "message", role: "assistant", content: [{ type: "output_text", text: "Starting." }] },
     { type: "function_call", call_id: "first", namespace: "agents", name: "spawn_agent", arguments: '{"prompt":"Task one"}' },
     { type: "custom_tool_call", call_id: "second", name: "apply_patch", input: "hello" },
     { type: "function_call_output", call_id: "first", output: "Done" },
     { type: "custom_tool_call_output", call_id: "second", output: "Applied" },
   ];
-  const { body } = buildChatRequest(ctx);
+  const { body } = buildDeepSeekRequest(ctx);
   assert.equal(body.messages.length, 4);
   assert.equal(body.messages[1].reasoning_content, "I will delegate.");
   assert.equal(body.messages[1].content, "Starting.");
@@ -79,17 +91,17 @@ test("Chat combines matching reasoning, assistant text and parallel tool calls i
   assert.equal(body.max_tokens, 2048);
 });
 
-test("Chat filters foreign reasoning without changing history and fills an empty reasoning field", () => {
+test("DeepSeek filters foreign reasoning by default and restores explicitly allowed state", () => {
   const ctx = context();
-  const foreign = reasoning("other/model", "Foreign reasoning");
+  const foreign = reasoning(resolveModel(modelConfig(), "other"), "Foreign reasoning");
   ctx.request.input = [foreign, { type: "function_call", call_id: "foreign_call", namespace: "agents", name: "spawn_agent", arguments: "{}" }, { type: "function_call_output", call_id: "foreign_call", output: "Done" }];
   const snapshot = structuredClone(ctx.request.input);
-  const { body } = buildChatRequest(ctx);
+  const { body } = buildDeepSeekRequest(ctx);
   assert.equal(body.messages[0].reasoning_content, "");
   assert.equal(JSON.stringify(body).includes("Foreign reasoning"), false);
   assert.deepEqual(ctx.request.input, snapshot);
-  ctx.route.key = "other/model";
-  assert.equal(buildChatRequest(ctx).body.messages[0].reasoning_content, "Foreign reasoning");
+  ctx.route = resolveModel(modelConfig(), "shared");
+  assert.equal(buildDeepSeekRequest(ctx).body.messages[0].reasoning_content, "Foreign reasoning");
 });
 
 test("Chat preserves system updates and places tool images after all parallel results", () => {
@@ -102,7 +114,7 @@ test("Chat preserves system updates and places tool images after all parallel re
     { type: "function_call_output", call_id: "b", output: "Finished" },
     { type: "message", role: "developer", content: "Updated instruction." },
   ]);
-  const { body } = buildChatRequest(ctx);
+  const { body } = buildDeepSeekRequest(ctx);
   assert.deepEqual(body.messages.map((m: any) => m.role), ["system", "user", "assistant", "tool", "tool", "user", "system"]);
   assert.equal(body.messages[1].content[0].image_url.detail, "high");
   assert.equal(body.messages[3].content, "Screenshot");
@@ -110,39 +122,61 @@ test("Chat preserves system updates and places tool images after all parallel re
   assert.equal(body.messages[6].content, "Updated instruction.");
 });
 
-test("Chat maps DeepSeek efforts, tool_choice and compaction", () => {
+test("DeepSeek maps efforts for any deployment name and forwards forced tools and JSON schema", () => {
   const ctx = context();
   for (const [incoming, outgoing] of [["minimal", "low"], ["medium", "high"], ["xhigh", "high"], ["ultra", "max"]]) {
     ctx.request.reasoning = { effort: incoming };
-    assert.equal(buildChatRequest(ctx).body.reasoning_effort, outgoing);
+    assert.equal(buildDeepSeekRequest(ctx).body.reasoning_effort, outgoing);
   }
   ctx.request.tool_choice = { type: "function", namespace: "agents", name: "spawn_agent" };
-  assert.throws(() => buildChatRequest(ctx), /does not support forced tool_choice/);
+  assert.deepEqual(buildDeepSeekRequest(ctx).body.tool_choice, { type: "function", function: { name: "agents__spawn_agent" } });
+  ctx.request.text = { format: { type: "json_schema", name: "answer", schema: { type: "object" }, strict: true } };
+  assert.deepEqual(buildDeepSeekRequest(ctx).body.response_format, {
+    type: "json_schema", json_schema: { name: "answer", schema: { type: "object" }, strict: true },
+  });
   ctx.request.reasoning = { effort: "none" };
-  const { body } = buildChatRequest(ctx);
+  const { body } = buildDeepSeekRequest(ctx);
   assert.deepEqual(body.thinking, { type: "disabled" });
   assert.deepEqual(body.tool_choice, { type: "function", function: { name: "agents__spawn_agent" } });
   ctx.compacting = true;
-  assert.equal(buildChatRequest(ctx).body.tool_choice, "none");
+  assert.equal(buildDeepSeekRequest(ctx).body.tool_choice, "none");
+  assert.equal(buildDeepSeekRequest(ctx).body.response_format, undefined);
 });
 
-test("Chat reasoning field can be configured without leaking the setting upstream", () => {
+test("DeepSeek uses configured effort mappings and lets options override derived parameters", () => {
+  const config = modelConfig();
+  config.models.flash.reasoning = { default_effort: "brief", effort_map: { brief: "low", thorough: "max" } };
   const ctx = context();
-  ctx.route.config.options = { reasoning_field: "reasoning", temperature: 0.2 };
-  ctx.request.input = [reasoning(ctx.route.key, "A thought"), { type: "message", role: "assistant", content: "Hi" }];
-  const { body } = buildChatRequest(ctx);
-  assert.equal(body.reasoning_field, undefined);
-  assert.equal(body.messages[0].reasoning, "A thought");
-  assert.equal(body.messages[0].reasoning_content, undefined);
+  ctx.route = resolveModel(validateConfig(config), "flash");
+  delete ctx.request.reasoning;
+  assert.equal(buildDeepSeekRequest(ctx).body.reasoning_effort, "low");
+  ctx.request.reasoning = { effort: "thorough" };
+  assert.equal(buildDeepSeekRequest(ctx).body.reasoning_effort, "max");
+  ctx.request.reasoning = { effort: "future-level" };
+  assert.equal(buildDeepSeekRequest(ctx).body.reasoning_effort, "future-level");
+  ctx.route.upstream.options = { temperature: 0.1, max_tokens: 100, reasoning_effort: "low" };
+  ctx.route.config.options = { reasoning_effort: "custom", temperature: 0.2, max_tokens: 500,
+    messages: [], tools: [], model: "wrong", stream: false, stream_options: { include_usage: false, extra: true } };
+  ctx.request.temperature = 0.9;
+  ctx.request.max_output_tokens = 2000;
+  ctx.request.input = [reasoning(ctx.route, "A thought"), { type: "message", role: "assistant", content: "Hi" }];
+  const { body } = buildDeepSeekRequest(ctx);
+  assert.equal(body.messages[0].reasoning_content, "A thought");
+  assert.equal(body.reasoning_effort, "custom");
   assert.equal(body.temperature, 0.2);
+  assert.equal(body.max_tokens, 500);
+  assert.equal(body.model, "deployment-a");
+  assert.equal(body.stream, true);
+  assert.equal(body.tools.length, 2);
+  assert.deepEqual(body.stream_options, { include_usage: true, extra: true });
 });
 
 test("Chat rejects unsupported content and explicit hosted tool selection", () => {
   const ctx = context([{ type: "message", role: "user", content: [{ type: "input_audio", data: "AAAA" }] }]);
-  assert.throws(() => buildChatRequest(ctx), /does not support content part input_audio/);
+  assert.throws(() => buildDeepSeekRequest(ctx), /does not support content part input_audio/);
   ctx.request.input = "Hello";
   ctx.request.tool_choice = { type: "web_search" };
-  assert.throws(() => buildChatRequest(ctx), /does not support this tool_choice/);
+  assert.throws(() => buildDeepSeekRequest(ctx), /does not support this tool_choice/);
 });
 
 test("Chat SSE round trip retains reasoning and waits to emit both complete tool calls", async () => {
@@ -160,8 +194,9 @@ test("Chat SSE round trip retains reasoning and waits to emit both complete tool
     const items = events.filter((e) => e.type === "response.output_item.done").map((e) => e.item);
     assert.deepEqual(items.map((i) => i.type), ["reasoning", "message", "function_call", "custom_tool_call"]);
     const carrier = decodeReasoning(items[0].encrypted_content)!;
-    assert.equal(carrier.key, ctx.route.key);
-    assert.deepEqual(decodeJsonPayload(carrier.payload), { type: "chat", text: "First think." });
+    assert.deepEqual(carrier.source, ctx.route.origin);
+    assert.equal(carrier.format, "reasoning.text.v1");
+    assert.equal(carrier.data, "First think.");
     assert.equal(items[1].phase, "commentary");
     assert.equal(items[2].namespace, "agents");
     assert.equal(items[2].name, "spawn_agent");
@@ -174,7 +209,7 @@ test("Chat final text becomes final_answer and can carry an empty reasoning carr
     assert.equal(result.endTurn, true);
     const items = events.filter((e) => e.type === "response.output_item.done").map((e) => e.item);
     assert.equal(items[1].phase, "final_answer");
-    assert.deepEqual(decodeJsonPayload(decodeReasoning(items[0].encrypted_content)!.payload), { type: "chat", text: "" });
+    assert.equal(decodeReasoning(items[0].encrypted_content)!.data, "");
   });
 });
 
@@ -202,8 +237,19 @@ test("Chat forced tool selection preserves the original identity and kind", () =
     { type: "function", namespace: "missing", name: "look_up" },
   ]) {
     ctx.request.tool_choice = selected;
-    assert.throws(() => buildChatRequest(ctx), /not available/);
+    assert.throws(() => buildDeepSeekRequest(ctx), /not available/);
   }
   ctx.request.tool_choice = { type: "function", name: "look_up" };
-  assert.deepEqual(buildChatRequest(ctx).body.tool_choice, { type: "function", function: { name: "look_up" } });
+  assert.deepEqual(buildDeepSeekRequest(ctx).body.tool_choice, { type: "function", function: { name: "look_up" } });
+});
+
+test("DeepSeek stream errors preserve the original upstream event", async () => {
+  const failure = { error: { code: "overloaded_error", message: "Capacity unavailable.", headers: { "Retry-After": "12" } }, request_id: "synthetic_request" };
+  await assert.rejects(exchange(context(), [failure], () => {}), (error: any) => {
+    assert.equal(error.message, "Capacity unavailable.");
+    assert.equal(error.code, "server_is_overloaded");
+    assert.deepEqual(error.headers, { "retry-after": "12" });
+    assert.deepEqual(error.upstream.body, failure);
+    return true;
+  });
 });

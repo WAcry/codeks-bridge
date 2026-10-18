@@ -1,85 +1,70 @@
-// Bridge-owned payloads stored in codeks history.
-//
-// codeks keeps reasoning items and compaction items in its history and sends
-// them back on every request. The bridge puts its own envelope into their
-// `encrypted_content` field so that it can tell, on later requests, which
-// model produced the payload. See docs/reasoning.md and docs/compaction.md.
-//
-// Reasoning:  "cxbr1:" + b64url(key) + ":" + payload
-// Compaction: "cxbc1:" + b64url(JSON CompactionCarrier)
+import { BridgeError } from "./errors.ts";
+import type { StateOrigin } from "./types.ts";
 
-const REASONING_PREFIX = "cxbr1:";
-const COMPACTION_PREFIX = "cxbc1:";
+// Versioned, self-contained state stored in the client's encrypted_content field.
+// These envelopes encode source facts and payloads, never replay policy.
+const REASONING_PREFIX = "cxbr2:";
+const COMPACTION_PREFIX = "cxbc2:";
 
-export function b64urlEncode(text: string): string {
-  return Buffer.from(text, "utf8").toString("base64url");
-}
-
-export function b64urlDecode(text: string): string {
-  return Buffer.from(text, "base64url").toString("utf8");
-}
-
-export interface ReasoningCarrier {
-  key: string;
-  payload: string;
-}
-
-/** The model identity is encoded; the payload is kept verbatim. */
-export function encodeReasoning(key: string, payload: string): string {
-  return `${REASONING_PREFIX}${b64urlEncode(key)}:${payload}`;
-}
-
-export function decodeReasoning(value: unknown): ReasoningCarrier | undefined {
-  if (typeof value !== "string" || !value.startsWith(REASONING_PREFIX)) return undefined;
-  const rest = value.slice(REASONING_PREFIX.length);
-  const sep = rest.indexOf(":");
-  if (sep < 0) return undefined;
-  try {
-    return { key: b64urlDecode(rest.slice(0, sep)), payload: rest.slice(sep + 1) };
-  } catch {
-    return undefined;
-  }
-}
-
-export function encodeJsonPayload(value: unknown): string {
-  return b64urlEncode(JSON.stringify(value));
-}
-
-export function decodeJsonPayload<T>(payload: string): T | undefined {
-  try {
-    return JSON.parse(b64urlDecode(payload)) as T;
-  } catch {
-    return undefined;
-  }
+export interface StatePayload {
+  source: StateOrigin;
+  format: string;
+  data: unknown;
 }
 
 export interface CompactionCarrier {
-  v: 1;
   /** The prompt-based summary. Any model can read it. */
   summary: string;
-  /** The upstream's own compaction item, valid only for the same key. */
-  native?: { key: string; item: Record<string, unknown> };
+  native?: StatePayload;
+}
+
+function object(value: unknown): value is Record<string, any> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function statePayload(value: unknown): value is StatePayload {
+  return object(value) && object(value.source) &&
+    [value.source.id, value.source.connection, value.source.model, value.source.adapter, value.format]
+      .every((field) => typeof field === "string" && field.length > 0) &&
+    Object.hasOwn(value, "data") && value.data !== undefined;
+}
+
+function compactionCarrier(value: unknown): value is CompactionCarrier {
+  return object(value) && typeof value.summary === "string" && !!value.summary.trim() &&
+    (value.native === undefined || statePayload(value.native));
+}
+
+function encode(prefix: string, value: unknown): string {
+  return prefix + Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+}
+
+function decode(value: unknown, prefix: string): unknown {
+  if (typeof value !== "string" || !value.startsWith(prefix)) return undefined;
+  try {
+    return JSON.parse(Buffer.from(value.slice(prefix.length), "base64url").toString("utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
+export function encodeReasoning(state: StatePayload): string {
+  if (!statePayload(state)) throw new TypeError("Invalid reasoning state envelope");
+  return encode(REASONING_PREFIX, state);
+}
+
+export function decodeReasoning(value: unknown): StatePayload | undefined {
+  if (typeof value !== "string" || !value.startsWith(REASONING_PREFIX)) return undefined;
+  const decoded = decode(value, REASONING_PREFIX);
+  if (!statePayload(decoded)) throw new BridgeError("Malformed bridge reasoning state envelope");
+  return decoded;
 }
 
 export function encodeCompaction(carrier: CompactionCarrier): string {
-  return COMPACTION_PREFIX + b64urlEncode(JSON.stringify(carrier));
+  if (!compactionCarrier(carrier)) throw new TypeError("Invalid compaction state envelope");
+  return encode(COMPACTION_PREFIX, carrier);
 }
 
 export function decodeCompaction(value: unknown): CompactionCarrier | undefined {
-  if (typeof value !== "string" || !value.startsWith(COMPACTION_PREFIX)) return undefined;
-  try {
-    const parsed = JSON.parse(b64urlDecode(value.slice(COMPACTION_PREFIX.length)));
-    if (!parsed || parsed.v !== 1 || typeof parsed.summary !== "string" || !parsed.summary.trim()) return undefined;
-    if (parsed.native !== undefined) {
-      const native = parsed.native;
-      if (!native || typeof native.key !== "string" || !native.key || !native.item ||
-          typeof native.item !== "object" || Array.isArray(native.item) ||
-          !["compaction", "compaction_summary"].includes(native.item.type) ||
-          typeof native.item.encrypted_content !== "string" || !native.item.encrypted_content) return undefined;
-    }
-    return parsed as CompactionCarrier;
-  } catch {
-    // fall through
-  }
-  return undefined;
+  const decoded = decode(value, COMPACTION_PREFIX);
+  return compactionCarrier(decoded) ? decoded : undefined;
 }

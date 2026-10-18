@@ -1,11 +1,11 @@
 import { upstreamHeaders } from "./auth.ts";
-import { BridgeError, upstreamError } from "./errors.ts";
+import { BridgeError, transportError, upstreamError } from "./errors.ts";
 import type { ResolvedModel } from "./types.ts";
 
 /** base_url includes any API version prefix; path is appended, never resolved from /. */
 export async function upstreamFetch(route: ResolvedModel, path: string, body: unknown, signal: AbortSignal): Promise<Response> {
   const url = route.upstream.base_url.replace(/\/+$/, "") + "/" + path.replace(/^\/+/, "");
-  const headers = await upstreamHeaders(route.upstream, signal);
+  const headers = await upstreamHeaders(route.upstream, route.profile.api, signal);
   const idle = new AbortController();
   const combined = AbortSignal.any([signal, idle.signal]);
   const timeoutMs = route.upstream.stream_idle_timeout_ms ?? 300_000;
@@ -18,10 +18,10 @@ export async function upstreamFetch(route: ResolvedModel, path: string, body: un
   let response: Response;
   try {
     response = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal: combined, redirect: "error" });
-  } catch {
+  } catch (error) {
     clearTimeout(timer!);
     if (combined.aborted) throw combined.reason;
-    throw new BridgeError("Could not reach the upstream", "upstream_error", 502);
+    throw transportError(error);
   }
   // Downstream keepalives do not count as upstream progress. Time out both the
   // wait for headers and an idle response body, including a stalled error body.
@@ -35,7 +35,7 @@ export async function upstreamFetch(route: ResolvedModel, path: string, body: un
           else { reset(); controller.enqueue(chunk.value); }
         } catch (error) {
           clearTimeout(timer);
-          controller.error(combined.aborted ? combined.reason : error);
+          controller.error(combined.aborted ? combined.reason : transportError(error));
         }
       },
       async cancel(reason) {
@@ -45,8 +45,9 @@ export async function upstreamFetch(route: ResolvedModel, path: string, body: un
     }), { status: response.status, statusText: response.statusText, headers: response.headers });
   } else clearTimeout(timer!);
   if (!response.ok) {
-    let payload: unknown;
-    try { payload = await response.json(); } catch { payload = undefined; }
+    const text = await response.text();
+    let payload: unknown = text;
+    try { payload = JSON.parse(text); } catch { /* Non-JSON error bodies are still useful diagnostics. */ }
     if (combined.aborted) throw combined.reason;
     throw upstreamError(response.status, payload, response.headers);
   }

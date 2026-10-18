@@ -1,12 +1,11 @@
-# Chat Completions 与 DeepSeek
+# DeepSeek Chat
 
-`api: "chat"` 使用经典 `/chat/completions` 端点。本轮实际验证的模型是 DeepSeek 官方的 `deepseek-flash`。其他 OpenAI 兼容服务可以配置，但兼容性取决于它们是否实现下述字段和流式事件；不能仅凭接口名称保证兼容。
+模型设置 `adapter: "deepseek-chat"`，请求发送到 `<base_url>/chat/completions`。这个 adapter 明确使用 DeepSeek 方言：`reasoning_content`、thinking 参数和对应 usage。实际模型可以是 `deepseek-flash` 或第三方部署名称，bridge 不按名字猜测规则。
 
 ```json
 {
   "upstreams": {
     "deepseek": {
-      "api": "chat",
       "base_url": "https://api.deepseek.com",
       "api_key_env": "DEEPSEEK_API_KEY"
     }
@@ -14,78 +13,65 @@
   "models": {
     "flash": {
       "upstream": "deepseek",
+      "adapter": "deepseek-chat",
       "model": "deepseek-flash",
-      "context_window": 1048576,
+      "context_window": 131072,
       "max_output_tokens": 16384
     }
   }
 }
 ```
 
-`base_url` 可以包含 `/v1` 等路径前缀，bridge 在其后追加 `/chat/completions`。`max_output_tokens` 转成 Chat 的 `max_tokens`，限制同时包含思考和可见输出。大任务需要给思考留足空间；达到上限时 bridge 报错，不执行可能只有一半的工具调用。
+窗口是示例配置值，以实际端点限制为准。`base_url` 可包含 `/v1` 等前缀。`max_output_tokens` 转为 `max_tokens`，上游的输出预算包含 thinking 与可见输出；达到上限返回失败，不执行不完整工具调用。
 
-## 消息和工具
+## Reasoning 与参数
 
-Responses 的 `instructions` 成为最前面的 system 消息。历史中的 developer 消息在原位置转换成 system 消息，保留执行过程中更新的指令。user 消息、assistant 文本、工具调用和结果保留原来的顺序。
+思考从 `delta.reasoning_content` 读取，作为 `reasoning.text.v1` 的字符串 data 保存。下次请求把允许来源的文本恢复到 assistant 的 `reasoning_content`。是否同模型、是否同上游都由来源策略决定，不能只凭文本格式推断应该共享。[复用配置](reasoning.md)
 
-同一次 assistant 输出的 reasoning、可见文本和并行工具调用合并到一条 Chat assistant 消息。工具结果是对应的 `role: "tool"` 消息，`tool_call_id` 与调用匹配。工具名通过共享工具映射恢复 namespace；custom 工具使用 `{ "input": "..." }` 形式的普通 function，语法放进说明。详见 [工具转换](tools.md)。
+没有可恢复 reasoning 的 assistant 历史使用 `reasoning_content: ""`，不编造思考。它使带有其他目标历史的工具循环仍具备 DeepSeek 要求的字段。
 
-Chat 不提供 Responses 托管的 web search、image generation 等工具。这些定义不会传给 Chat；显式用 `tool_choice` 选择不支持的工具会报错。`auto`、`none`、`required` 和指定 function/custom 工具可以转换，但上游本身仍可能有限制。
+默认 effort 为 `high`，默认映射如下：
 
-DeepSeek 思考模式只支持 `auto` 与 `none`。要求强制调用工具时，调用方须明确设 `reasoning.effort: "none"`，bridge 不会为满足工具选择而暗中关闭思考。压缩使用 `tool_choice: "none"`。
-
-## Reasoning 与模型切换
-
-默认从 Chat 流的 `delta.reasoning_content` 读取纯文本思考，并把它保存在带来源标识的 reasoning carrier 中。下次请求同一个实际模型和端点时，恢复到 assistant 的 `reasoning_content`。切到别的模型或端点时，只过滤当前请求里的思考，原历史仍保留；切回来就能恢复。carrier 是编码，不是加密。
-
-DeepSeek 带工具的思考模式要求回传历史 reasoning；只依赖它有时能通过原生 tool call ID 恢复思考不可靠。其他模型生成的 assistant 历史没有可兼容的思考，bridge 发送 `reasoning_content: ""`，不复制其他模型的内容，也不编造思考。真实测试验证了非原生调用 ID 加空字段可继续工具循环；省略该字段则可能返回 400。
-
-其他 Chat 服务如果使用同级纯文本字段，例如 `reasoning`，可以设置：
-
-```json
-{ "options": { "reasoning_field": "reasoning" } }
-```
-
-该选项同时控制读取和重放，且不会作为请求参数发送给上游。数组式 reasoning、嵌套对象、不同字段分别读写等格式本轮不支持；遇到非文本思考会明确报错。普通 `options` 项作为 Chat 请求参数；bridge 生成的 model、messages、stream、工具等协议字段优先。
-
-DeepSeek 的 effort 映射遵循其当前文档：
-
-| 请求 effort | DeepSeek 行为 |
+| 客户端 effort | 原生参数 |
 | --- | --- |
 | `none` | `thinking.type: "disabled"` |
-| `minimal`、`low` | 开启思考，`reasoning_effort: "low"` |
-| `medium`、`high`、`xhigh` | 开启思考，`reasoning_effort: "high"` |
-| `max`、`ultra` | 开启思考，`reasoning_effort: "max"` |
+| `minimal`、`low` | `thinking.type: "enabled"`，`reasoning_effort: "low"` |
+| `medium`、`high`、`xhigh` | `thinking.type: "enabled"`，`reasoning_effort: "high"` |
+| `max`、`ultra` | `thinking.type: "enabled"`，`reasoning_effort: "max"` |
 
-未指定 effort 时保留配置里的参数和上游默认值。其他模型的 effort 原样发送，不套用 DeepSeek 的映射。
+映射可由 `reasoning.effort_map` 整体替换，目录中可选档位来自同一配置。未映射的显式 effort 原样发送。上游和模型 `options` 随后覆盖推导参数，允许直接设置端点专有选项；桥接器最终固定 model、messages、工具定义、流模式和 usage 开关。
 
-## 图片
+强制工具选择、JSON Schema 与 thinking 能否组合由上游判断。bridge 转换可表达的请求后直接发送，上游不支持时保留错误，不自动关闭 thinking 或改成普通文本输出。
 
-user 消息里的 `input_image` 转成 Chat 的 `image_url` 内容块，支持 HTTP(S) 图片地址和 `data:image/...;base64,...`。`detail: "original"` 转成 Chat 的 `high`；其他 detail 原样传递。
+## 消息、工具与图片
 
-为了兼容只允许 user 消息带图片的 Chat 服务，工具结果中的文本仍放在 tool 消息，图片移到紧跟在这一组 tool 结果之后的 user 消息，并标明来源 `call_id`。即使有并行调用，也先完成所有 tool 结果，再发图片；不会在调用和结果之间插入 user 消息。这会增加一个 user 边界，是协议转换的取舍。
+Responses instructions 成为开头的 system 消息；历史 developer 在原位置转为 system。user、assistant、工具调用和结果保留顺序。同一次 assistant 输出的 reasoning、文字和并行工具调用合并为一条 Chat assistant 消息。
 
-assistant 图片、system/developer 图片、上传文件 ID、音频和视频本轮不支持，并会明确报错。图片是否可读、可用格式和尺寸上限由上游决定。测试验证了 `deepseek-flash` 可以识别 user 图片和转换后的工具图片。
+工具结果使用 `role: "tool"` 和原 `tool_call_id`。namespace、自由文本工具及语法使用[共享工具转换](tools.md)。Responses JSON Schema 转为 Chat `response_format.json_schema`，JSON object 转为 `response_format: {type: "json_object"}`；schema 由上游验证。
 
-## 流、结束与用量
+用户图片转为 `image_url`，支持 HTTP(S) 和 image data URL，`detail: "original"` 转为 `high`。工具结果文本保持 tool 消息，图片放在同组所有 tool 结果之后的 user 消息，标注来源 call ID；这样不打断并行调用与结果的配对。这会增加一个 user 边界，是转换的代价。
 
-请求始终开启流式输出和 `stream_options.include_usage`。文本与 reasoning 实时写入 Responses SSE，工具参数按索引拼接；只有流完整结束、所有工具调用都合法后，才把调用交给 codeks 执行。未结束的连接、无 usage、无 `finish_reason`、未知工具和无效参数都不能形成一次成功响应。
+assistant/system/developer 图片、文件 ID、音频和视频没有本轮转换路径，明确报错。图片的实际识别能力和尺寸限制交给模型端点。
 
-`stop` 表示完成；`tool_calls` 表示还需处理工具。`length` 和内容过滤返回明确错误。DeepSeek 的 `insufficient_system_resource`、`aborted` 转成可重试的 `server_is_overloaded`。HTTP 限流、容量、配额和鉴权错误由共享错误映射处理；bridge 不另加重试循环。
+## 流、用量与压缩
 
-| Chat 用量 | Responses 用量 |
+出站开启 `stream: true`、`stream_options.include_usage: true`。文字与 reasoning 随到随发，工具参数按索引拼接，只有流结束且所有调用完整时才交给 codeks。未结束的连接、缺失 usage、未知工具或不完整参数不能构成成功响应。
+
+`stop` 完成，`tool_calls` 要求继续执行工具。`length` 和内容过滤返回错误；DeepSeek 的 `insufficient_system_resource`、`aborted` 归为容量错误。HTTP 与流内错误保留原始上游详情，bridge 不叠加重试。[错误结构](responses-stream.md)
+
+| DeepSeek 用量 | Responses 用量 |
 | --- | --- |
 | `prompt_tokens` | `input_tokens` |
 | `completion_tokens` | `output_tokens` |
-| `prompt_cache_hit_tokens`，否则 `prompt_tokens_details.cached_tokens` | `input_tokens_details.cached_tokens` |
+| `prompt_cache_hit_tokens`，或 `prompt_tokens_details.cached_tokens` | `input_tokens_details.cached_tokens` |
 | `completion_tokens_details.reasoning_tokens` | `output_tokens_details.reasoning_tokens` |
 
-总量直接取上游统计，不额外叠加历史 reasoning。缺少完整的 input/output 用量时失败，避免以零用量悄悄影响上下文压缩判断。
+reasoning 不重复加到总量中。压缩只生成文字摘要，仍由客户端远程 V2 通道接收；保留工具定义并固定 `tool_choice: none`，不能保证上游继续缓存所有工具上下文。
 
-## 压缩与验证范围
+## 扩展方言
 
-Chat 通过 prompt 生成可移植摘要，作为 bridge 的 compaction carrier 返回，详见 [压缩](compaction.md)。DeepSeek 实测 `tool_choice: "none"` 会影响工具上下文和输入 token 数，即使请求保留工具定义，也不能保证这一部分缓存命中。压缩正确性不依赖缓存。
+[`src/backends/chat.ts`](../src/backends/chat.ts) 负责公共消息、工具和流，定义小型 `ChatDialect` 接口；[`src/backends/deepseek.ts`](../src/backends/deepseek.ts) 提供 reasoning 字段、请求参数与 usage。未来使用不同字段或结构的模型通过自己的方言实现支持，不把任意 Chat 兼容端点视为 DeepSeek。
 
-合成测试覆盖历史合并、来源过滤后切回、命名空间、自定义语法工具、并行工具结果与图片顺序、effort、流截断和失败保护。DeepSeek 官方端点的实测覆盖工具循环、异模型历史、图片和 custom 工具；真实请求、签名和完整响应不放进公开仓库。
+配置差异优先使用 profile 和 options；实际载荷结构改变时再改 adapter 或新增版本。当前没有其他 Chat 方言实现。
 
-接口依据：[Chat API](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion)、[思考模式](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode)、[图片](https://api-docs.deepseek.com/zh-cn/guides/vision)。这些规则可能随上游更新；变更时应同时更新转换和测试。
+验证见 [`test/chat.test.ts`](../test/chat.test.ts)。协议参考：[Chat API](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion)、[思考模式](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode)、[图片](https://api-docs.deepseek.com/zh-cn/guides/vision)。

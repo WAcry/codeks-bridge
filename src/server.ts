@@ -1,15 +1,15 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { validateConfig, resolveModel } from "./config.ts";
-import { BridgeError } from "./errors.ts";
+import { BridgeError, transportError } from "./errors.ts";
 import { ResponseWriter, usageJson } from "./writer.ts";
 import { runResponses } from "./backends/responses.ts";
 import { runAnthropic } from "./backends/anthropic.ts";
-import { runChat } from "./backends/chat.ts";
+import { runDeepSeek } from "./backends/deepseek.ts";
 import { compact, isCompactionRequest } from "./compaction.ts";
-import type { Backend, BridgeConfig, ResponsesRequest } from "./types.ts";
+import type { AdapterId, Backend, BridgeConfig, ResponsesRequest } from "./types.ts";
 
-const BACKENDS: Record<string, Backend> = { responses: runResponses, anthropic: runAnthropic, chat: runChat };
+const BACKENDS: Record<AdapterId, Backend> = { "gpt-responses": runResponses, "claude-messages": runAnthropic, "deepseek-chat": runDeepSeek };
 const MAX_BODY_BYTES = 64 * 1024 * 1024;
 function json(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
   res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store", ...headers });
@@ -68,7 +68,7 @@ export function createBridgeServer(value: BridgeConfig): Server {
       const request = await readRequest(req);
       const route = resolveModel(config, request.model);
       const context = { request, route, signal: controller.signal };
-      const backend = BACKENDS[route.upstream.api];
+      const backend = BACKENDS[route.profile.id];
       const streaming = request.stream === true;
       if (streaming) {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", "x-accel-buffering": "no" });
@@ -94,9 +94,9 @@ export function createBridgeServer(value: BridgeConfig): Server {
       });
     } catch (cause) {
       if (controller.signal.aborted || res.destroyed) return;
-      const error = cause instanceof BridgeError ? cause : new BridgeError("Upstream response could not be completed", "upstream_error", 502);
-      if (res.headersSent && writer) { writer.fail(error.code, error.message, error.headers); res.end(); }
-      else json(res, error.status, { error: { code: error.code, message: error.message } }, error.headers);
+      const error = cause instanceof BridgeError ? cause : transportError(cause);
+      if (res.headersSent && writer) { writer.fail(error.code, error.message, error.headers, error.upstream); res.end(); }
+      else json(res, error.status, { error: { code: error.code, message: error.message, ...(error.upstream ? { upstream: error.upstream } : {}) } }, error.headers);
     } finally {
       if (keepalive) clearInterval(keepalive);
       res.off("close", abort);
