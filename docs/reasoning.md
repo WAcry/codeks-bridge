@@ -2,6 +2,12 @@
 
 Reasoning 默认只恢复给产生它的目标，配置可以允许其他来源。是否允许复用和如何解码是两件事：来源策略由 `replay.reasoning_from` 决定，载荷的 `format` 告诉 adapter 如何还原内容。
 
+## 显示与推理分开
+
+目录的 `default_reasoning_summary`、客户端的 `model_reasoning_summary` 和请求的 `reasoning.summary` 控制可见摘要，不决定是否进行推理。Claude / DeepSeek 沿用 GPT-6.1 Sol 的摘要默认值 `none`；在 codeks 配置 `model_reasoning_summary = "auto"` 可打开显示，也可使用 `concise` 或 `detailed`。Codex `0.163.0` 在 `codex-rs/core/src/client.rs` 的 `build_reasoning` 中将有效配置 `none` 表达为省略请求的 summary 字段，因此 bridge 对缺省和 `none` 都不输出可见摘要，仍保存完整原生载荷，并按来源策略回放。
+
+启用显示时，Claude 请求 summarized thinking，DeepSeek 展示上游 reasoning 文本，不另外调用模型生成摘要。`auto`、`concise` 和 `detailed` 在这两个 adapter 中都表示请求可见内容，不承诺复现 GPT 的摘要长度差异。隐藏摘要也不意味着丢弃签名、密文或明文 reasoning；这些数据仍由 carrier 持久化。
+
 ## 保存格式
 
 Responses reasoning item 的 `encrypted_content` 保存：
@@ -49,9 +55,9 @@ codeks 会再次发送 `encrypted_content`，因此载荷可以跨请求、会�
 { "replay": { "reasoning_from": ["a"] } }
 ```
 
-B 可以接收自身及 A 的 reasoning；A 不会因此接收 B。A 接受 C 也不会让 B 自动接受 C。别名在加载配置时解析为实际来源身份。
+B 可以接收自身及 A 的 reasoning；A 不会因此接收 B。A 接受 C 也不会让 B 自动接受 C。别名按连接、adapter 和实际部署解析为来源身份。
 
-加载配置只检查引用存在且格式可解码。两个 GPT 模型的 reasoning、同一 DeepSeek 模型的不同部署均可配置复用；上游是否真正接受，交给实际请求验证。失败按上游错误返回，不删掉 reasoning 再发送。
+加载配置检查引用存在且源与目标的格式标识一致。两个 GPT 模型的 reasoning、同一 DeepSeek 模型的不同部署均可配置复用；每次请求恢复实际载荷，上游是否真正接受，交给实际请求验证。失败按上游错误返回，不删掉 reasoning 再发送。
 
 `prepareHistory` 每次复制输入，恢复来源允许且格式匹配的 carrier，其他 reasoning 只在本次请求中过滤。普通消息、工具调用、结果和图片继续保留。没有来源包装的 reasoning 不归属到当前目标。
 

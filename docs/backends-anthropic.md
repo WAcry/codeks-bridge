@@ -1,6 +1,6 @@
 # Claude Messages
 
-模型设置 `adapter: "claude-messages"`，请求转换为 `POST <base_url>/messages`。官方端点的 `base_url` 为 `https://api.anthropic.com/v1`；默认使用 `x-api-key` 和 `anthropic-version: 2023-06-01`，可通过连接配置覆盖。
+模型选择 `catalog: "claude-opus-5-5"` 或 `"claude-sonnet-5-5"`，条目指定 `claude-messages` adapter，请求转换为 `POST <base_url>/messages`。官方端点的 `base_url` 为 `https://api.anthropic.com/v1`；默认使用 `x-api-key` 和 `anthropic-version: 2023-06-01`，可通过连接配置覆盖。
 
 ## 历史与 thinking
 
@@ -8,9 +8,11 @@
 
 相邻同角色消息合并；reasoning、文本和工具调用成为 assistant 内容块，工具输出成为下一条 user 消息中的 `tool_result`。原历史不变。
 
-默认 effort 为 `medium`，默认映射支持 `none`、`low`、`medium`、`high`、`xhigh`、`max` 并保留同名值。映射后为 `none` 时设置 `thinking: {type: "disabled"}`；其他值使用 adaptive thinking 并写入 `output_config.effort`。`reasoning.summary: "none"` 选择 `display: "omitted"`，否则为 `summarized`。
+默认 effort 为 `medium`，普通映射支持 `none`、`low`、`medium`、`high`、`xhigh`、`max` 并保留同名值。codeks 的 `ultra` 注入多代理提示词，并将 Opus 5.5 的原生 effort 设为 `xhigh`、Sonnet 5.5 设为 `max`。映射后为 `none` 时设置 `thinking: {type: "disabled"}`；其他值使用 adaptive thinking 并写入 `output_config.effort`。
 
-`reasoning.effort_map` 可以替换映射，`options.thinking` 和 `options.output_config` 可以覆盖完整原生对象，例如手动 budget。未映射的显式 effort 原样发送，端点自己判断是否支持。输出预算先取请求 `max_output_tokens`、模型默认值、默认 16384，再接受上游和模型 options 的覆盖。[配置优先级](config.md)
+`reasoning.summary` 缺省或为 `none` 时选择 `display: "omitted"`；`auto`、`concise`、`detailed` 选择 `summarized`，不保证上游区分摘要长度。目录默认值与 GPT-6.1 Sol 一样为 `none`；要显示摘要，在 codeks 配置中设置 `model_reasoning_summary = "auto"`。显示开关不关闭 thinking 或载荷回放。
+
+`reasoning.effort_map` 可以替换映射，`options.thinking` 和 `options.output_config` 可以覆盖完整原生对象，例如手动 budget。未映射的显式 effort 原样发送，端点自己判断是否支持。Opus / Sonnet 5.5 目录的默认及最大上下文窗口为 `1000000`，Messages API 要求提供 `max_tokens`，因此目录设置默认输出预算 `128000`，对应官方标准最大输出。输出预算依次取请求 `max_output_tokens`、模型配置、目录默认值，再接受上游和模型 options 的覆盖；这是允许的上限，不要求每次生成同样长度。[模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[配置优先级](config.md)
 
 完整 `thinking`/`redacted_thinking` block，包括签名或隐藏数据，存入 `anthropic.thinking.v1` carrier。请求按 `replay.reasoning_from` 恢复允许来源，签名完整保留；其他来源只在当前请求过滤。允许配对不意味着上游一定接受其签名。[Reasoning 策略](reasoning.md)
 
@@ -19,6 +21,8 @@
 Responses `text.format: {type: "json_schema", schema: ...}` 转为 `output_config.format: {type: "json_schema", schema: ...}`；name/strict 不转发。schema 内容直接交给上游，随后 options 仍可覆盖原生格式。普通 `text` 不添加约束；无法表达为 Messages 的未知格式报错。
 
 namespace 和 custom tool 使用共享映射。自由文本工具转换成 `{input: string}`，Lark/regex 放入描述，返回时恢复原始字符串；不添加工具专属提示词。指定工具必须能在当前工具表中解析，thinking 与强制工具选择是否兼容由上游判断。
+
+有工具且未选择 `none` 时，显式 `parallel_tool_calls: false` 转为 `tool_choice.disable_parallel_tool_use: true`，显式 `true` 则转为 `false`；未指定 choice 时采用 `auto`，原生 options 仍可覆盖。这保留 Codex Lite 的外层工具调用限制，不限制一次 `exec` 内 JavaScript 的并发执行。[Claude 并行工具调用](https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use)
 
 用户与工具结果都可带图片。HTTP(S) URL 和 JPEG、PNG、GIF、WebP 的 base64 data URL 转为原生 image block，bridge 不下载图片。图片能力、尺寸和 schema 限制交给上游，不能转换的内容类型明确报错。
 
@@ -36,4 +40,4 @@ input 为 `input_tokens + cache_read_input_tokens + cache_creation_input_tokens`
 
 HTTP 与流内错误经共享层分类，同时保留上游原始错误体；未完整结束的流返回错误。bridge 不改参数重试，容量与限流退避由 codeks 决定。[错误结构](responses-stream.md)
 
-实现与测试：[`src/backends/anthropic.ts`](../src/backends/anthropic.ts)、[`test/anthropic.test.ts`](../test/anthropic.test.ts)。协议参考：[thinking](https://platform.claude.com/docs/en/build-with-claude/thinking)、[结构化输出](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)、[缓存](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)。
+实现与测试：[`src/backends/anthropic.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/backends/anthropic.ts)、[`test/anthropic.test.ts`](https://github.com/WAcry/codeks-bridge/blob/main/test/anthropic.test.ts)。协议参考：[thinking](https://platform.claude.com/docs/en/build-with-claude/thinking)、[结构化输出](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)、[缓存](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)。

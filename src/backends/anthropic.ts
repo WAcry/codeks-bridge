@@ -1,7 +1,7 @@
 import { encodeReasoning } from "../carrier.ts";
 import { BridgeError, upstreamError } from "../errors.ts";
 import { prepareHistory } from "../history.ts";
-import { reasoningEffort } from "../profiles.ts";
+import { reasoningEffort, reasoningSummaryRequested } from "../profiles.ts";
 import { parseJsonSse } from "../sse.ts";
 import { buildToolSet, normalizeToolDeclarations, safeCallId } from "../tools.ts";
 import type { ToolSet } from "../tools.ts";
@@ -114,15 +114,18 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
   const effort = reasoningEffort(route, request.reasoning?.effort);
   const body: Record<string, any> = {
     thinking: effort === "none" ? { type: "disabled" } : {
-      type: "adaptive", display: request.reasoning?.summary === "none" ? "omitted" : "summarized",
+      type: "adaptive", display: reasoningSummaryRequested(request) ? "summarized" : "omitted",
     },
     ...(effort !== "none" ? { output_config: { effort } } : {}),
-    max_tokens: request.max_output_tokens ?? route.config.max_output_tokens ?? 16384,
+    max_tokens: request.max_output_tokens ?? route.profile.max_output_tokens,
   };
   for (const name of ["temperature", "top_p"] as const) {
     if (request[name] !== undefined) body[name] = request[name];
   }
-  const choice = toolChoice(request.tool_choice, tools);
+  let choice = toolChoice(request.tool_choice, tools);
+  if (tools.entries.length && typeof request.parallel_tool_calls === "boolean" && choice?.type !== "none") {
+    choice = { ...(choice ?? { type: "auto" }), disable_parallel_tool_use: !request.parallel_tool_calls };
+  }
   if (choice) body.tool_choice = choice;
   const format = request.text?.format;
   if (format !== undefined && format.type !== "text") {

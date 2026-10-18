@@ -17,6 +17,9 @@
   },
   "files": [
     "dist",
+    "catalog",
+    "docs",
+    "examples",
     "README.md",
     "LICENSE",
     "NOTICE"

@@ -18,9 +18,9 @@ function modelConfig() {
   return validateConfig({
     upstreams: { test: { base_url: "http://127.0.0.1:1" }, other: { base_url: "http://127.0.0.1:2" } },
     models: {
-      flash: { upstream: "test", model: "deployment-a", adapter: "deepseek-chat", max_output_tokens: 2048 },
-      other: { upstream: "other", model: "deployment-b", adapter: "deepseek-chat" },
-      shared: { upstream: "test", model: "deployment-c", adapter: "deepseek-chat", replay: { reasoning_from: ["other"] } },
+      flash: { upstream: "test", model: "deployment-a", catalog: "deepseek-flash", max_output_tokens: 2048 },
+      other: { upstream: "other", model: "deployment-b", catalog: "deepseek-flash" },
+      shared: { upstream: "test", model: "deployment-c", catalog: "deepseek-flash", replay: { reasoning_from: ["other"] } },
     },
   });
 }

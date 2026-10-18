@@ -1,6 +1,6 @@
 # GPT Responses
 
-模型设置 `adapter: "gpt-responses"`，bridge 向连接的 `/responses` 发请求。`base_url` 包含版本前缀，例如 `https://api.openai.com/v1`。实际模型名可以是任意部署别名，转换不依赖名称前缀。
+模型选择 GPT 目录 key，例如 `catalog: "gpt-6.1-sol"`，条目指定 `gpt-responses` adapter，bridge 向连接的 `/responses` 发请求。`base_url` 包含版本前缀，例如 `https://api.openai.com/v1`。实际模型名可以是任意部署别名，转换不依赖名称前缀。
 
 ## 请求与参数
 
@@ -30,4 +30,4 @@ HTTP 和流内错误保留原始上游内容，并映射为客户端可识别的
 
 是否生成原生压缩与是否恢复原生检查点独立。配置 `native_replay` 和 `native_compaction_from` 后，格式可读且来源允许的原生状态优先发送；上游拒绝即报错。[压缩配置](compaction.md)
 
-实现与测试：[`src/backends/responses.ts`](../src/backends/responses.ts)、[`test/responses.test.ts`](../test/responses.test.ts)。
+实现与测试：[`src/backends/responses.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/backends/responses.ts)、[`test/responses.test.ts`](https://github.com/WAcry/codeks-bridge/blob/main/test/responses.test.ts)。

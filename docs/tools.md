@@ -8,11 +8,17 @@
 
 增量声明只包含新增或变更的成员，按 namespace 与工具名覆盖旧定义，保留未变的其他成员和已分配的上游名字。工具移除的 developer 通知保留原位置，不从提示词文字推断删工具。codeks 将默认 `functions` namespace、空 namespace 和省略 namespace 视为同一身份，因此历史调用和显式工具选择均按此规则查找；返回调用保留声明中的原 namespace。
 
+## 工具发现与网页搜索
+
+`supports_search_tool` 表示客户端的工具发现能力，与网页搜索不同。当前源目录的 GPT 条目显式设为 `true`，bridge 保留它。是否出现独立 `tool_search` 还取决于客户端工具模式和功能开关，不能只从目录字段推断。
+
+当前目录采用 Code Mode Only：大多数工具通过 `exec` 中的函数调用，模型从 `ALL_TOOLS` 读取目录；外层不会因此增加一个独立搜索工具。网页搜索对应 `web_search`，由客户端配置单独关闭；图片生成也有独立开关，均不通过 `supports_search_tool` 控制。
+
 ## 名字
 
 普通函数保留原名。namespace 中的工具使用 `namespace__name`；namespace 已以 `_` 结尾时直接拼接名字。名字规范化为字母、数字、`_` 和 `-`。只有两个不同工具的规范化结果实际冲突时，才为后来的名字加 `_2`、`_3` 等后缀。返回调用通过该请求的映射恢复原 name/namespace。
 
-Messages/Chat 工具名统一上限 64 字符。超长名称保留 55 字符可读前缀，加 `_` 与 8 位摘要；这是为了遵守端点长度限制，同时区别同前缀工具。正常长度不加 hash。历史名称根据当前工具集映射，因此同一次工具调用的名称不依赖模型临时起名。
+共享转换层将 Messages/Chat 工具名统一限制为 64 字符，沿用 Chat 端点的较小限制，不为不同后端维护两套命名规则；这不表示所有端点的原生上限都是 64。超长名称保留 55 字符可读前缀，加 `_` 与 8 位摘要，以区别同前缀工具。正常长度不加 hash。历史名称根据当前工具集映射，因此同一次工具调用的名称不依赖模型临时起名。
 
 ## 自由文本与语法
 
@@ -30,12 +36,12 @@ Messages 对不符合端点格式的 call ID 采用确定性映射，并添加�
 
 普通 JSON Schema 清理 Responses 专用的布尔 `encrypted` 关键字，不删除名为 `encrypted` 的普通属性或数据。客户端使用明文多代理工具；返回的函数项显式携带 `encrypted_function_args: []`。
 
-Codeks V2 多代理工具的 task/message 是明文，历史中的 `agent_message` 对 Messages/Chat 转成 user 消息，保留 author、recipient 和内容顺序。它不会成为模型 reasoning。不能解密的工具或 agent message 会明确报错。
+codeks V2 多代理工具的 task/message 是明文，历史中的 `agent_message` 对 Messages/Chat 转成 user 消息，保留 author、recipient 和内容顺序。它不会成为模型 reasoning。不能解密的工具或 agent message 会明确报错。
 
 ## 结果与范围
 
-文本结果按对应 API 的 tool result 形式传递。Messages 可以把图片放进 `tool_result`；Chat 的工具结果只放文本，图片在同组所有工具结果之后组成 user 消息，并标注来源 call ID，避免打断平行调用的结果序列。
+文本结果按对应 API 的 tool result 形式传递。Messages 可以把图片放进 `tool_result`；Chat 的工具结果只放文本，图片在同组所有工具结果之后组成 user 消息，并标注来源 call ID，避免打断并行调用的结果序列。
 
 输出调用先缓存，只有上游完整成功后才发送 `output_item.done`。截断、容量错误和断流不会释放部分调用。
 
-Messages/Chat 不提供 hosted web search、image generation 等工具。默认定义中出现这些项时不向上游广告；显式 `tool_choice` 选择不支持的工具会报错。生成的客户端配置关闭 web search。本轮不转换历史搜索/图片生成结果，遇到这类不支持的历史项会提示错误。
+Messages/Chat 不提供 hosted web search、image generation 等工具。默认定义中出现这些项时不放入上游工具表；显式 `tool_choice` 选择不支持的工具会报错。生成的客户端配置关闭 web search 和 image generation。当前不转换历史搜索/图片生成结果，遇到这类不支持的历史项会提示错误。

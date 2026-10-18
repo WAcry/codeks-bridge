@@ -8,10 +8,10 @@ import type { ModelConfig, ResolvedModel } from "../src/types.ts";
 function routes(overrides: Record<string, Partial<ModelConfig>> = {}) {
   const models: Record<string, ModelConfig> = {};
   for (const slug of ["a", "b", "c"]) models[slug] = {
-    upstream: "example", model: `model-${slug}`, adapter: "gpt-responses", ...overrides[slug],
+    upstream: "example", model: `model-${slug}`, catalog: "gpt-6.1-sol", ...overrides[slug],
   };
-  models.claude = { upstream: "example", model: "example-claude", adapter: "claude-messages", ...overrides.claude };
-  models.deepseek = { upstream: "example", model: "example-deepseek", adapter: "deepseek-chat", ...overrides.deepseek };
+  models.claude = { upstream: "example", model: "example-claude", catalog: "claude-sonnet-5-5", ...overrides.claude };
+  models.deepseek = { upstream: "example", model: "example-deepseek", catalog: "deepseek-flash", ...overrides.deepseek };
   const config = validateConfig({ upstreams: { example: { base_url: "https://example.com/v1" } }, models });
   return Object.fromEntries(Object.keys(models).map((slug) => [slug, resolveModel(config, slug)]));
 }

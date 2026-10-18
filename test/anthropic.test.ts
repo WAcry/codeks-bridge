@@ -12,9 +12,9 @@ import { ResponseWriter } from "../src/writer.ts";
 const config = validateConfig({
   upstreams: { messages: { base_url: "https://api.example.com/v1" } },
   models: {
-    "messages-model": { upstream: "messages", model: "claude-sonnet-5-5", adapter: "claude-messages" },
-    other: { upstream: "messages", model: "other", adapter: "claude-messages" },
-    shared: { upstream: "messages", model: "shared", adapter: "claude-messages", replay: { reasoning_from: ["messages-model"] } },
+    "messages-model": { upstream: "messages", model: "claude-sonnet-5-5", catalog: "claude-sonnet-5-5" },
+    other: { upstream: "messages", model: "other", catalog: "claude-sonnet-5-5" },
+    shared: { upstream: "messages", model: "shared", catalog: "claude-sonnet-5-5", replay: { reasoning_from: ["messages-model"] } },
   },
 });
 const route = resolveModel(config, "messages-model");
@@ -190,18 +190,39 @@ test("Messages rejects unavailable selected tools and lets configured tool choic
   assert.deepEqual(body.tool_choice, { type: "any" });
 });
 
+test("Messages preserves the client parallel tool policy including Lite declarations", () => {
+  const ctx = context({ parallel_tool_calls: false, input: [
+    { type: "additional_tools", tools: [tool] }, message("user", "Look up a."),
+  ] });
+  assert.deepEqual(buildAnthropicRequest(ctx).body.tool_choice, { type: "auto", disable_parallel_tool_use: true });
+  for (const [parallel_tool_calls, tool_choice, expected] of [
+    [undefined, undefined, undefined],
+    [true, "auto", { type: "auto", disable_parallel_tool_use: false }],
+    [false, "none", { type: "none" }],
+    [false, "required", { type: "any", disable_parallel_tool_use: true }],
+    [false, { type: "function", name: "lookup" }, { type: "tool", name: "lookup", disable_parallel_tool_use: true }],
+  ] as const) {
+    assert.deepEqual(buildAnthropicRequest(context({ tools: [tool], parallel_tool_calls, tool_choice })).body.tool_choice, expected);
+  }
+  assert.equal(buildAnthropicRequest(context({ parallel_tool_calls: false })).body.tool_choice, undefined);
+  const body = buildAnthropicRequest({ ...ctx, route: { ...route, config: { ...route.config,
+    options: { tool_choice: { type: "auto", disable_parallel_tool_use: false } },
+  } } }).body;
+  assert.deepEqual(body.tool_choice, { type: "auto", disable_parallel_tool_use: false });
+});
+
 test("Messages applies endpoint options after generated output limits", () => {
   const ctx = context();
   const configured = { ...route, config: { ...route.config, max_output_tokens: 2000, options: { max_tokens: 1000 } }, upstream: { ...route.upstream, options: { max_tokens: 500 } } };
   assert.equal(buildAnthropicRequest({ ...ctx, route: configured }).body.max_tokens, 1000);
   assert.equal(buildAnthropicRequest({ ...ctx, request: { ...ctx.request, max_output_tokens: 3000 }, route: configured }).body.max_tokens, 1000);
   assert.equal(buildAnthropicRequest({ ...ctx, route: { ...configured, config: { ...configured.config, max_output_tokens: undefined } } }).body.max_tokens, 1000);
-  assert.equal(buildAnthropicRequest(ctx).body.max_tokens, 16384);
+  assert.equal(buildAnthropicRequest(ctx).body.max_tokens, 128000);
 });
 
 test("Messages compaction forces no tools and removes only the structured format", () => {
   const output_config = { effort: "high", format: { type: "json_schema", schema: { type: "object" } } };
-  const ctx = { ...context({ tools: [tool], tool_choice: { type: "function", name: "lookup" }, text: { format: { type: "json_schema", schema: { type: "string" } } } }), compacting: true,
+  const ctx = { ...context({ tools: [tool], parallel_tool_calls: false, tool_choice: { type: "function", name: "lookup" }, text: { format: { type: "json_schema", schema: { type: "string" } } } }), compacting: true,
     route: { ...route, config: { ...route.config, options: { output_config, tool_choice: { type: "any" } } } } };
   const body = buildAnthropicRequest(ctx).body;
   assert.deepEqual(body.tool_choice, { type: "none" });
@@ -391,4 +412,15 @@ test("Messages stream errors preserve the original upstream event", async () => 
       return true;
     });
   });
+});
+
+test("Messages summary display follows the request without disabling thinking or replay", () => {
+  for (const summary of [undefined, "none", "auto", "concise", "detailed"]) {
+    const { body } = buildAnthropicRequest(context({
+      reasoning: { effort: "medium", ...(summary ? { summary } : {}) },
+      input: [message("user", "Earlier task"), reasoning, message("assistant", "Done"), message("user", "Continue")],
+    }));
+    assert.deepEqual(body.thinking, { type: "adaptive", display: summary && summary !== "none" ? "summarized" : "omitted" });
+    assert.deepEqual(body.messages[1].content[0], thinking);
+  }
 });

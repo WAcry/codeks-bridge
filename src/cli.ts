@@ -1,31 +1,28 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
-import { readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { loadConfig } from "./config.ts";
 import { createBridgeServer } from "./server.ts";
-import { buildCatalog, configSnippet, readBundledCatalog } from "./catalog.ts";
+import { buildCatalog, configSnippet } from "./catalog.ts";
 
 const HELP = `Usage: codeks-bridge <command> --config <file> [options]
 
 Commands:
   serve           Start the local Responses API server
-  catalog         Generate a model catalog for codeks
+  catalog         Export the configured model catalog for codeks
   config-snippet  Print the codeks provider configuration
 
 Options:
   --output <file>        Write catalog JSON (otherwise stdout)
-  --codeks <binary>      Client executable used by catalog (default: codeks)
-  --bundled <file>       Read a saved bundled model catalog
-  --template <slug>      Select a bundled model as the catalog template
-  --catalog <file>       Catalog path for config-snippet
+  --catalog <file>       Use a static catalog instead of HTTP discovery
   --help                Show this help
 `;
 
 async function main(): Promise<void> {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
-    config: { type: "string" }, output: { type: "string" }, codeks: { type: "string" }, bundled: { type: "string" },
-    template: { type: "string" }, catalog: { type: "string" }, help: { type: "boolean" },
+    config: { type: "string" }, output: { type: "string" },
+    catalog: { type: "string" }, help: { type: "boolean" },
   } });
   if (values.help || positionals.length === 0) { process.stdout.write(HELP); return; }
   const command = positionals[0];
@@ -33,13 +30,11 @@ async function main(): Promise<void> {
   if (!values.config) throw new Error("--config is required");
   const config = await loadConfig(values.config);
   if (command === "catalog") {
-    const bundled = values.bundled ? JSON.parse(await readFile(values.bundled, "utf8")) : await readBundledCatalog(values.codeks ?? "codeks");
-    const text = JSON.stringify(buildCatalog(config, bundled, values.template), null, 2) + "\n";
+    const text = JSON.stringify(buildCatalog(config), null, 2) + "\n";
     if (values.output) await writeFile(values.output, text, { mode: 0o600 });
     else process.stdout.write(text);
   } else if (command === "config-snippet") {
-    if (!values.catalog) throw new Error("--catalog is required");
-    process.stdout.write(configSnippet(config, resolve(values.catalog)));
+    process.stdout.write(configSnippet(config, values.catalog ? resolve(values.catalog) : undefined));
   } else {
     const server = createBridgeServer(config);
     server.on("error", error => { process.stderr.write(`Server error: ${error.message}\n`); process.exitCode = 1; });

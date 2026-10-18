@@ -6,3 +6,6 @@ licensed under the Apache License, Version 2.0:
 
 - src/prompts.ts contains a summary prefix copied from:
   codex-rs/prompts/templates/compact/summary_prefix.md
+- catalog/*.json contains model metadata and prompts copied or adapted from:
+  codex-rs/models-manager/models.json
+  Each catalog entry records its source tag, commit, and changes.

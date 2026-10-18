@@ -8,12 +8,11 @@ import test, { type TestContext } from "node:test";
 import { promisify } from "node:util";
 import { formatSse } from "../src/sse.ts";
 import { SUMMARIZATION_PROMPT } from "../src/prompts.ts";
-import { buildCatalog, readBundledCatalog } from "../src/catalog.ts";
+import { buildCatalog } from "../src/catalog.ts";
 import type { BridgeConfig } from "../src/types.ts";
 
 const run = promisify(execFile);
 const binary = process.env.CODEKS_BIN;
-let bundled: Promise<any> | undefined;
 
 async function listen(server: Server): Promise<string> {
   await new Promise<void>((resolve, reject) => {
@@ -53,7 +52,7 @@ function sendChat(res: ServerResponse, reply: Reply) {
   res.end("data: [DONE]\n\n");
 }
 
-async function fixture(t: TestContext, template: string, respond: (body: any, index: number) => Reply, compactLimit?: number) {
+async function fixture(t: TestContext, toolMode: "direct" | "code_mode_only", respond: (body: any, index: number) => Reply, compactLimit?: number) {
   const requests: any[] = [];
   const clientRequests: any[] = [];
   const failures: unknown[] = [];
@@ -76,7 +75,7 @@ async function fixture(t: TestContext, template: string, respond: (body: any, in
   const { createBridgeServer } = await import("../src/server.ts");
   const config: BridgeConfig = {
     upstreams: { fake: { base_url: upstreamUrl } },
-    models: { "test-model": { adapter: "deepseek-chat", upstream: "fake", model: "test-model", context_window: 272_000, max_output_tokens: 4096 } },
+    models: { "test-model": { catalog: "deepseek-flash", upstream: "fake", model: "test-model", context_window: 272_000, max_output_tokens: 4096 } },
   };
   const bridge = createBridgeServer(config);
   // Observe the real client's wire request before the bridge translates it.
@@ -109,8 +108,9 @@ async function fixture(t: TestContext, template: string, respond: (body: any, in
   await mkdir(work);
   // Keep this disposable directory for diagnosing a failed real-process run.
   t.diagnostic(`Scratch directory: ${scratch}`);
-  bundled ??= readBundledCatalog(binary!);
-  const catalog = buildCatalog(config, await bundled, template);
+  const catalog = buildCatalog(config);
+  // Direct-mode tests exercise lower-level tool/image conversion independently of the default Code Mode surface.
+  catalog.models[0].tool_mode = toolMode;
   assert.equal(catalog.models[0].use_responses_lite, true);
   if (compactLimit) catalog.models[0].auto_compact_token_limit = compactLimit;
   const modelsPath = join(home, "models.json");
@@ -168,7 +168,7 @@ function toolReply(body: any, id: string): any {
 const pixel = "89504e470d0a1a0a0000000d4948445200000004000000040802000000269309290000001049444154789c63f8cfc000470cc47100ae930ff1d05f239e0000000049454e44ae426082";
 
 test("real codeks Lite: function/custom tools execute and image results reach Chat", { skip: !binary, timeout: 120_000 }, async (t) => {
-  const { requests, invoke, work } = await fixture(t, "gpt-5.5", (body, index) => {
+  const { requests, invoke, work } = await fixture(t, "direct", (body, index) => {
     if (index === 1) {
       assert.ok(body.messages.some((message: any) => Array.isArray(message.content) && message.content.some((part: any) => part.type === "image_url")));
       return { calls: [
@@ -197,7 +197,7 @@ test("real codeks Lite: function/custom tools execute and image results reach Ch
 test("real codeks Lite: code mode and plaintext multi-agent v2 calls round-trip", { skip: !binary, timeout: 120_000 }, async (t) => {
   let parentStep = 0;
   let children = 0;
-  const { requests, invoke } = await fixture(t, "gpt-6-sol", (body) => {
+  const { requests, invoke } = await fixture(t, "code_mode_only", (body) => {
     if (!JSON.stringify(body.messages).includes("ROOT_SYNTHETIC_TASK")) {
       children++;
       assert.match(JSON.stringify(body.messages), /CHILD_SYNTHETIC_TASK/);
@@ -233,7 +233,7 @@ test("real codeks Lite: code mode and plaintext multi-agent v2 calls round-trip"
 test("real codeks Lite: remote compaction V2 replaces history and survives resume", { skip: !binary, timeout: 120_000 }, async (t) => {
   let normal = 0;
   let summaries = 0;
-  const { requests, clientRequests, invoke } = await fixture(t, "gpt-5.5", (body) => {
+  const { requests, clientRequests, invoke } = await fixture(t, "direct", (body) => {
     if (body.tool_choice === "none" && body.messages.some((message: any) => message.content === SUMMARIZATION_PROMPT)) {
       summaries++;
       assert.ok(toolReply(body, "call_before_compact"));

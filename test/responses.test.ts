@@ -12,9 +12,9 @@ import { ResponseWriter } from "../src/writer.ts";
 const config = validateConfig({
   upstreams: { test: { base_url: "https://example.com/v1" } },
   models: {
-    test: { upstream: "test", model: "model-a", adapter: "gpt-responses" },
-    other: { upstream: "test", model: "model-b", adapter: "gpt-responses" },
-    shared: { upstream: "test", model: "model-c", adapter: "gpt-responses", replay: { reasoning_from: ["test"] } },
+    test: { upstream: "test", model: "model-a", catalog: "gpt-6.1-sol" },
+    other: { upstream: "test", model: "model-b", catalog: "gpt-6.1-sol" },
+    shared: { upstream: "test", model: "model-c", catalog: "gpt-6.1-sol", replay: { reasoning_from: ["test"] } },
   },
 });
 const route = resolveModel(config, "test");

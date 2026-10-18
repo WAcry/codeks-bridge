@@ -5,7 +5,7 @@ import { resolveModel, validateConfig } from "../src/config.ts";
 
 const route = resolveModel(validateConfig({
   upstreams: { local: { base_url: "https://example.com/v1" } },
-  models: { test: { upstream: "local", adapter: "gpt-responses", model: "test-model" } },
+  models: { test: { upstream: "local", catalog: "gpt-6.1-sol", model: "test-model" } },
 }), "test");
 const source = route.origin;
 const encoded = (prefix: string, value: unknown) => prefix + Buffer.from(JSON.stringify(value)).toString("base64url");

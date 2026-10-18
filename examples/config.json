@@ -19,23 +19,17 @@
     "gpt": {
       "upstream": "openai",
       "model": "gpt-6.1-sol",
-      "context_window": 272000,
-      "max_output_tokens": 16384,
-      "adapter": "gpt-responses"
+      "catalog": "gpt-6.1-sol"
     },
     "claude": {
       "upstream": "anthropic",
       "model": "claude-sonnet-5-5",
-      "context_window": 131072,
-      "max_output_tokens": 16384,
-      "adapter": "claude-messages"
+      "catalog": "claude-sonnet-5-5"
     },
     "deepseek": {
       "upstream": "deepseek",
       "model": "deepseek-flash",
-      "context_window": 131072,
-      "max_output_tokens": 16384,
-      "adapter": "deepseek-chat"
+      "catalog": "deepseek-flash"
     }
   }
 }

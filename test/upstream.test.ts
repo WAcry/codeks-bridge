@@ -6,7 +6,7 @@ import { upstreamFetch } from "../src/upstream.ts";
 
 const route = () => resolveModel({
   upstreams: { remote: { base_url: "https://upstream.example/v1" } },
-  models: { chosen: { upstream: "remote", model: "synthetic-model", adapter: "gpt-responses" } },
+  models: { chosen: { upstream: "remote", model: "synthetic-model", catalog: "gpt-6.1-sol" } },
 }, "chosen");
 
 test("HTTP errors retain the original JSON or text and never retry", async (t) => {

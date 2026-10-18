@@ -15,7 +15,7 @@ export interface UpstreamConfig {
 export interface ModelConfig {
   upstream: string;
   model: string;
-  adapter: AdapterId;
+  catalog: string;
   context_window?: number;
   max_output_tokens?: number;
   input_modalities?: ("text" | "image")[];
@@ -32,6 +32,8 @@ export interface BridgeConfig {
   models: Record<string, ModelConfig>;
 }
 export interface ModelProfile {
+  model_info: Record<string, any>;
+  max_output_tokens?: number;
   id: AdapterId;
   api: Api;
   reasoning_format: string;

@@ -1,6 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { validateConfig, resolveModel } from "./config.ts";
+import { buildCatalog } from "./catalog.ts";
+import { reasoningSummaryRequested } from "./profiles.ts";
 import { BridgeError, transportError } from "./errors.ts";
 import { ResponseWriter, usageJson } from "./writer.ts";
 import { runResponses } from "./backends/responses.ts";
@@ -45,6 +47,8 @@ function authenticated(req: IncomingMessage, token: string | undefined): boolean
 /** Creates a server without opening a socket, so callers control its lifecycle. */
 export function createBridgeServer(value: BridgeConfig): Server {
   const config = validateConfig(value);
+  const catalog = JSON.stringify(buildCatalog(config));
+  const catalogEtag = `"${createHash("sha256").update(catalog).digest("hex")}"`;
   const token = config.token_env ? process.env[config.token_env] : undefined;
   if (config.token_env && !token) throw new BridgeError(`Missing bridge token environment variable: ${config.token_env}`);
   const host = config.host ?? "127.0.0.1";
@@ -60,11 +64,13 @@ export function createBridgeServer(value: BridgeConfig): Server {
       const path = new URL(req.url ?? "/", "http://localhost").pathname.replace(/^\/v1(?=\/)/, "");
       if (req.method === "GET" && path === "/health") { json(res, 200, { status: "ok" }); return; }
       if (req.method === "GET" && path === "/models") {
-        json(res, 200, { object: "list", data: Object.keys(config.models).map(id => ({ id, object: "model", owned_by: "local" })) }); return;
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "no-cache", etag: catalogEtag });
+        res.end(catalog); return;
       }
       if (req.method !== "POST" || path !== "/responses") {
         json(res, 404, { error: { code: "invalid_prompt", message: "Use POST /v1/responses with remote_compaction = v2" } }); return;
       }
+      res.setHeader("x-models-etag", catalogEtag);
       const request = await readRequest(req);
       const route = resolveModel(config, request.model);
       const responsesLite = req.headers["x-openai-internal-codex-responses-lite"] === "true" ||
@@ -76,7 +82,7 @@ export function createBridgeServer(value: BridgeConfig): Server {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", "x-accel-buffering": "no" });
         res.flushHeaders();
       }
-      writer = new ResponseWriter(streaming ? res : { write() {} }, { model: request.model, showSummary: request.reasoning?.summary !== "none" });
+      writer = new ResponseWriter(streaming ? res : { write() {} }, { model: request.model, showSummary: reasoningSummaryRequested(request) });
       writer.start();
       if (streaming) keepalive = setInterval(() => writer?.keepalive(), 15_000).unref();
       let result;
