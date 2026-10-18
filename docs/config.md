@@ -164,6 +164,10 @@ node dist/cli.js config-snippet --config /absolute/path/bridge.json
 
 provider 显示名为 `Local bridge`，并显式声明 `[model_providers.bridge.capabilities] remote_compaction = "v2"`，无需借用 Azure 或 OpenAI 名称触发能力。片段关闭 `web_search` 和 `features.image_generation`，图片输入仍然支持。
 
+片段还设置 `[features.multi_agent_v2] tool_namespace = "agents"`。在默认的保留 namespace `collaboration` 下，`spawn_agent`、`send_message` 和 `followup_task` 的 `message` 带 `encrypted` 标记，GPT 上游会把子代理任务写成密文。GPT 父代理创建的 Claude 或 DeepSeek 子代理只能收到读不懂的密文，会话记录和请求日志里也看不到任务内容。改用其他 namespace 后，codeks 去掉这个标记并按明文投递消息（见 [codeks patch 0005](https://github.com/WAcry/codeks/blob/main/fork/patches/0005-plaintext-agent-messages.md)），任何模型的子代理都能读懂任务，日志中也能看到原始 prompt。没有这个补丁的 Codex 只会改变工具名，消息仍然加密。
+
+这张表不写 `enabled`，只修改 namespace；多代理 V2 是否启用仍由目录的 `multi_agent_version` 和已有配置决定。若已有配置在 `[features]` 下写了 `multi_agent_v2 = true`，合并时改为在 `[features.multi_agent_v2]` 中写 `enabled = true`，因为同一个 TOML 文件不能把同一个键同时写成值和表。
+
 bridge 使用 HTTP/SSE。已核对 Codex `0.163.0` 的 `codex-rs/model-provider-info/src/lib.rs` 与 `codex-rs/core/src/client.rs`：自定义 provider 的 `supports_websockets` 默认为 `false`，生成的片段沿用该默认值；目录中的 `prefer_websockets: true` 保留源条目原值，不会越过 provider 的能力开关。若将片段合并到已有 provider 配置，应确认没有遗留的 `supports_websockets = true`。今后接入 WebSocket 时需实现相应传输契约，而不只是修改目录偏好。
 
 目录响应带 `ETag`，普通响应带同值的 `x-models-etag`。服务配置修改后重启 bridge，新内容的标记会让客户端刷新模型目录；客户端也有定时缓存刷新。当前 Codex 的目录请求限制为 1 MiB、5 秒且不跟随重定向。每个别名都包含完整提示词，大量窗口或部署别名会增大响应。超过 1 MiB 时，HTTP 目录返回明确的 413 错误，不删减条目；模型请求和静态目录导出仍可用。可减少别名，或使用下方的静态 `model_catalog_json` 方案。这是客户端接口的固定限制，不是上游模型能力预检。

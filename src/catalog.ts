@@ -20,6 +20,8 @@ export function configSnippet(config: BridgeConfig, catalogPath?: string): strin
     `model = ${JSON.stringify(Object.keys(config.models)[0])}`, 'model_provider = "bridge"',
     ...(catalogPath ? [`model_catalog_json = ${JSON.stringify(catalogPath)}`] : []),
     'web_search = "disabled"', "", "[features]", "image_generation = false", "",
+    // Outside the reserved "collaboration" namespace, codeks sends multi-agent task messages as plaintext.
+    "[features.multi_agent_v2]", 'tool_namespace = "agents"', "",
     "[model_providers.bridge]", 'name = "Local bridge"',
     `base_url = ${JSON.stringify(baseUrl)}`, 'wire_api = "responses"',
   ];
