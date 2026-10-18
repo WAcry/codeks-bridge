@@ -56,4 +56,4 @@ HTTP 和流内失败保留原始上游内容及可得的状态码，同时规范
 
 后端在完整成功前缓存工具调用，Responses writer 统一交付历史项和 usage。Reasoning item 的载荷必须出现在 `output_item.done`，确保 codeks 可以保存。远程 V2 压缩也由同一个 writer 返回，客户端继续执行自己的历史保留规则。
 
-设计参考了现有 Responses、Messages 和 Chat 转换实践，没有复制其他项目的运行时代码。摘要提示词的许可归属见 `NOTICE`。
+设计参考了现有 Responses、Messages 和 Chat 转换实践，没有复制其他项目的运行时代码。文字压缩使用完整的交接摘要提示词；摘要恢复前缀逐字来自 Apache-2.0 许可的 OpenAI Codex，出处列在 `NOTICE`。
