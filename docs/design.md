@@ -68,6 +68,12 @@ GPT 原生 HTTP 失败保留 status、body 和诊断 header，流内失败保留
 
 双压缩两条请求都成功才发布检查点。恢复时，原生格式可读、来源允许且开启 native replay，便优先使用原生；其他情况按配置选择文字摘要。这是发送前的表示选择，已经发送的原生状态被上游拒绝时不会自动降级。[压缩细节](compaction.md)
 
+## 调试捕获只观察
+
+[检查器](inspect.md)记录 bridge 真正收发的字节，不重新构造请求。入口请求在解析前保存原文；所有上游请求都经过 `upstreamFetch`，在这里保存实际发送的 JSON 和逐块到达的响应；写回 codeks 的内容在 `writeHead`/`write`/`end` 处记录。每条请求在 AsyncLocalStorage 中持有自己的记录，压缩的两条分支只附加 `summary`/`native` 标签，因此并发会话和子代理不会混在一起，后端代码不需要传递捕获参数。
+
+服务端保存完整正文，折叠、截断和格式化都在页面完成，避免字段白名单遗漏协议新增内容。状态标注调用与 `prepareHistory` 相同的回放判断函数，显示的决定不会与实际转换分叉。页面是零依赖的静态文件，和运行时一样不引入第三方包。捕获关闭时不保存任何内容，每条请求只多一个 AsyncLocalStorage 作用域。
+
 ## 协议边界
 
 客户端发送完整 Responses Lite 历史。Responses 后端保留 namespace 与 grammar；Claude/DeepSeek 将它们转换成普通函数并恢复调用身份。Lark/regex 只转换为描述约束，不追加特定工具的提示词。

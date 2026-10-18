@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>codeks-bridge 检查器</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<header class="top">
+  <span class="brand" title="codeks-bridge inspector">bridge 检查器</span>
+  <span id="conn" class="chip dim">连接中…</span>
+  <button id="capture" type="button" class="btn capture" disabled>开始捕获</button>
+  <button id="clear" type="button" class="btn" title="删除所有已捕获的记录">清空</button>
+  <button id="export-all" type="button" class="btn" title="下载全部记录（可再导入离线查看）">导出全部</button>
+  <button id="import" type="button" class="btn" title="打开导出文件离线查看；也可以把文件拖到页面上">导入</button>
+  <button id="live" type="button" class="btn" hidden>返回实时</button>
+  <input id="import-file" type="file" accept=".json,application/json" hidden>
+  <span id="mem" class="mem"></span>
+  <details id="models" class="pop"><summary class="btn">模型</summary><div class="pop-body" id="models-body"></div></details>
+  <span class="grow"></span>
+  <input id="filter" class="filter" type="search" placeholder="筛选：模型 / 线程 / 预览 / 状态（按 / 聚焦）" autocomplete="off">
+  <span id="chips" class="chips"></span>
+  <button id="group" type="button" class="btn toggle" title="按 thread_id（或 session_id）分组">按线程分组</button>
+</header>
+<div id="banner" class="banner" hidden></div>
+<main id="main" class="main">
+  <section class="list-pane">
+    <div id="list-info" class="list-info"></div>
+    <div id="list" class="list" tabindex="0"></div>
+  </section>
+  <div id="splitter" class="splitter" title="拖动调整宽度"></div>
+  <section id="detail" class="detail">
+    <div id="boot" class="empty">
+      <p>正在加载…</p>
+      <p class="dim">如果一直停留在这里：请通过 bridge 提供的 /inspect/ 地址打开本页（浏览器不允许从本地文件加载 ES 模块）。</p>
+    </div>
+  </section>
+</main>
+<dialog id="token-dialog" class="token-dialog">
+  <form id="token-form">
+    <h3>需要访问令牌</h3>
+    <p class="dim">这个 bridge 配置了 inspector 令牌。令牌只保存在当前标签页（sessionStorage）。</p>
+    <input id="token-input" type="password" autocomplete="off" placeholder="令牌" required>
+    <p id="token-error" class="err" hidden></p>
+    <div class="dialog-buttons">
+      <button type="button" id="token-cancel" class="btn">取消</button>
+      <button type="submit" class="btn primary">确定</button>
+    </div>
+  </form>
+</dialog>
+<div id="drop" class="drop" hidden>松开以导入导出文件</div>
+<div id="toast" class="toast"></div>
+</body>
+</html>

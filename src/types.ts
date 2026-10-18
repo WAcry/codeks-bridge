@@ -28,6 +28,8 @@ export interface BridgeConfig {
   host?: string;
   port?: number;
   token_env?: string;
+  /** Debug capture for the /inspect/ page. */
+  inspect?: { capture?: boolean; max_mib?: number };
   upstreams: Record<string, UpstreamConfig>;
   models: Record<string, ModelConfig>;
 }

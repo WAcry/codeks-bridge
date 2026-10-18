@@ -48,8 +48,9 @@
 | `token_env` | 保存 bridge 入口 Bearer token 的环境变量名称 |
 | `upstreams` | 上游连接配置表 |
 | `models` | 客户端模型别名表 |
+| `inspect` | 可选；`capture` 决定启动时是否捕获，`max_mib` 是内存软上限，见[调试检查器](inspect.md) |
 
-监听非 loopback 地址时必须配置 `token_env`，客户端也要设置同一个变量。它是 bridge 入口鉴权，不是上游 API key。HTTP 请求体最多 64 MiB，包含所有图片编码；入口没有 CORS。携带 `Origin` 的请求必须使用配置好的 bridge token，即使监听 loopback 也一样，避免网页的简单 POST 在无法读取响应时仍触发上游调用。没有 `Origin` 的 codeks 请求保持原行为。`GET /health`、`GET /v1/models` 和 `POST /v1/responses` 使用同一鉴权。
+监听非 loopback 地址时必须配置 `token_env`，客户端也要设置同一个变量。它是 bridge 入口鉴权，不是上游 API key。HTTP 请求体最多 64 MiB，包含所有图片编码；入口没有 CORS。携带 `Origin` 的请求必须使用配置好的 bridge token，即使监听 loopback 也一样，避免网页的简单 POST 在无法读取响应时仍触发上游调用。没有 `Origin` 的 codeks 请求保持原行为。`GET /health`、`GET /v1/models` 和 `POST /v1/responses` 使用同一鉴权。`/inspect/` 页面与接口使用[自己的规则](inspect.md#访问与鉴权)。
 
 ## 上游连接
 
