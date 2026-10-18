@@ -68,8 +68,8 @@ reasoning 不重复加到总量中。压缩只生成文字摘要，仍由客户�
 
 ## 扩展方言
 
-[`src/backends/chat.ts`](../src/backends/chat.ts) 负责 Chat 消息、工具和流转换，定义小型 `ChatDialect` 接口；[`src/backends/deepseek.ts`](../src/backends/deepseek.ts) 提供 DeepSeek 的 reasoning 字段、thinking 参数、usage 和特殊结束原因。`deepseek-flash` 目录条目选择 `deepseek-chat` adapter，由后者调用前者。
+[`src/backends/chat.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/backends/chat.ts) 负责 Chat 消息、工具和流转换，定义小型 `ChatDialect` 接口；[`src/backends/deepseek.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/backends/deepseek.ts) 提供 DeepSeek 的 reasoning 字段、thinking 参数、usage 和特殊结束原因。`deepseek-flash` 目录条目选择 `deepseek-chat` adapter，由后者调用前者。
 
 当前 Chat 转换层按单个文本字段读写 reasoning，包括为没有 reasoning 的 assistant 历史写入空字符串。这是现有 DeepSeek 路径需要的行为；接入其他模型时须按其协议决定能否复用。参数差异优先使用 profile 和 options；如果 reasoning 改为内容块或其他结构，再调整转换边界。当前没有其他 Chat 方言实现。
 
-验证见 [`test/chat.test.ts`](../test/chat.test.ts)。协议参考：[Chat API](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion)、[思考模式](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode)、[图片](https://api-docs.deepseek.com/zh-cn/guides/vision)。
+验证见 [`test/chat.test.ts`](https://github.com/WAcry/codeks-bridge/blob/main/test/chat.test.ts)。协议参考：[Chat API](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion)、[思考模式](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode)、[图片](https://api-docs.deepseek.com/zh-cn/guides/vision)。

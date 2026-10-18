@@ -30,4 +30,4 @@ HTTP 和流内错误保留原始上游内容，并映射为客户端可识别的
 
 是否生成原生压缩与是否恢复原生检查点独立。配置 `native_replay` 和 `native_compaction_from` 后，格式可读且来源允许的原生状态优先发送；上游拒绝即报错。[压缩配置](compaction.md)
 
-实现与测试：[`src/backends/responses.ts`](../src/backends/responses.ts)、[`test/responses.test.ts`](../test/responses.test.ts)。
+实现与测试：[`src/backends/responses.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/backends/responses.ts)、[`test/responses.test.ts`](https://github.com/WAcry/codeks-bridge/blob/main/test/responses.test.ts)。

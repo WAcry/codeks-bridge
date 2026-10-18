@@ -2,8 +2,8 @@
 //
 // codeks sends three kinds of client tools: `function`, `custom` (freeform
 // input, optionally constrained by a Lark or regex grammar) and `namespace`
-// (a group of functions). Messages and Chat upstreams only accept functions
-// with names matching [a-zA-Z0-9_-]{1,64}. See docs/tools.md.
+// (a group of functions). The shared Messages/Chat mapping uses names matching
+// [a-zA-Z0-9_-]{1,64}, the smaller Chat limit. See docs/tools.md.
 
 import { createHash } from "node:crypto";
 import { BridgeError } from "./errors.ts";

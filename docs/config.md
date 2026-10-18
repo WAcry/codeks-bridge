@@ -142,7 +142,7 @@ model_reasoning_summary = "auto"
 
 自身状态默认允许恢复；两份列表增加其他允许来源，关系有方向且不传递。若也要接受 A 的 reasoning，把 A 加入 B 的 `reasoning_from`。这个例子的 B 自己只生成文字摘要，但仍可读取 A 的原生检查点：生成和恢复是独立能力。设置 `native_replay: false` 则所有压缩都使用文字表示，包括自身生成的检查点。
 
-引用在加载配置时解析为来源身份，按连接、实际模型和 adapter 比较，不绑定显示别名。bridge 检查来源是否存在、载荷格式是否可解码，不探测密文是否被上游接受。上游拒绝被允许的状态时直接报错，不删掉状态再试。详见 [reasoning](reasoning.md) 和[压缩](compaction.md)。
+引用按连接、实际模型和 adapter 解析为来源身份，不绑定显示别名。加载配置时检查来源是否存在、源与目标的格式标识是否一致；每条请求恢复时再检查实际载荷。bridge 不探测密文是否被上游接受。上游拒绝被允许的状态时直接报错，不删掉状态再试。详见 [reasoning](reasoning.md) 和[压缩](compaction.md)。
 
 连接身份包含 upstream ID 和去掉末尾斜杠的 URL，来源身份再包含 adapter 与实际模型。密钥、header 和 options 不参与身份。如果同一 URL 通过 header 或凭据切换到不兼容区域，使用不同 upstream ID；改显示别名不影响已保存状态。
 
@@ -163,6 +163,8 @@ node dist/cli.js config-snippet --config /absolute/path/bridge.json
 配置了 `token_env` 时，片段用 `env_key` 传递 bridge 入口凭据。匿名 loopback 服务使用公开标记 `experimental_bearer_token = "codeks-bridge-local"`，让 codeks 进入 API key 目录发现流程。这个固定字符串不是密钥，也不为服务提供鉴权；需要入口鉴权时应配置 `token_env`。
 
 provider 显示名为 `Local bridge`，并显式声明 `[model_providers.bridge.capabilities] remote_compaction = "v2"`，无需借用 Azure 或 OpenAI 名称触发能力。片段关闭 `web_search` 和 `features.image_generation`，图片输入仍然支持。
+
+bridge 使用 HTTP/SSE。已核对 Codex `0.163.0` 的 `codex-rs/model-provider-info/src/lib.rs` 与 `codex-rs/core/src/client.rs`：自定义 provider 的 `supports_websockets` 默认为 `false`，生成的片段沿用该默认值；目录中的 `prefer_websockets: true` 保留源条目原值，不会越过 provider 的能力开关。若将片段合并到已有 provider 配置，应确认没有遗留的 `supports_websockets = true`。今后接入 WebSocket 时需实现相应传输契约，而不只是修改目录偏好。
 
 目录响应带 `ETag`，普通响应带同值的 `x-models-etag`。服务配置修改后重启 bridge，新内容的标记会让客户端刷新模型目录；客户端也有定时缓存刷新。当前 Codex 的目录请求限制为 1 MiB、5 秒且不跟随重定向。每个别名都包含完整提示词，大量窗口或部署别名会增大响应。
 

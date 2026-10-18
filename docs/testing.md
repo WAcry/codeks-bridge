@@ -55,7 +55,7 @@ CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/cata
 - 保持 `supports_search_tool: true` 和 Code Mode Only。外层没有独立 `tool_search` 或 MCP 工具，`exec` 描述也没有内嵌延迟 MCP 的 schema。
 - 模型通过 `ALL_TOOLS` 按描述找到延迟 MCP 工具，再调用 `tools[name]`。真实客户端执行 MCP 请求并把结果回传模型上游。
 
-同轮 codeks 二进制还重新通过了上表中的普通工具/图片、明文多代理 V2、远程压缩/resume 三个场景。TypeScript 检查、122 项普通测试、构建与打包解包后的 CLI 检查通过；包中包含全部八个目录文件。这里验证客户端协议与包的完整性，不代表新增了真实模型端点或缓存时长的实测。
+同轮 codeks 二进制还重新通过了上表中的普通工具/图片、明文多代理 V2、远程压缩/resume 三个场景。TypeScript 检查、普通测试、构建与打包解包后的 CLI 检查通过；包中包含全部八个目录文件。这里验证客户端协议与包的完整性，不代表新增了真实模型端点或缓存时长的实测。
 
 ### 摘要显示与 Ultra
 
@@ -66,7 +66,13 @@ CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/cata
 - 关闭显示仍保存载荷，包括只有签名、thinking 文本为空的块，并在后续请求中回放。
 - `ultra` 的多代理提示词由真实客户端注入一次；Opus 使用 `xhigh`，Sonnet 与 DeepSeek 使用 `max`。
 
-本轮 TypeScript 检查和 125 项普通测试通过；未设置 `CODEKS_BIN` 的完整测试清单共 133 项，其中 8 项客户端集成测试跳过。新增客户端场景各在两个现成二进制上单独运行，不将本地假上游结果当作真实模型规格验证。
+TypeScript 检查和普通测试通过，客户端场景各在两个现成二进制上单独运行。这些结果验证协议与客户端行为，不作为真实模型规格的验证。
+
+### 最终审计与构建产物
+
+2026-10-18（America/Los_Angeles），补充 Claude 的 `parallel_tool_calls` 转换回归测试，覆盖客户端显式选择、原生 options 覆盖优先级，以及压缩时的 `tool_choice: none`。普通测试、类型检查与构建通过。
+
+构建后实际打包并在独立目录解包，确认八份目录、文档和示例完整，CLI 与 HTTP 目录可用，包内文档相对链接及私有内容扫描通过。
 
 ## 真实上游验证
 

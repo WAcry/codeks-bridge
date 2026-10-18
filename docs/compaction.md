@@ -13,6 +13,8 @@
 
 例如 GPT 目标可以设 `mode: "summary"`、`native_replay: true`：它自己只生成文字摘要，但仍可读取允许来源的原生检查点。另一目标可以支持双压缩，却通过 `native_replay: false` 始终使用文字表示。Claude/DeepSeek adapter 没有原生压缩格式，只使用文字摘要。
 
+原生表示由 adapter 的 `native_compaction_format` 声明，不通过 GPT 模型名判定。未来其他协议提供原生检查点时，需要实现该格式的生成与恢复；文字摘要、来源策略和双压缩协调层可继续复用。只有参数或部署能力不同，则优先使用目录及配置表达。
+
 允许来源是定向、非传递的关系，与 reasoning 的列表互不影响。bridge 只检查格式能否还原，兼容配对由配置明确选择。原生压缩生成失败或原生检查点被拒绝都按上游错误返回，不自动改成文字压缩重试。
 
 ## 客户端契约
@@ -26,11 +28,19 @@ remote_compaction = "v2"
 
 两种生成模式都使用这条路径，客户端继续执行远程 V2 的历史保留规则。bridge 不自行裁剪或重复拼装近期消息，也不提供独立的 `/responses/compact` 接口。
 
-已核对的 codeks `0.162.1` 行为是成功后保留最多约 64,000 tokens 的近期用户消息及其他符合规则的消息，再附检查点；本地 prompt 压缩路径约为 20,000 tokens。这些预算属于客户端，升级时应复核 `codex-rs/core/src/compact_remote_v2_attempt.rs`、`compact_remote_v2.rs` 和 `codex-rs/protocol/src/models.rs`。
+已核对的 codeks `0.162.1` 与 Codex `0.163.0` 行为是成功后保留最多约 64,000 tokens 的近期用户消息及其他符合规则的消息，再附检查点；本地 prompt 压缩路径约为 20,000 tokens。这些预算属于客户端，升级时应复核 `codex-rs/core/src/compact_remote_v2_attempt.rs`、`compact_remote_v2.rs` 和 `codex-rs/protocol/src/models.rs`。
+
+### `comp_hash` 与原生状态兼容性
+
+Codex 目录中的 `comp_hash` 是压缩兼容组的标识，不是提示词内容的 hash。`0.163.0` 在前后两轮的非空值不同时，会先调用上一模型执行压缩；切换到更小窗口时也有独立的压缩判断。相同值只避免因兼容组变化而额外压缩，不关闭窗口用量检查。
+
+当前八个条目保留源目录的 `"3000"`。bridge 的每个检查点都带有所有目标可读取的文字摘要，因此这些目标可以继续消费同一个检查点，无需按模型另造兼容组。是否恢复其中的原生密文仍由来源、格式和 `native_replay` 策略决定；相同 `comp_hash` 不表示 GPT、Claude 或不同区域之间能直接共享密文。
+
+上游改变 `comp_hash` 或切换模型时的压缩逻辑后，应复核 `codex-rs/core/src/session/turn.rs` 及检查点恢复契约，再决定是否沿用新值。提示词或窗口调整本身不是重新计算此字段的理由。
 
 ## 生成
 
-文字摘要请求将 trigger 换成共享的 checkpoint prompt，保留原 instructions、历史和工具定义，设置 `tool_choice: "none"`，移除结构化输出格式。提示词和恢复前缀集中在 [`src/prompts.ts`](../src/prompts.ts)，许可归属见 `NOTICE`。
+文字摘要请求将 trigger 换成共享的 checkpoint prompt，保留原 instructions、历史和工具定义，设置 `tool_choice: "none"`，移除结构化输出格式。提示词和恢复前缀集中在 [`src/prompts.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/prompts.ts)，许可归属见 `NOTICE`。
 
 `dual` 额外并行发送一条保留 trigger 的原生请求。两个请求从相同原历史出发，互不消费对方输出。原生请求移除普通回答的输出预算，交由上游管理；文字摘要仍使用普通回答预算。
 
@@ -92,4 +102,4 @@ cxbc2:<base64url(JSON)>
 
 客户端在压缩后可能按 `encrypted_content` 长度粗估 token，双表示会让估算偏保守；下一次正常响应的 usage 提供实际用量。bridge 不伪造 usage 或修改客户端公式。
 
-实现见 [`src/compaction.ts`](../src/compaction.ts)、[`src/carrier.ts`](../src/carrier.ts)、[`src/history.ts`](../src/history.ts)。
+实现见 [`src/compaction.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/compaction.ts)、[`src/carrier.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/carrier.ts)、[`src/history.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/history.ts)。

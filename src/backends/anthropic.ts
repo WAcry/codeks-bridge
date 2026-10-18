@@ -122,7 +122,10 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
   for (const name of ["temperature", "top_p"] as const) {
     if (request[name] !== undefined) body[name] = request[name];
   }
-  const choice = toolChoice(request.tool_choice, tools);
+  let choice = toolChoice(request.tool_choice, tools);
+  if (tools.entries.length && typeof request.parallel_tool_calls === "boolean" && choice?.type !== "none") {
+    choice = { ...(choice ?? { type: "auto" }), disable_parallel_tool_use: !request.parallel_tool_calls };
+  }
   if (choice) body.tool_choice = choice;
   const format = request.text?.format;
   if (format !== undefined && format.type !== "text") {
