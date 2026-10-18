@@ -8,9 +8,9 @@
 
 | adapter | 上游路径 | 模型方言 |
 | --- | --- | --- |
-| `gpt-responses` | `/responses` | GPT 的 Responses reasoning 与原生压缩 |
-| `claude-messages` | `/messages` | Claude thinking、签名和 Messages 缓存 |
-| `deepseek-chat` | `/chat/completions` | DeepSeek thinking 参数、`reasoning_content` 和 usage |
+| [`gpt-responses`](backends-responses.md) | `/responses` | GPT 的 Responses reasoning 与原生压缩 |
+| [`claude-messages`](backends-anthropic.md) | `/messages` | Claude thinking、签名和 Messages 缓存 |
+| [`deepseek-chat`](backends-deepseek-chat.md) | `/chat/completions` | DeepSeek thinking 参数、`reasoning_content` 和 usage |
 
 同一个兼容网关的连接可供不同 adapter 使用。服务按每条请求的模型别名独立选路，因此父代理、子代理和并行会话可以同时使用不同上游。别名固定对应一个目标，不做上游模型发现或自动负载均衡。
 
@@ -57,7 +57,7 @@
 
 请求先由 adapter 转换，再浅层合并 `upstream.options`、`model.options`；后者优先，嵌套对象整体替换。例如模型 `options.output_config` 会替换推导值和上游同名对象。由此可以显式调整 thinking budget、原生 effort 或端点专有字段。
 
-最终由 bridge 固定模型路由、转换后的历史、工具定义、流模式和必要协议字段。摘要请求固定禁止调用工具并移除结构化输出约束；原生压缩移除普通回答的输出上限。这些字段承载桥接契约，不由 options 改写。详见各[后端文档](backends-responses.md)。
+最终由 bridge 固定模型路由、转换后的历史、工具定义、流模式和必要协议字段。摘要请求固定禁止调用工具并移除结构化输出约束；原生压缩移除普通回答的输出上限。这些字段承载桥接契约，不由 options 改写。详见上表链接的后端文档。
 
 ## Reasoning 与模型目录
 
