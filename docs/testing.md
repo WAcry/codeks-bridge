@@ -15,12 +15,13 @@ npm run check
 - 工具：普通函数、namespace、自定义工具的原始字符串、Lark/regex 描述、名称冲突与超长名称、加密 schema 关键字的清理。
 - Lite：工具声明原位传给 GPT；Claude/DeepSeek 提取增量 schema，保留原历史与默认 namespace 身份；header、all-turns 和双压缩前缀保持。
 - 流：跨字节分块的 UTF-8、CR/LF、SSE 多行数据、结束标记、非法 JSON。
-- Responses 输出：先 added 后 delta/done、完整历史项、usage、reasoning carrier、消息 phase、明文多代理参数、重试提示、失败时不执行尚未提交的工具。
+- Responses 输出：先 added 后 delta/done、完整历史项、usage、reasoning carrier、原生消息 phase（含 `partial_answer`）、缺省 phase 与 `end_turn` 的关系、摘要分段索引和最终数组一致、明文多代理参数、失败时不执行尚未提交的工具。
 - 配置与目录：有限 key、原始 GPT 条目保留、第三方精调、别名与部署名分离、窗口覆盖、effort 映射及默认值、catalog 与出站参数一致、options 覆盖顺序。
 - 目录发现：Codex 专用 `/models` 响应、入口鉴权、ETag 与响应版本标记、连接及凭据配置不进入目录。
 - 状态：reasoning 与原生压缩的独立允许来源、定向非传递关系、配置改变后恢复已有 carrier、身份与显示别名分离、输入历史不变。
-- 压缩：生成模式与 native replay 独立、双分支成功才交付、失败取消另一分支、上游拒绝时原错误直传。
-- 后端与历史：各 API 的消息、工具、图片、schema、thinking、usage 与错误转换。错误测试检查原始 status/body 和重试提示，验证没有额外请求或自动降级。
+- 压缩：生成模式与 native replay 独立、双分支接受后才建立流、双分支成功才交付、首个失败取消另一分支、HTTP 与早期 SSE 失败的路径保留。
+- 后端与历史：各 API 的消息、工具、图片、schema、thinking、usage 与错误转换；Claude 空工具结果、上下文边界停止及不完整工具不交付。
+- 错误：等待上游响应头时不发送 200；GPT HTTP status/body、诊断 header 与原生 SSE error 字段保留；移除不适用的传输 header；Claude/DeepSeek 继续转换协议；验证没有额外请求或自动降级。
 
 这些测试检查协议和客户端行为；假上游不会验证模型是否理解提示词，也不会验证真实服务的缓存命中率、容量和区域之间的密文兼容性。
 
@@ -29,7 +30,7 @@ npm run check
 可选集成测试启动已经安装的 codeks，并让它通过桥接器访问本地假上游。指定要验证的二进制即可，测试不会下载或编译 codeks：
 
 ```sh
-CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/catalog-e2e.test.ts test/reasoning-e2e.test.ts
+CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/catalog-e2e.test.ts test/reasoning-e2e.test.ts test/errors-e2e.test.ts
 ```
 
 未设置 `CODEKS_BIN` 时，这些测试自动跳过。它们为每个场景创建独立的 `CODEX_HOME` 和工作目录，监听随机的回环端口。临时目录路径会写入测试输出，保留会话和进程输出便于复查。退出时关闭本轮创建的服务器。
@@ -73,6 +74,17 @@ TypeScript 检查和普通测试通过，客户端场景各在两个现成二进
 2026-10-18（America/Los_Angeles），补充 Claude 的 `parallel_tool_calls` 转换回归测试，覆盖客户端显式选择、原生 options 覆盖优先级，以及压缩时的 `tool_choice: none`。普通测试、类型检查与构建通过。
 
 构建后实际打包并在独立目录解包，确认八份目录、文档和示例完整，CLI 与 HTTP 目录可用，包内文档相对链接及私有内容扫描通过。
+
+### 错误路径与客户端重试
+
+2026-10-18（America/Los_Angeles），`@openai/codex@0.163.0` 的现成二进制通过 `test/errors-e2e.test.ts` 的八个场景，上游均为本地测试服务器：
+
+- SSE 策略拦截、预算超限、`usage_not_included`、`flex_unavailable` 保留客户端专用分类和提示，各请求一次即停止。
+- HTTP 429 用量限制保留 `plan_type`、`resets_at`，客户端显示对应升级和恢复时间提示；HTTP 429 预算限制停止。
+- HTTP 400 的未知错误码保留原响应体，不变成流内未知错误而触发重试。
+- 未知 SSE 错误按客户端配置重试一次，bridge 收到和转发的请求均为两次，没有额外重试。
+
+普通 HTTP 测试另覆盖双压缩接受协调、失败取消、错误体解压后的 header 清理、凭据失败的终止语义，以及原生错误附加字段的完整保留。这里验证客户端协议，不代表真实服务产生过上述合成错误。
 
 ## 真实上游验证
 

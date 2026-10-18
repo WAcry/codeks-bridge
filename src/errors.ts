@@ -3,6 +3,30 @@ export interface UpstreamFailure {
   body: unknown;
 }
 
+/** Native Responses HTTP failures retain their transport-level meaning. */
+export class UpstreamHttpError extends Error {
+  readonly status: number;
+  readonly body: string;
+  readonly headers: Headers;
+  constructor(status: number, body: string, headers: Headers) {
+    super(`Upstream returned HTTP ${status}`);
+    this.name = "UpstreamHttpError";
+    this.status = status;
+    this.body = body;
+    this.headers = headers;
+  }
+}
+
+/** A Responses failure belongs to the SSE protocol, not HTTP classification. */
+export class ResponsesStreamError extends Error {
+  readonly error: Record<string, unknown>;
+  constructor(error: Record<string, unknown>) {
+    super(typeof error.message === "string" ? error.message : "The upstream response failed");
+    this.name = "ResponsesStreamError";
+    this.error = error;
+  }
+}
+
 /** Client retry classification is separate from the unmodified upstream failure. */
 export class BridgeError extends Error {
   readonly code: string;
@@ -31,7 +55,17 @@ function retryAfter(value: unknown): string | undefined {
   return undefined;
 }
 
-/** HTTP failures and SSE error events use the same classification and metadata. */
+/** Keep native fields; only supplement missing retry advice from HTTP headers. */
+export function responsesStreamError(payload: unknown, headers?: Headers): ResponsesStreamError {
+  const error = record(record(payload)?.error ?? payload) ?? {};
+  const delay = retryAfter(headers);
+  if (delay !== undefined && retryAfter(error.headers) === undefined) {
+    return new ResponsesStreamError({ ...error, headers: { ...record(error.headers), "retry-after": delay } });
+  }
+  return new ResponsesStreamError(error);
+}
+
+/** Translate non-Responses protocols into errors understood by the client. */
 export function upstreamError(status: number | undefined, payload: unknown, headers?: Headers): BridgeError {
   const envelope = record(payload);
   const raw = envelope?.error ?? payload;

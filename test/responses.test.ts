@@ -241,10 +241,97 @@ test("Responses stream errors preserve upstream details and retry hints", async 
     const { writer } = capture();
     await assert.rejects(runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer), (error: any) => {
       assert.equal(error.message, "Capacity unavailable.");
-      assert.equal(error.code, "server_is_overloaded");
-      assert.deepEqual(error.headers, { "retry-after": "12" });
-      assert.deepEqual(error.upstream.body, failure);
+      assert.deepEqual(error.error, failure.error);
       return true;
     });
   });
+});
+
+
+test("Responses Lite keeps native phases and an unfinished turn without tool calls", async () => {
+  const usage = { input_tokens: 4, output_tokens: 2 };
+  for (const phase of ["commentary", "partial_answer", "final_answer", undefined]) {
+    const message = { type: "message", id: "msg_phase", role: "assistant", phase, content: [{ type: "output_text", text: "Continuing." }] };
+    for (const streaming of [true, false]) {
+      const completed = { status: "completed", end_turn: false, output: [message], usage };
+      const payload = streaming ? [
+        { type: "response.output_item.added", output_index: 0, item: { ...message, content: [] } },
+        { type: "response.output_text.delta", output_index: 0, item_id: message.id, delta: "Continuing." },
+        { type: "response.output_item.done", output_index: 0, item: message },
+        { type: "response.completed", response: completed },
+      ] : completed;
+      await fakeUpstream(payload, async (base) => {
+        const { writer, events } = capture();
+        let accepted = false;
+        const result = await runResponses(context({
+          route: { ...route, upstream: { ...route.upstream, base_url: base } }, responsesLite: true,
+          onAccepted: () => { assert.equal(writer.hasOutput, false); accepted = true; },
+        }), writer);
+        assert.equal(accepted, true);
+        writer.complete(result.usage, result.endTurn);
+        const response = events.at(-1).response;
+        assert.equal(response.end_turn, false);
+        assert.equal(response.output[0].phase, phase ?? "commentary");
+      });
+    }
+  }
+});
+
+test("message phase provided only on item completion is retained", async () => {
+  const message = { type: "message", id: "msg_late_phase", role: "assistant", content: [{ type: "output_text", text: "A partial answer." }] };
+  await fakeUpstream([
+    { type: "response.output_item.added", output_index: 0, item: { ...message, content: [] } },
+    { type: "response.output_text.delta", output_index: 0, item_id: message.id, delta: "A partial answer." },
+    { type: "response.output_item.done", output_index: 0, item: { ...message, phase: "partial_answer" } },
+    { type: "response.completed", response: { status: "completed", end_turn: false, output: [], usage: { input_tokens: 2, output_tokens: 3 } } },
+  ], async (base) => {
+    const { writer, events } = capture();
+    const result = await runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer);
+    writer.complete(result.usage, result.endTurn);
+    assert.equal(events.at(-1).response.output[0].phase, "partial_answer");
+  });
+});
+
+test("GPT summary parts retain boundaries in streaming and complete JSON responses", async () => {
+  const summary = [{ type: "summary_text", text: "First." }, { type: "summary_text", text: "Second." }];
+  const item = { type: "reasoning", id: "rs_parts", summary, encrypted_content: "synthetic-cipher" };
+  const completed = { status: "completed", output: [item], usage: { input_tokens: 4, output_tokens: 2 } };
+  const streamed = [
+    { type: "response.output_item.added", output_index: 0, item: { ...item, summary: [], encrypted_content: null } },
+    ...summary.flatMap((part, summary_index) => [
+      { type: "response.reasoning_summary_part.added", item_id: item.id, output_index: 0, summary_index, part: { ...part, text: "" } },
+      { type: "response.reasoning_summary_text.delta", item_id: item.id, output_index: 0, summary_index, delta: part.text },
+      { type: "response.reasoning_summary_text.done", item_id: item.id, output_index: 0, summary_index, text: part.text },
+      { type: "response.reasoning_summary_part.done", item_id: item.id, output_index: 0, summary_index, part },
+    ]),
+    { type: "response.output_item.done", output_index: 0, item },
+    { type: "response.completed", response: completed },
+  ];
+  for (const payload of [streamed, completed]) {
+    await fakeUpstream(payload, async (base) => {
+      const { writer, events } = capture();
+      const result = await runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer);
+      writer.complete(result.usage, result.endTurn);
+      assert.deepEqual(events.at(-1).response.output[0].summary, summary);
+      assert.deepEqual(events.filter((event) => event.type === "response.reasoning_summary_part.added").map((event) => event.summary_index), [0, 1]);
+      assert.deepEqual(events.filter((event) => event.type === "response.reasoning_summary_part.done").map((event) => event.part), summary);
+      assert.deepEqual(events.filter((event) => event.type === "response.reasoning_summary_text.delta").map((event) => [event.summary_index, event.delta]), [[0, "First."], [1, "Second."]]);
+      assert.equal(decodeReasoning(events.at(-1).response.output[0].encrypted_content)?.data, "synthetic-cipher");
+    });
+  }
+});
+
+test("GPT stream and JSON failures retain unrecognized native codes and details", async () => {
+  for (const code of ["cyber_policy", "bio_policy", "misalignment_policy_violation", "usage_not_included", "flex_unavailable", "organization_spend_limit_exceeded", "project_spend_limit_exceeded", "future_native_code"]) {
+    const error = { code, message: "Synthetic failure.", misalignment: { category: "synthetic" }, plan_type: "synthetic", resets_at: 1234567890 };
+    for (const payload of [[{ type: "response.failed", response: { status: "failed", error } }], { status: "failed", error }]) {
+      await fakeUpstream(payload, async (base) => {
+        const { writer } = capture();
+        await assert.rejects(runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer), (failure: any) => {
+          assert.deepEqual(failure.error, error);
+          return true;
+        });
+      });
+    }
+  }
 });

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { resolveModel } from "../src/config.ts";
-import { BridgeError, transportError, upstreamError } from "../src/errors.ts";
+import { BridgeError, responsesStreamError, transportError, upstreamError, UpstreamHttpError } from "../src/errors.ts";
 import { upstreamFetch } from "../src/upstream.ts";
 
 const route = () => resolveModel({
@@ -14,10 +14,9 @@ test("HTTP errors retain the original JSON or text and never retry", async (t) =
     {
       status: 429,
       body: { error: { code: "capacity_pool_empty", type: "capacity_error", message: "No workers available", param: "model", details: { pool: "synthetic" } }, request_id: "req_synthetic" },
-      code: "rate_limit_exceeded", message: "No workers available",
     },
-    { status: 503, body: "Maintenance in progress\nPlease try again later.", code: "server_is_overloaded", message: "Maintenance in progress\nPlease try again later." },
-    { status: 400, body: { error: "Unsupported request field" }, code: "invalid_prompt", message: "Unsupported request field" },
+    { status: 503, body: "Maintenance in progress\nPlease try again later." },
+    { status: 400, body: { error: "Unsupported request field" } },
   ];
   for (const failure of cases) {
     let calls = 0;
@@ -29,12 +28,10 @@ test("HTTP errors retain the original JSON or text and never retry", async (t) =
       });
     });
     await assert.rejects(upstreamFetch(route(), "/responses", { model: "synthetic-model" }, new AbortController().signal), (error: unknown) => {
-      assert.ok(error instanceof BridgeError);
-      assert.equal(error.message, failure.message);
-      assert.equal(error.code, failure.code);
+      assert.ok(error instanceof UpstreamHttpError);
       assert.equal(error.status, failure.status);
-      assert.deepEqual(error.upstream, { status: failure.status, body: failure.body });
-      assert.deepEqual(error.headers, { "retry-after": "23" });
+      assert.equal(error.body, typeof failure.body === "string" ? failure.body : JSON.stringify(failure.body));
+      assert.equal(error.headers.get("retry-after"), "23");
       return true;
     });
     assert.equal(calls, 1);
@@ -42,7 +39,7 @@ test("HTTP errors retain the original JSON or text and never retry", async (t) =
   }
 });
 
-test("HTTP and streaming failures share classification and preserve provider metadata", () => {
+test("non-Responses failures translate protocol semantics and preserve provider metadata", () => {
   const cases = [
     { status: 400, type: "invalid_request_error", message: "Prompt is too long", code: "context_length_exceeded" },
     { status: 429, type: "insufficient_quota", message: "Account limit reached", code: "insufficient_quota" },
@@ -64,6 +61,19 @@ test("HTTP and streaming failures share classification and preserve provider met
   }
   const error = upstreamError(429, { error: { code: "rate_limit_exceeded", headers: { "retry-after": "10" } } }, new Headers({ "retry-after": "30" }));
   assert.deepEqual(error.headers, { "retry-after": "30" });
+});
+
+test("native Responses errors retain their object and only add missing retry advice", () => {
+  const original = { code: "future_native_code", message: "Native detail", details: { reason: "synthetic" }, headers: { "Retry-After": "19", "x-request-id": "req_synthetic" } };
+  const snapshot = structuredClone(original);
+  assert.deepEqual(responsesStreamError({ error: original }, new Headers({ "retry-after": "30" })).error, original);
+  const withoutDelay = { ...original, headers: { "x-request-id": "req_synthetic" } };
+  assert.deepEqual(responsesStreamError(withoutDelay, new Headers({ "retry-after": "30" })).error, {
+    ...withoutDelay, headers: { ...withoutDelay.headers, "retry-after": "30" },
+  });
+  const noCode = { type: "error", message: "Native error without a code" };
+  assert.deepEqual(responsesStreamError(noCode).error, noCode);
+  assert.deepEqual(original, snapshot);
 });
 
 test("network failures expose the cause and code without request or credential output", async (t) => {

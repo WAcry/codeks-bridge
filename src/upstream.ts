@@ -1,5 +1,5 @@
 import { upstreamHeaders } from "./auth.ts";
-import { BridgeError, transportError, upstreamError } from "./errors.ts";
+import { BridgeError, transportError, upstreamError, UpstreamHttpError } from "./errors.ts";
 import type { ResolvedModel } from "./types.ts";
 
 /** base_url includes any API version prefix; path is appended, never resolved from /. */
@@ -47,9 +47,10 @@ export async function upstreamFetch(route: ResolvedModel, path: string, body: un
   } else clearTimeout(timer!);
   if (!response.ok) {
     const text = await response.text();
+    if (combined.aborted) throw combined.reason;
+    if (route.profile.api === "responses") throw new UpstreamHttpError(response.status, text, response.headers);
     let payload: unknown = text;
     try { payload = JSON.parse(text); } catch { /* Non-JSON error bodies are still useful diagnostics. */ }
-    if (combined.aborted) throw combined.reason;
     throw upstreamError(response.status, payload, response.headers);
   }
   return response;

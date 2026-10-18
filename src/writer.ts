@@ -8,6 +8,7 @@
 
 import { formatSse } from "./sse.ts";
 import { newId } from "./ids.ts";
+import { BridgeError } from "./errors.ts";
 
 export interface Usage {
   input_tokens: number;
@@ -35,19 +36,24 @@ export interface CustomToolCallItem {
   namespace?: string;
 }
 
-type Phase = "commentary" | "final_answer";
+type Phase = "commentary" | "partial_answer" | "final_answer";
 
 interface OpenMessage {
   id: string;
   outputIndex: number;
   text: string;
+  phase?: Phase;
+}
+
+interface SummaryPart {
+  text: string;
+  done: boolean;
 }
 
 interface OpenReasoning {
   id: string;
   outputIndex: number;
-  summary: string;
-  summaryOpen: boolean;
+  summary: Map<number, SummaryPart>;
 }
 
 export function usageJson(usage: Usage): Record<string, unknown> {
@@ -137,7 +143,7 @@ export class ResponseWriter {
     if (this.reasoning) return this.reasoning;
     this.closeMessage();
     this.flushPendingMessage("commentary");
-    const r: OpenReasoning = { id: newId("rs"), outputIndex: this.nextOutputIndex++, summary: "", summaryOpen: false };
+    const r: OpenReasoning = { id: newId("rs"), outputIndex: this.nextOutputIndex++, summary: new Map() };
     this.reasoning = r;
     this.emit("response.output_item.added", {
       output_index: r.outputIndex,
@@ -146,43 +152,70 @@ export class ResponseWriter {
     return r;
   }
 
-  reasoningDelta(text: string): void {
+  startReasoningSummary(summaryIndex = 0): void {
+    const r = this.openReasoning();
+    if (!this.showSummary || r.summary.has(summaryIndex)) return;
+    r.summary.set(summaryIndex, { text: "", done: false });
+    this.emit("response.reasoning_summary_part.added", {
+      item_id: r.id,
+      output_index: r.outputIndex,
+      summary_index: summaryIndex,
+      part: { type: "summary_text", text: "" },
+    });
+  }
+
+  reasoningDelta(text: string, summaryIndex = 0): void {
     const r = this.openReasoning();
     if (!text || !this.showSummary) return;
-    if (!r.summaryOpen) {
-      r.summaryOpen = true;
-      this.emit("response.reasoning_summary_part.added", {
-        item_id: r.id,
-        output_index: r.outputIndex,
-        summary_index: 0,
-        part: { type: "summary_text", text: "" },
-      });
-    }
-    r.summary += text;
+    this.startReasoningSummary(summaryIndex);
+    const part = r.summary.get(summaryIndex)!;
+    if (part.done) throw new BridgeError("The upstream changed a completed reasoning summary", "stream_error", 502);
+    part.text += text;
     this.emit("response.reasoning_summary_text.delta", {
       item_id: r.id,
       output_index: r.outputIndex,
-      summary_index: 0,
+      summary_index: summaryIndex,
       delta: text,
     });
   }
 
-  /** Closes the open reasoning item (opening one if needed) with its carrier. */
-  endReasoning(encryptedContent: string | undefined, summaryText?: string): void {
+  endReasoningSummary(summaryIndex = 0, text?: string): void {
     const r = this.openReasoning();
-    const summary = summaryText ?? r.summary;
-    if (r.summaryOpen) {
-      this.emit("response.reasoning_summary_text.done", {
-        item_id: r.id,
-        output_index: r.outputIndex,
-        summary_index: 0,
-        text: r.summary,
-      });
+    if (!this.showSummary) return;
+    this.startReasoningSummary(summaryIndex);
+    const part = r.summary.get(summaryIndex)!;
+    if (text !== undefined) {
+      if (!text.startsWith(part.text)) {
+        throw new BridgeError("The upstream changed already streamed reasoning summary", "stream_error", 502);
+      }
+      this.reasoningDelta(text.slice(part.text.length), summaryIndex);
     }
+    if (part.done) return;
+    part.done = true;
+    this.emit("response.reasoning_summary_text.done", {
+      item_id: r.id,
+      output_index: r.outputIndex,
+      summary_index: summaryIndex,
+      text: part.text,
+    });
+    this.emit("response.reasoning_summary_part.done", {
+      item_id: r.id,
+      output_index: r.outputIndex,
+      summary_index: summaryIndex,
+      part: { type: "summary_text", text: part.text },
+    });
+  }
+
+  /** Closes the open reasoning item (opening one if needed) with its carrier. */
+  endReasoning(encryptedContent: string | undefined, summary?: Array<{ type: "summary_text"; text: string }>): void {
+    const r = this.openReasoning();
+    for (const [index, part] of (summary ?? []).entries()) this.endReasoningSummary(index, part.text);
+    for (const index of r.summary.keys()) this.endReasoningSummary(index);
     const item = {
       type: "reasoning",
       id: r.id,
-      summary: this.showSummary && summary ? [{ type: "summary_text", text: summary }] : [],
+      summary: [...r.summary.entries()].sort(([a], [b]) => a - b)
+        .map(([, part]) => ({ type: "summary_text", text: part.text })),
       encrypted_content: encryptedContent ?? null,
     };
     this.reasoning = undefined;
@@ -196,16 +229,17 @@ export class ResponseWriter {
 
   // Messages ------------------------------------------------------------
 
-  textDelta(text: string): void {
+  textDelta(text: string, phase?: Phase): void {
+    if (this.message && phase !== undefined) this.message.phase = phase;
     if (!text) return;
     if (this.reasoning) this.endReasoning(undefined);
     if (!this.message) {
       this.flushPendingMessage("commentary");
-      const m: OpenMessage = { id: newId("msg"), outputIndex: this.nextOutputIndex++, text: "" };
+      const m: OpenMessage = { id: newId("msg"), outputIndex: this.nextOutputIndex++, text: "", phase };
       this.message = m;
       this.emit("response.output_item.added", {
         output_index: m.outputIndex,
-        item: { type: "message", id: m.id, role: "assistant", status: "in_progress", content: [] },
+        item: { type: "message", id: m.id, role: "assistant", status: "in_progress", content: [], ...(phase !== undefined ? { phase } : {}) },
       });
       this.emit("response.content_part.added", {
         item_id: m.id,
@@ -224,8 +258,9 @@ export class ResponseWriter {
   }
 
   /** Ends the current text block. Its done event waits until the phase is known. */
-  closeMessage(): void {
+  closeMessage(phase?: Phase): void {
     if (!this.message) return;
+    if (phase !== undefined) this.message.phase = phase;
     this.flushPendingMessage("commentary");
     this.pendingMessage = this.message;
     this.message = undefined;
@@ -241,7 +276,7 @@ export class ResponseWriter {
       role: "assistant",
       status: "completed",
       content: [{ type: "output_text", text: m.text, annotations: [] }],
-      phase,
+      phase: m.phase ?? phase,
     };
     this.emit("response.output_text.done", {
       item_id: m.id,
@@ -300,10 +335,10 @@ export class ResponseWriter {
     this.output.push(item);
   }
 
-  private flushAll(): void {
+  private flushAll(endTurn?: boolean): void {
     this.closeMessage();
     if (this.reasoning) this.endReasoning(undefined);
-    this.flushPendingMessage(this.toolCalls.length > 0 ? "commentary" : "final_answer");
+    this.flushPendingMessage(endTurn === false || this.toolCalls.length > 0 ? "commentary" : "final_answer");
     for (const item of this.toolCalls) {
       const outputIndex = this.nextOutputIndex++;
       const added: Record<string, unknown> = { ...item, status: "in_progress" };
@@ -321,7 +356,7 @@ export class ResponseWriter {
   complete(usage: Usage | undefined, endTurn?: boolean): void {
     if (this.finished) return;
     this.start();
-    this.flushAll();
+    this.flushAll(endTurn);
     this.finished = true;
     const extra: Record<string, unknown> = {};
     if (usage) extra.usage = usageJson(usage);
@@ -330,13 +365,13 @@ export class ResponseWriter {
   }
 
   /** Fails the response. Tool calls that were not emitted yet are dropped. */
-  fail(code: string, message: string, headers?: Record<string, string>, upstream?: unknown): void {
+  fail(error: Record<string, unknown>): void {
     if (this.finished) return;
     this.start();
     this.toolCalls.length = 0;
     this.finished = true;
     this.emit("response.failed", {
-      response: this.responseObject("failed", { error: { code, message, ...(headers ? { headers } : {}), ...(upstream ? { upstream } : {}) } }),
+      response: this.responseObject("failed", { error }),
     });
   }
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { gzipSync } from "node:zlib";
 import test, { type TestContext } from "node:test";
 import { createBridgeServer } from "../src/server.ts";
 import { decodeCompaction, decodeReasoning } from "../src/carrier.ts";
@@ -97,6 +98,28 @@ function messagesSuccess(res: ServerResponse, text: string) {
 async function post(url: string, body: any, init: RequestInit = {}) {
   return fetch(`${url}/v1/responses`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), ...init });
 }
+
+test("credential preparation failures remain terminal HTTP errors without exposing diagnostics", async (t) => {
+  const missingEnv = `SYNTHETIC_MISSING_CREDENTIAL_${process.pid}`;
+  assert.equal(process.env[missingEnv], undefined);
+  const cases = [
+    { auth: { api_key_env: missingEnv }, message: `Missing credential environment variable: ${missingEnv}` },
+    { auth: { api_key_command: [process.execPath, "-e", "console.log('synthetic-sensitive-value');console.error('synthetic-sensitive-value');process.exit(1)"] }, message: "Credential command failed" },
+    { auth: { api_key_command: [process.execPath, "-e", "process.stdout.write('   ')"] }, message: "Credential command returned an empty credential" },
+    { auth: { api_key_command: [process.execPath, "-e", "console.log('synthetic-sensitive-value');console.log('second-line')"] }, message: "Credential must be a single line" },
+  ];
+  for (const { auth, message } of cases) {
+    await t.test(message, async (t) => {
+      const f = await fixture(t, (_body, _req, res) => nativeSuccess(res, []), {}, config => {
+        Object.assign(config.upstreams.native, auth);
+      });
+      const response = await post(f.url, { model: "gpt", stream: true, input: "hello" });
+      assert.equal(response.status, 400);
+      assert.deepEqual(await response.json(), { error: { code: "invalid_prompt", message } });
+      assert.equal(f.seen.length, 0);
+    });
+  }
+});
 async function events(response: Response): Promise<any[]> {
   assert.match(response.headers.get("content-type") ?? "", /text\/event-stream/);
   const text = await response.text();
@@ -258,7 +281,96 @@ test("GPT keeps Lite declarations, transport and reasoning through dual compacti
   assert(f.seen.slice(2).some(({ body: sent }) => sent.tool_choice === "none"));
 });
 
-test("HTTP and SSE errors preserve capacity classification and Retry-After", async (t) => {
+test("dual compaction waits for both successful upstream headers before sending HTTP 200", { timeout: 5000 }, async (t) => {
+  let nativeResponse!: ServerResponse;
+  let ready!: () => void;
+  let calls = 0;
+  const bothStarted = new Promise<void>((resolve) => { ready = resolve; });
+  const f = await fixture(t, (body, _req, res) => {
+    if (body.input.some((item: any) => item.type === "compaction_trigger")) nativeResponse = res;
+    else nativeSuccess(res, [message("Portable summary")]);
+    if (++calls === 2) ready();
+  });
+  let responseReceived = false;
+  const pending = post(f.url, { model: "gpt", input: [{ type: "compaction_trigger" }], stream: true })
+    .then((response) => { responseReceived = true; return response; });
+  await bothStarted;
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(responseReceived, false);
+  nativeSuccess(nativeResponse, [{ type: "compaction", encrypted_content: "synthetic-checkpoint" }]);
+  const response = await pending;
+  assert.equal(response.status, 200);
+  const frames = await events(response);
+  assert.equal(frames.at(-1).type, "response.completed");
+  assert.equal(frames.at(-1).response.output[0].type, "compaction");
+  assert.equal(f.seen.length, 2);
+});
+
+test("a dual-compaction HTTP failure keeps its HTTP error and cancels the accepted sibling", { timeout: 5000 }, async (t) => {
+  let ready!: () => void;
+  let closed!: () => void;
+  let calls = 0;
+  const bothStarted = new Promise<void>((resolve) => { ready = resolve; });
+  const siblingClosed = new Promise<void>((resolve) => { closed = resolve; });
+  const body = { error: { code: "invalid_encrypted_content", message: "Synthetic checkpoint rejection" } };
+  const f = await fixture(t, async (request, _req, res) => {
+    const native = request.input.some((item: any) => item.type === "compaction_trigger");
+    if (!native) {
+      res.on("close", closed);
+      sse(res, [{ type: "response.created", response: { id: "resp_summary" } }], false);
+    }
+    if (++calls === 2) ready();
+    await bothStarted;
+    if (native) {
+      res.writeHead(400, { "content-type": "application/json", "retry-after": "11" });
+      res.end(JSON.stringify(body));
+    }
+  });
+  const response = await post(f.url, { model: "gpt", input: [{ type: "compaction_trigger" }], stream: true });
+  assert.equal(response.status, 400);
+  assert.equal(response.headers.get("retry-after"), "11");
+  assert.deepEqual(await responseJson(response), body);
+  await siblingClosed;
+  assert.equal(f.seen.length, 2);
+});
+
+for (const siblingAccepted of [false, true]) {
+  test(`dual-compaction native stream failure survives with sibling headers ${siblingAccepted ? "accepted" : "pending"}`, { timeout: 5000 }, async (t) => {
+    const error = { code: "misalignment_policy_violation", message: "Synthetic policy failure", misalignment: { reason: "synthetic_reason" }, future_field: { retained: true } };
+    let ready!: () => void;
+    let closed!: () => void;
+    let failNative!: () => void;
+    let calls = 0;
+    const bothStarted = new Promise<void>((resolve) => { ready = resolve; });
+    const siblingClosed = new Promise<void>((resolve) => { closed = resolve; });
+    const f = await fixture(t, async (request, _req, res) => {
+      const native = request.input.some((item: any) => item.type === "compaction_trigger");
+      if (native) {
+        sse(res, [{ type: "response.created", response: { id: "resp_native" } }], false);
+        failNative = () => res.end(`data: ${JSON.stringify({ type: "response.failed", response: { error } })}\n\n`);
+      } else {
+        res.on("close", closed);
+        if (siblingAccepted) sse(res, [{ type: "response.created", response: { id: "resp_summary" } }], false);
+      }
+      if (++calls === 2) ready();
+    });
+    const pending = post(f.url, { model: "gpt", input: [{ type: "compaction_trigger" }], stream: true });
+    await bothStarted;
+    // Once both headers are accepted the downstream stream must already exist.
+    const response = siblingAccepted ? await pending : undefined;
+    failNative();
+    const received = response ?? await pending;
+    assert.equal(received.status, 200);
+    const frames = await events(received);
+    assert.equal(frames.at(-1).type, "response.failed");
+    assert.deepEqual(frames.at(-1).response.error, error);
+    assert.equal(frames.some((frame) => frame.type === "response.completed" || frame.item?.type === "compaction"), false);
+    await siblingClosed;
+    assert.equal(f.seen.length, 2);
+  });
+}
+
+test("translated HTTP errors preserve capacity classification and Retry-After before starting a stream", async (t) => {
   let status = 429;
   let code = "rate_limit_exceeded";
   const f = await fixture(t, (_body, _req, res) => {
@@ -267,16 +379,60 @@ test("HTTP and SSE errors preserve capacity classification and Retry-After", asy
   });
   for (const failure of [{ status: 429, code: "rate_limit_exceeded" }, { status: 503, code: "server_is_overloaded" }, { status: 429, code: "insufficient_quota" }]) {
     ({ status, code } = failure);
-    const response = await post(f.url, { model: "flash", input: "Hello" });
-    assert.equal(response.status, status);
-    assert.equal(response.headers.get("retry-after"), "17");
-    assert.equal((await responseJson(response)).error.code, code);
-    const frames = await events(await post(f.url, { model: "flash", input: "Hello", stream: true }));
-    assert.equal(frames.some((frame) => frame.type === "response.completed"), false);
-    const failed = frames.find((frame) => frame.type === "response.failed").response;
-    assert.equal(failed.error.code, code);
-    assert.deepEqual(failed.error.headers, { "retry-after": "17" });
+    for (const stream of [false, true]) {
+      const response = await post(f.url, { model: "flash", input: "Hello", stream });
+      assert.equal(response.status, status);
+      assert.equal(response.headers.get("retry-after"), "17");
+      const error = (await responseJson(response)).error;
+      assert.equal(error.code, code);
+      assert.deepEqual(error.upstream, { status, body: { error: { code, message: "Synthetic upstream failure" } } });
+    }
   }
+  assert.equal(f.seen.length, 6);
+});
+
+test("native HTTP failures preserve status, original fields and body without retries", async (t) => {
+  const failures = [
+    { status: 429, error: { code: "usage_limit_reached", type: "usage_limit_reached", message: "Synthetic plan limit", plan_type: "plus", resets_at: 1900000000 } },
+    { status: 403, error: { code: "organization_spend_limit_exceeded", type: "budget_error", message: "Synthetic budget limit", limit: 100 } },
+    { status: 400, error: { code: "misalignment_policy_violation", message: "Synthetic policy failure", misalignment: { type: "synthetic_policy", reason: "synthetic_reason" } } },
+  ];
+  let current = failures[0];
+  const f = await fixture(t, (_body, _req, res) => {
+    res.writeHead(current.status, { "content-type": "application/json", "retry-after": "19", "x-request-id": "synthetic-request" });
+    res.end(JSON.stringify({ error: current.error }, null, 2));
+  });
+  for (const failure of failures) {
+    current = failure;
+    const before = f.seen.length;
+    const response = await post(f.url, { model: "gpt", input: "Hello", stream: true });
+    assert.equal(response.status, failure.status);
+    assert.equal(response.headers.get("retry-after"), "19");
+    assert.equal(response.headers.get("x-request-id"), "synthetic-request");
+    assert.equal(await response.text(), JSON.stringify({ error: failure.error }, null, 2));
+    assert.equal(f.seen.length, before + 1);
+  }
+});
+
+test("native HTTP text failures forward decoded content without stale compression or connection headers", async (t) => {
+  const text = "Synthetic upstream access failure.\n";
+  const compressed = gzipSync(text);
+  const f = await fixture(t, (_body, _req, res) => {
+    res.writeHead(403, {
+      "content-type": "text/plain; charset=utf-8", "content-encoding": "gzip", "content-length": String(compressed.length),
+      connection: "close, x-synthetic-hop", "x-synthetic-hop": "upstream-only", "x-request-id": "synthetic-compressed-request",
+    });
+    res.end(compressed);
+  });
+  const response = await post(f.url, { model: "gpt", input: "Hello", stream: true });
+  assert.equal(response.status, 403);
+  assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8");
+  assert.equal(response.headers.get("content-encoding"), null);
+  assert.equal(response.headers.get("content-length"), null);
+  assert.equal(response.headers.get("x-synthetic-hop"), null);
+  assert.equal(response.headers.get("x-request-id"), "synthetic-compressed-request");
+  assert.equal(await response.text(), text);
+  assert.equal(f.seen.length, 1);
 });
 
 test("all adapters complete tool calls and report usage through the HTTP stream", async (t) => {
@@ -372,8 +528,26 @@ for (const model of ["gpt", "claude", "flash"]) {
   });
 }
 
+test("client cancellation before response headers aborts the pending upstream request", { timeout: 5000 }, async (t) => {
+  let upstreamStarted!: () => void;
+  let upstreamClosed!: () => void;
+  const started = new Promise<void>((resolve) => { upstreamStarted = resolve; });
+  const closed = new Promise<void>((resolve) => { upstreamClosed = resolve; });
+  const f = await fixture(t, (_body, _req, res) => {
+    res.on("close", upstreamClosed);
+    upstreamStarted();
+  });
+  const controller = new AbortController();
+  const pending = post(f.url, { model: "gpt", input: "Hello", stream: true }, { signal: controller.signal });
+  await started;
+  controller.abort();
+  await assert.rejects(pending, /abort/i);
+  await closed;
+  assert.equal(f.seen.length, 1);
+});
+
 for (const stage of ["headers", "body"] as const) {
-  test(`idle upstream ${stage} time out despite downstream keepalives`, { timeout: 5000 }, async (t) => {
+  test(`idle upstream ${stage} time out using the accepted transport`, { timeout: 5000 }, async (t) => {
     // Run the server's heartbeat more often so the test exercises keepalives
     // without waiting for the production 15-second interval.
     const originalInterval = globalThis.setInterval;
@@ -384,11 +558,18 @@ for (const stage of ["headers", "body"] as const) {
       res.on("close", upstreamClosed);
       if (stage === "body") sse(res, [{ choices: [{ index: 0, delta: { content: "Started" }, finish_reason: null }] }], false);
     }, {}, (config) => { config.upstreams.chat.stream_idle_timeout_ms = 50; });
-    const frames = await events(await post(f.url, { model: "flash", input: "Hello", stream: true }));
-    assert.ok(frames.some((event) => event.type === "keepalive"));
-    assert.equal(frames.at(-1).type, "response.failed");
-    assert.equal(frames.at(-1).response.error.code, "stream_error");
-    assert.equal(frames.some((event) => event.type === "response.completed"), false);
+    const response = await post(f.url, { model: "flash", input: "Hello", stream: true });
+    if (stage === "headers") {
+      assert.equal(response.status, 504);
+      assert.equal((await responseJson(response)).error.code, "stream_error");
+    } else {
+      assert.equal(response.status, 200);
+      const frames = await events(response);
+      assert.ok(frames.some((event) => event.type === "keepalive"));
+      assert.equal(frames.at(-1).type, "response.failed");
+      assert.equal(frames.at(-1).response.error.code, "stream_error");
+      assert.equal(frames.some((event) => event.type === "response.completed"), false);
+    }
     await closed;
   });
 }
@@ -528,20 +709,10 @@ test("explicitly shared native state rejected upstream returns its original erro
   for (const stream of [false, true]) {
     const before = f.seen.length;
     const response = await post(f.url, { model: "gpt-region", input: compacted.output, stream });
-    let error;
-    if (stream) {
-      const frames = await events(response);
-      assert.equal(frames.at(-1).type, "response.failed");
-      error = frames.at(-1).response.error;
-    } else {
-      assert.equal(response.status, 400);
-      error = (await responseJson(response)).error;
-    }
-    assert.equal(error.code, "invalid_prompt");
-    assert.deepEqual(error.upstream, {
-      status: 400,
-      body: { error: { code: "invalid_encrypted_content", message: "Synthetic endpoint cannot decrypt this checkpoint." } },
-    });
+    assert.equal(response.status, 400);
+    const error = (await responseJson(response)).error;
+    assert.equal(error.code, "invalid_encrypted_content");
+    assert.equal(Object.hasOwn(error, "upstream"), false);
     assert.equal(error.message, "Synthetic endpoint cannot decrypt this checkpoint.");
     assert.equal(f.seen.length, before + 1);
   }

@@ -82,7 +82,8 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
         input: item.type === "custom_tool_call" ? { input: item.input } : parseArguments(item.arguments),
       }]);
     } else if (item.type === "function_call_output" || item.type === "custom_tool_call_output") {
-      append("user", [{ type: "tool_result", tool_use_id: safeCallId(item.call_id), content: contentBlocks(item.output) }]);
+      const content = contentBlocks(item.output);
+      append("user", [{ type: "tool_result", tool_use_id: safeCallId(item.call_id), ...(content.length ? { content } : {}) }]);
     } else if (item.type === "message" || item.role) {
       const blocks = contentBlocks(item.content);
       if (item.role === "developer" || item.role === "system") {
@@ -167,6 +168,7 @@ function validateUsage(value: any, required: string[]): void {
 export const runAnthropic: Backend = async (context, writer) => {
   const { body, tools } = buildAnthropicRequest(context);
   const response = await upstreamFetch(context.route, "/messages", body, context.signal);
+  context.onAccepted?.();
   if (!response.body) throw new BridgeError("Messages returned an empty stream.", "upstream_error", 502);
   const blocks = new Map<number, { value: Block; json: string }>();
   let rawUsage: Block = {};
@@ -223,6 +225,9 @@ export const runAnthropic: Backend = async (context, writer) => {
   }
   if (!started || !stopped || blocks.size || !stopReason) {
     throw new BridgeError("Messages stream ended before the message was complete.", "upstream_error", 502);
+  }
+  if (stopReason === "model_context_window_exceeded") {
+    throw new BridgeError("Messages reached the model context window before completing the response.", "context_length_exceeded");
   }
   if (stopReason === "max_tokens" || stopReason === "refusal") {
     throw new BridgeError(stopReason === "max_tokens" ? "Messages reached max_tokens before completing the response." : "Messages refused the request.");

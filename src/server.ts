@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { validateConfig, resolveModel } from "./config.ts";
 import { buildCatalog } from "./catalog.ts";
 import { reasoningSummaryRequested } from "./profiles.ts";
-import { BridgeError, transportError } from "./errors.ts";
+import { BridgeError, ResponsesStreamError, transportError, UpstreamHttpError } from "./errors.ts";
 import { ResponseWriter, usageJson } from "./writer.ts";
 import { runResponses } from "./backends/responses.ts";
 import { runAnthropic } from "./backends/anthropic.ts";
@@ -16,6 +16,14 @@ const MAX_BODY_BYTES = 64 * 1024 * 1024;
 function json(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
   res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store", ...headers });
   res.end(JSON.stringify(body));
+}
+function upstreamHttpFailure(res: ServerResponse, error: UpstreamHttpError): void {
+  const headers = new Headers(error.headers);
+  const connectionHeaders = (headers.get("connection") ?? "").split(",").map(name => name.trim()).filter(Boolean);
+  // fetch decodes the body; hop-by-hop and encoded-length headers no longer apply.
+  for (const name of [...connectionHeaders, "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade", "content-encoding", "content-length"]) headers.delete(name);
+  res.writeHead(error.status, Object.fromEntries(headers));
+  res.end(error.body);
 }
 async function readRequest(req: IncomingMessage): Promise<ResponsesRequest> {
   let size = 0;
@@ -59,6 +67,7 @@ export function createBridgeServer(value: BridgeConfig): Server {
     res.on("close", abort);
     let writer: ResponseWriter | undefined;
     let keepalive: NodeJS.Timeout | undefined;
+    let startStream: (() => void) | undefined;
     try {
       if (!authenticated(req, token)) { json(res, 401, { error: { code: "invalid_api_key", message: "Invalid bridge token" } }); return; }
       const path = new URL(req.url ?? "/", "http://localhost").pathname.replace(/^\/v1(?=\/)/, "");
@@ -75,16 +84,18 @@ export function createBridgeServer(value: BridgeConfig): Server {
       const route = resolveModel(config, request.model);
       const responsesLite = req.headers["x-openai-internal-codex-responses-lite"] === "true" ||
         (Array.isArray(request.input) && request.input.some((item) => item.type === "additional_tools"));
-      const context = { request, route, signal: controller.signal, responsesLite };
       const backend = BACKENDS[route.profile.id];
       const streaming = request.stream === true;
-      if (streaming) {
+      writer = new ResponseWriter(streaming ? res : { write() {} }, { model: request.model, showSummary: reasoningSummaryRequested(request) });
+      if (streaming) startStream = () => {
+        if (res.headersSent || controller.signal.aborted) return;
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", "x-accel-buffering": "no" });
         res.flushHeaders();
-      }
-      writer = new ResponseWriter(streaming ? res : { write() {} }, { model: request.model, showSummary: reasoningSummaryRequested(request) });
-      writer.start();
-      if (streaming) keepalive = setInterval(() => writer?.keepalive(), 15_000).unref();
+        writer!.start();
+        keepalive = setInterval(() => writer?.keepalive(), 15_000).unref();
+      };
+      else writer.start();
+      const context = { request, route, signal: controller.signal, responsesLite, onAccepted: startStream };
       let result;
       if (isCompactionRequest(request)) {
         const compacted = await compact(context, backend);
@@ -102,9 +113,19 @@ export function createBridgeServer(value: BridgeConfig): Server {
       });
     } catch (cause) {
       if (controller.signal.aborted || res.destroyed) return;
+      if (cause instanceof UpstreamHttpError) { upstreamHttpFailure(res, cause); return; }
+      if (cause instanceof ResponsesStreamError) {
+        // A compaction branch can fail in its stream while its sibling still
+        // awaits headers. Preserve that first failure as an SSE error.
+        startStream?.();
+        if (res.headersSent && writer) { writer.fail(cause.error); res.end(); }
+        else json(res, 502, { error: cause.error });
+        return;
+      }
       const error = cause instanceof BridgeError ? cause : transportError(cause);
-      if (res.headersSent && writer) { writer.fail(error.code, error.message, error.headers, error.upstream); res.end(); }
-      else json(res, error.status, { error: { code: error.code, message: error.message, ...(error.upstream ? { upstream: error.upstream } : {}) } }, error.headers);
+      const payload = { code: error.code, message: error.message, ...(error.headers ? { headers: error.headers } : {}), ...(error.upstream ? { upstream: error.upstream } : {}) };
+      if (res.headersSent && writer) { writer.fail(payload); res.end(); }
+      else json(res, error.status, { error: payload }, error.headers);
     } finally {
       if (keepalive) clearInterval(keepalive);
       res.off("close", abort);

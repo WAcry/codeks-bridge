@@ -1,5 +1,5 @@
 import { encodeReasoning } from "../carrier.ts";
-import { BridgeError, upstreamError } from "../errors.ts";
+import { BridgeError, responsesStreamError } from "../errors.ts";
 import { prepareHistory } from "../history.ts";
 import { reasoningEffort } from "../profiles.ts";
 import { parseJsonSse } from "../sse.ts";
@@ -67,13 +67,13 @@ function usageFrom(value: any): Usage {
 interface ItemState {
   item: Record<string, any>;
   text: string;
-  summary: string;
   done: boolean;
 }
 
 export const runResponses: Backend = async (context, writer) => {
   const response = await upstreamFetch(context.route, "/responses", responsesBody(context), context.signal,
     context.responsesLite ? { "x-openai-internal-codex-responses-lite": "true" } : undefined);
+  context.onAccepted?.();
   const states = new Map<number, ItemState>();
   const byId = new Map<string, ItemState>();
   const calls: Record<string, any>[] = [];
@@ -82,7 +82,7 @@ export const runResponses: Backend = async (context, writer) => {
     const index = Number(event.output_index ?? 0);
     let state = event.item_id ? byId.get(event.item_id) : states.get(index);
     if (!state) {
-      state = { item: event.item ?? {}, text: "", summary: "", done: false };
+      state = { item: event.item ?? {}, text: "", done: false };
       states.set(index, state);
     }
     if (event.item?.id) byId.set(event.item.id, state);
@@ -92,15 +92,12 @@ export const runResponses: Backend = async (context, writer) => {
   function finishItem(item: any, state: ItemState): void {
     if (state.done) return;
     state.done = true;
-    state.item = item;
+    state.item = { ...state.item, ...item };
     switch (item.type) {
       case "reasoning": {
-        const summary = (item.summary ?? []).filter((part: any) => part.type === "summary_text")
-          .map((part: any) => part.text ?? "").join("\n\n");
-        if (!state.summary && summary) writer.reasoningDelta(summary);
         const content = typeof item.encrypted_content === "string" && item.encrypted_content
           ? encodeReasoning({ source: context.route.origin, format: context.route.profile.reasoning_format, data: item.encrypted_content }) : undefined;
-        writer.endReasoning(content, summary || state.summary);
+        writer.endReasoning(content, item.summary);
         break;
       }
       case "message": {
@@ -111,8 +108,8 @@ export const runResponses: Backend = async (context, writer) => {
         const text = content.filter((part: any) => part.type === "output_text")
           .map((part: any) => part.text ?? "").join("");
         if (!text.startsWith(state.text)) throw new BridgeError("The upstream changed already streamed text", "stream_error", 502);
-        writer.textDelta(text.slice(state.text.length));
-        writer.closeMessage();
+        writer.textDelta(text.slice(state.text.length), state.item.phase);
+        writer.closeMessage(state.item.phase);
         break;
       }
       case "function_call":
@@ -131,7 +128,7 @@ export const runResponses: Backend = async (context, writer) => {
   }
 
   function finishResponse(result: any): { usage: Usage; endTurn: boolean } {
-    if (result?.status === "failed" || result?.error) throw upstreamError(undefined, result, response.headers);
+    if (result?.status === "failed" || result?.error) throw responsesStreamError(result, response.headers);
     if (result?.status === "incomplete") {
       throw new BridgeError(`The upstream response is incomplete: ${String(result.incomplete_details?.reason ?? "unknown")}`, "invalid_prompt");
     }
@@ -173,16 +170,23 @@ export const runResponses: Backend = async (context, writer) => {
       case "response.output_item.added":
         stateFor(event);
         break;
-      case "response.reasoning_summary_text.delta": {
-        const state = stateFor(event);
-        state.summary += String(event.delta ?? "");
-        writer.reasoningDelta(String(event.delta ?? ""));
+      case "response.reasoning_summary_part.added":
+        writer.startReasoningSummary(event.summary_index ?? 0);
+        writer.reasoningDelta(event.part?.text ?? "", event.summary_index ?? 0);
         break;
-      }
+      case "response.reasoning_summary_text.delta":
+        writer.reasoningDelta(String(event.delta ?? ""), event.summary_index ?? 0);
+        break;
+      case "response.reasoning_summary_text.done":
+        writer.endReasoningSummary(event.summary_index ?? 0, event.text);
+        break;
+      case "response.reasoning_summary_part.done":
+        writer.endReasoningSummary(event.summary_index ?? 0, event.part?.text);
+        break;
       case "response.output_text.delta": {
         const state = stateFor(event);
         state.text += String(event.delta ?? "");
-        writer.textDelta(String(event.delta ?? ""));
+        writer.textDelta(String(event.delta ?? ""), state.item.phase);
         break;
       }
       case "response.output_item.done":
@@ -192,7 +196,7 @@ export const runResponses: Backend = async (context, writer) => {
         return finishResponse(event.response);
       case "response.failed":
       case "error":
-        throw upstreamError(undefined, event.response ?? event, response.headers);
+        throw responsesStreamError(event.response ?? event, response.headers);
       case "response.incomplete":
         throw new BridgeError(`The upstream response is incomplete: ${String(event.response?.incomplete_details?.reason ?? "unknown")}`, "invalid_prompt");
     }

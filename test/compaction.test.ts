@@ -36,6 +36,7 @@ function context(adapter: AdapterId = "gpt-responses", signal = new AbortControl
 
 function successfulBackend(onCall?: (ctx: BackendContext) => void): Backend {
   return async (ctx, writer) => {
+    ctx.onAccepted?.();
     onCall?.(ctx);
     if (isCompactionRequest(ctx.request)) {
       writer.addItem(checkpoint);
@@ -48,11 +49,14 @@ function successfulBackend(onCall?: (ctx: BackendContext) => void): Backend {
 
 test("native compaction stores both representations and accounts for both requests", async () => {
   const ctx = context();
+  let accepted = 0;
+  ctx.onAccepted = () => { accepted++; };
   const original = structuredClone(ctx.request);
   const calls: BackendContext[] = [];
   const result = await compact(ctx, successfulBackend((call) => calls.push(call)));
   assert.deepEqual(ctx.request, original);
   assert.equal(calls.length, 2);
+  assert.equal(accepted, 1);
   assert.ok(calls.every((call) => call.compacting === true));
   assert.equal(result.item.type, "compaction");
   assert.match(String(result.item.id), /^cmp_/);
@@ -68,8 +72,10 @@ test("native compaction stores both representations and accounts for both reques
 for (const adapter of ["claude-messages", "deepseek-chat"] as const) {
   test(`${adapter} compaction creates a portable summary with one upstream request`, async () => {
     const calls: BackendContext[] = [];
-    const result = await compact(context(adapter), successfulBackend((call) => calls.push(call)));
+    let accepted = 0;
+    const result = await compact({ ...context(adapter), onAccepted: () => { accepted++; } }, successfulBackend((call) => calls.push(call)));
     assert.equal(calls.length, 1);
+    assert.equal(accepted, 1);
     assert.equal(isCompactionRequest(calls[0].request), false);
     assert.deepEqual(decodeCompaction(result.item.encrypted_content), {
       summary: "The task must preserve the number 42.",

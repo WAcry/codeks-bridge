@@ -20,13 +20,13 @@
 
 Responses `text.format: {type: "json_schema", schema: ...}` 转为 `output_config.format: {type: "json_schema", schema: ...}`；name/strict 不转发。schema 内容直接交给上游，随后 options 仍可覆盖原生格式。普通 `text` 不添加约束；无法表达为 Messages 的未知格式报错。
 
-namespace 和 custom tool 使用共享映射。自由文本工具转换成 `{input: string}`，Lark/regex 放入描述，返回时恢复原始字符串；不添加工具专属提示词。指定工具必须能在当前工具表中解析，thinking 与强制工具选择是否兼容由上游判断。
+namespace 和 custom tool 使用共享映射。自由文本工具转换成 `{input: string}`，Lark/regex 放入描述，返回时恢复原始字符串；不添加工具专属提示词。指定工具必须能在当前工具表中解析，`tool_choice: "required"` 转为原生 `any`，不会改成 `auto`。显式 `temperature`、`top_p` 也继续发送；这些参数与具体模型、thinking 的组合是否受支持由上游判断。静默删除参数或关闭 thinking 会改变用户请求，bridge 不做这类修正。
 
 有工具且未选择 `none` 时，显式 `parallel_tool_calls: false` 转为 `tool_choice.disable_parallel_tool_use: true`，显式 `true` 则转为 `false`；未指定 choice 时采用 `auto`，原生 options 仍可覆盖。这保留 Codex Lite 的外层工具调用限制，不限制一次 `exec` 内 JavaScript 的并发执行。[Claude 并行工具调用](https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use)
 
-用户与工具结果都可带图片。HTTP(S) URL 和 JPEG、PNG、GIF、WebP 的 base64 data URL 转为原生 image block，bridge 不下载图片。图片能力、尺寸和 schema 限制交给上游，不能转换的内容类型明确报错。
+用户与工具结果都可带图片。HTTP(S) URL 和 JPEG、PNG、GIF、WebP 的 base64 data URL 转为原生 image block，bridge 不下载图片。图片能力、尺寸和 schema 限制交给上游，不能转换的内容类型明确报错。空工具结果仍发送 `tool_result` 及原调用 ID，只省略空的 `content` 数组，不添加占位文字。
 
-工具参数分片先拼接、解析，完整 `message_stop` 后才交给 writer。`tool_use`、`pause_turn` 返回 `end_turn: false`；输出截断或 refusal 返回失败，不交付部分工具调用。
+工具参数分片先拼接、解析，完整 `message_stop` 后才交给 writer。`tool_use`、`pause_turn` 返回 `end_turn: false`；输出截断或 refusal 返回失败，不交付部分工具调用。`model_context_window_exceeded` 转为 `context_length_exceeded`，同样不交付工具调用；后续是否压缩或重试由 codeks 决定。
 
 ## 缓存与压缩
 

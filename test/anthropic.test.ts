@@ -93,6 +93,19 @@ test("Messages preserves reminders between an assistant reply and the next user 
   assert.deepEqual(body.messages[2].content.map((b: any) => b.text), ["<system-reminder>\nNew constraint.\n</system-reminder>", "Next."]);
 });
 
+test("Messages represents empty tool results without content or placeholder text", () => {
+  for (const output of ["", [], [{ type: "input_text", text: "" }]]) {
+    for (const type of ["function_call_output", "custom_tool_call_output"]) {
+      const { body } = buildAnthropicRequest(context({ input: [{ type, call_id: "empty_result", output }] }));
+      const result = body.messages[0].content[0];
+      assert.equal(result.type, "tool_result");
+      assert.equal(result.tool_use_id, "empty_result");
+      assert.equal(Object.hasOwn(result, "content"), false);
+      assert.deepEqual(body.messages[0].content.map((block: any) => block.type), ["tool_result"]);
+    }
+  }
+});
+
 test("Messages round trips Lite namespaced tools and consumes declarations without reminders", async () => {
   const custom = { type: "custom", name: "exec", format: { type: "grammar", syntax: "lark", definition: 'start: "hello"' } };
   const ctx = context({ tool_choice: { type: "custom", name: "exec" }, input: [
@@ -325,6 +338,24 @@ test("Messages maps stream overload and refuses truncated completion", async () 
       await assert.rejects(runAnthropic({ ...context(), route: { ...route, upstream: { ...route.upstream, base_url: base } } }, capture.writer), { code });
     });
   }
+});
+
+test("Messages maps context window exhaustion without delivering buffered tools", async () => {
+  const stream = events(start, ...textEvents("Partial response."),
+    { type: "content_block_start", index: 1, content_block: { type: "tool_use", id: "call", name: "lookup", input: { q: "sample" } } },
+    { type: "content_block_stop", index: 1 }, ...finish("model_context_window_exceeded"));
+  await withUpstream(stream, async (base) => {
+    let accepted = false;
+    const capture = writerCapture();
+    await assert.rejects(runAnthropic({
+      ...context({ tools: [tool] }),
+      route: { ...route, upstream: { ...route.upstream, base_url: base } },
+      onAccepted: () => { accepted = true; },
+    }, capture.writer), { code: "context_length_exceeded" });
+    assert.equal(accepted, true);
+    assert.equal(capture.writer.toolCallCount, 0);
+    assert.equal(capture.output().some((event) => event.item?.type === "function_call"), false);
+  });
 });
 
 test("Messages rejects missing, nonnumeric, or negative usage without emitting tools", async () => {
