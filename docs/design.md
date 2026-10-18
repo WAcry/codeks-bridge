@@ -43,4 +43,4 @@ GPT 的 native compaction 与文字摘要读同一份原历史，并行执行。
 
 ## 借鉴与来源
 
-设计调研比较了现有 Responses↔Messages 和 Responses↔Chat 转换实践，采用边界适配、函数工具转换和完整响应后提交工具调用。没有复制其他项目的运行时代码。压缩 prompt 逐字来自 Apache-2.0 许可的 OpenAI Codex，出处列在 `NOTICE`。
+设计调研比较了现有 Responses↔Messages 和 Responses↔Chat 转换实践，采用边界适配、函数工具转换和完整响应后提交工具调用。没有复制其他项目的运行时代码。文字压缩使用完整的交接摘要提示词；摘要恢复前缀逐字来自 Apache-2.0 许可的 OpenAI Codex，出处列在 `NOTICE`。

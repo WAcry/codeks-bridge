@@ -8,6 +8,7 @@ import test, { type TestContext } from "node:test";
 import { promisify } from "node:util";
 import { formatSse } from "../src/sse.ts";
 import { buildCatalog, readBundledCatalog } from "../src/catalog.ts";
+import { SUMMARIZATION_PROMPT } from "../src/prompts.ts";
 import type { BridgeConfig } from "../src/types.ts";
 
 const run = promisify(execFile);
@@ -210,7 +211,7 @@ test("real codeks: remote compaction V2 replaces history and survives resume", {
   let normal = 0;
   let summaries = 0;
   const { requests, invoke } = await fixture(t, "gpt-5.5", (body) => {
-    if (body.tool_choice === "none" && JSON.stringify(body.messages).includes("CONTEXT CHECKPOINT COMPACTION")) {
+    if (body.tool_choice === "none" && JSON.stringify(body.messages).includes(JSON.stringify(SUMMARIZATION_PROMPT).slice(1, -1))) {
       summaries++;
       assert.ok(toolReply(body, "call_before_compact"));
       assert.ok(body.tools.length > 0, "Summary requests keep the tool prefix");

@@ -27,9 +27,11 @@ remote_compaction = "v2"
 Responses 上游并行接收两条请求，二者都从原始历史出发：
 
 1. 原生请求保留 `compaction_trigger`，取得服务端的加密压缩 item。
-2. 摘要请求把 trigger 换成 Codex 自带的 checkpoint summary prompt；保留原 instructions、历史和工具定义，设置 `tool_choice: "none"`，移除原会话的结构化输出格式，取得文本摘要。
+2. 摘要请求把 trigger 换成完整的交接摘要提示词；保留原 instructions、历史和工具定义，设置 `tool_choice: "none"`，移除原会话的结构化输出格式，取得文本摘要。
 
-摘要提示词和恢复前缀逐字取自 Codex `rust-v0.162.1` 的 `codex-rs/prompts/templates/compact/`，集中在 [`src/prompts.ts`](../src/prompts.ts)，许可证归属见 `NOTICE`。没有附加项目专用的摘要要求。
+摘要提示词集中在 [`src/prompts.ts`](../src/prompts.ts)，要求按对话顺序梳理用户意图、技术决策、相关文件与代码、错误修复、待办和当前工作，并原样保留用户提出的安全约束。它明确区分真实 user 消息与 assistant 引用的“用户话语”，避免把模型生成的内容记成用户授权。输出为 `<analysis>` 和 `<summary>` 两个文本块，完整文本一并保存在 checkpoint 中。GPT 双压缩的文字摘要、Anthropic Messages 和 Chat Completions 的单次摘要共用这份提示词。
+
+恢复前缀仍逐字取自 Codex `rust-v0.162.1` 的 `codex-rs/prompts/templates/compact/summary_prefix.md`，许可证归属见 `NOTICE`。更详细的交接内容可能增加摘要长度与输出用量；输出被上游截断时，仍按失败处理，不替换原历史。
 
 两条请求共享很长的输入前缀，可能利用上游已有的 prompt cache；是否命中由上游决定，并行请求也不保证互相建立缓存。这是两次实际推理，可能增加延迟和费用。返回的 usage 是两条请求的实际用量之和，包含 cache read、cache write 与 reasoning 用量中可得的部分。
 
