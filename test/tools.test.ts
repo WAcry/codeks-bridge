@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { baseFlatName, buildToolSet, cleanSchema, safeCallId } from "../src/tools.ts";
+import { baseFlatName, buildToolSet, cleanSchema, normalizeToolDeclarations, safeCallId } from "../src/tools.ts";
 
 const fn = (name: string) => ({ type: "function", name, parameters: { type: "object", properties: {} } });
 
@@ -75,4 +75,38 @@ test("call ids preserve valid ids and normalize unsupported characters and lengt
   assert.equal(safeCallId("call_123-abc"), "call_123-abc");
   assert.notEqual(safeCallId("call/a"), safeCallId("call:a"));
   assert.match(safeCallId("call with spaces/" + "x".repeat(90)), /^[a-zA-Z0-9_-]{1,64}$/);
+});
+
+test("Lite declarations merge changed members without losing siblings or mutating history", () => {
+  const original = {
+    model: "example", tools: [fn("initial")], input: [
+      { type: "additional_tools", role: "developer", tools: [
+        { type: "namespace", name: "files", tools: [fn("read"), fn("write")] },
+        { type: "namespace", name: "functions", tools: [fn("lookup")] },
+      ] },
+      { type: "message", role: "user", content: "Read it." },
+      { type: "additional_tools", role: "developer", tools: [
+        { type: "namespace", name: "files", tools: [
+          { ...fn("read"), description: "Updated.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
+          fn("list"),
+        ] },
+      ] },
+      { type: "message", role: "developer", content: "The write tool is no longer available." },
+    ],
+  };
+  const snapshot = structuredClone(original);
+  const normalized = normalizeToolDeclarations(original);
+  assert.deepEqual(normalized.input, [original.input[1], original.input[3]]);
+  const tools = buildToolSet(normalized.tools);
+  assert.deepEqual(tools.entries.map((tool) => tool.flatName), ["initial", "files__read", "files__write", "functions__lookup", "files__list"]);
+  assert.equal(tools.get("files", "read")?.description, "Updated.");
+  assert.deepEqual(tools.get("files", "read")?.parameters.required, ["path"]);
+  assert.equal(tools.flatFor(undefined, "lookup"), "functions__lookup");
+  assert.equal(tools.flatFor("", "lookup"), "functions__lookup");
+  assert.equal(tools.get("functions", "initial")?.name, "initial");
+  assert.deepEqual(original, snapshot);
+});
+
+test("Lite rejects malformed declaration arrays instead of silently losing tools", () => {
+  assert.throws(() => normalizeToolDeclarations({ model: "example", input: [{ type: "additional_tools", role: "developer" }] }), /requires a tools array/);
 });

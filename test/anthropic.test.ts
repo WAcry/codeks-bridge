@@ -3,21 +3,27 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import test from "node:test";
 import { buildAnthropicRequest, runAnthropic } from "../src/backends/anthropic.ts";
-import { decodeJsonPayload, decodeReasoning, encodeJsonPayload, encodeReasoning } from "../src/carrier.ts";
+import { decodeReasoning, encodeReasoning } from "../src/carrier.ts";
 import { formatSse } from "../src/sse.ts";
-import type { BackendContext, ResolvedModel, ResponsesRequest } from "../src/types.ts";
+import { resolveModel, validateConfig } from "../src/config.ts";
+import type { BackendContext, ResponsesRequest } from "../src/types.ts";
 import { ResponseWriter } from "../src/writer.ts";
 
-const route: ResolvedModel = {
-  slug: "messages-model", key: "endpoint/model", config: { upstream: "messages", model: "claude-sonnet-5-5" },
-  upstream: { api: "anthropic", base_url: "https://api.example.com/v1" },
-};
+const config = validateConfig({
+  upstreams: { messages: { base_url: "https://api.example.com/v1" } },
+  models: {
+    "messages-model": { upstream: "messages", model: "claude-sonnet-5-5", adapter: "claude-messages" },
+    other: { upstream: "messages", model: "other", adapter: "claude-messages" },
+    shared: { upstream: "messages", model: "shared", adapter: "claude-messages", replay: { reasoning_from: ["messages-model"] } },
+  },
+});
+const route = resolveModel(config, "messages-model");
 function context(request: Partial<ResponsesRequest> = {}): BackendContext {
   return { route, request: { model: route.slug, input: "Hello", ...request }, signal: new AbortController().signal };
 }
 const tool = { type: "function", name: "lookup", parameters: { type: "object", properties: { q: { type: "string" } } } };
 const thinking = { type: "thinking", thinking: "Synthetic reasoning.", signature: "synthetic_signature" };
-const reasoning = { type: "reasoning", encrypted_content: encodeReasoning(route.key, encodeJsonPayload(thinking)) };
+const reasoning = { type: "reasoning", encrypted_content: encodeReasoning({ source: route.origin, format: route.profile.reasoning_format, data: thinking }) };
 const message = (role: string, text: string) => ({ type: "message", role, content: [{ type: "input_text", text }] });
 const events = (...values: unknown[]) => values.map((value) => formatSse(value)).join("");
 const start = { type: "message_start", message: { usage: { input_tokens: 10, cache_read_input_tokens: 100, cache_creation_input_tokens: 20, output_tokens: 1 } } };
@@ -58,7 +64,7 @@ function writerCapture(): { writer: ResponseWriter; output: () => any[] } {
 }
 
 test("Messages preserves signed reasoning, chronological instructions, and grouped tools", () => {
-  const foreign = { type: "reasoning", encrypted_content: encodeReasoning("another-model", encodeJsonPayload(thinking)) };
+  const foreign = { type: "reasoning", encrypted_content: encodeReasoning({ source: resolveModel(config, "other").origin, format: route.profile.reasoning_format, data: thinking }) };
   const input = [
     message("developer", "Initial rules."), message("user", "Look up a."), foreign, reasoning,
     { type: "function_call", call_id: "call/1", name: "lookup", arguments: '{"q":"a"}' },
@@ -85,6 +91,48 @@ test("Messages preserves reminders between an assistant reply and the next user 
   ] }));
   assert.deepEqual(body.messages.map((m: any) => m.role), ["user", "assistant", "user"]);
   assert.deepEqual(body.messages[2].content.map((b: any) => b.text), ["<system-reminder>\nNew constraint.\n</system-reminder>", "Next."]);
+});
+
+test("Messages round trips Lite namespaced tools and consumes declarations without reminders", async () => {
+  const custom = { type: "custom", name: "exec", format: { type: "grammar", syntax: "lark", definition: 'start: "hello"' } };
+  const ctx = context({ tool_choice: { type: "custom", name: "exec" }, input: [
+    { type: "additional_tools", role: "developer", tools: [
+      { type: "namespace", name: "functions", tools: [custom] },
+      { type: "namespace", name: "agents", tools: [tool] },
+    ] },
+    message("developer", "Initial rules."), message("user", "Start."),
+    { type: "custom_tool_call", call_id: "earlier", name: "exec", input: "hello" },
+    { type: "custom_tool_call_output", call_id: "earlier", output: "Done." },
+    { type: "additional_tools", role: "developer", tools: [
+      { type: "namespace", name: "agents", tools: [{ ...tool, description: "Updated lookup." }] },
+    ] },
+    message("developer", "New rule."),
+  ] });
+  const before = structuredClone(ctx.request);
+  const stream = events(start,
+    { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "next", name: "functions__exec", input: { input: "hello" } } },
+    { type: "content_block_stop", index: 0 }, ...finish("tool_use"));
+  await withUpstream(stream, async (base, requests) => {
+    const capture = writerCapture();
+    const result = await runAnthropic({ ...ctx, route: { ...route, upstream: { ...route.upstream, base_url: base } } }, capture.writer);
+    capture.writer.complete(result.usage);
+    const body = requests[0].body;
+    assert.deepEqual(body.tools.map((tool: any) => tool.name), ["functions__exec", "agents__lookup"]);
+    assert.match(body.tools[0].description, /start: "hello"/);
+    assert.equal(body.tools[1].description, "Updated lookup.");
+    assert.deepEqual(body.tool_choice, { type: "tool", name: "functions__exec" });
+    assert.deepEqual(body.system.map((block: any) => block.text), ["Initial rules."]);
+    assert.deepEqual(body.messages.map((item: any) => item.role), ["user", "assistant", "user"]);
+    assert.equal(body.messages[1].content[0].name, "functions__exec");
+    assert.deepEqual(body.messages[2].content.map((block: any) => block.type), ["tool_result", "text"]);
+    assert.equal(body.messages[2].content[1].text, "<system-reminder>\nNew rule.\n</system-reminder>");
+    const call = capture.output().at(-1).response.output[0];
+    assert.equal(call.type, "custom_tool_call");
+    assert.equal(call.namespace, "functions");
+    assert.equal(call.name, "exec");
+    assert.equal(call.input, "hello");
+    assert.deepEqual(ctx.request, before);
+  });
 });
 
 test("Messages converts custom grammar tools and images in tool results", () => {
@@ -121,7 +169,7 @@ test("Messages keeps four ordered cache breakpoints and only shortens the compac
 });
 
 test("Messages uses adaptive thinking and permits explicit endpoint options", () => {
-  const ctx = context({ reasoning: { effort: "minimal", summary: "none" }, tools: [tool], tool_choice: "none" });
+  const ctx = context({ reasoning: { effort: "low", summary: "none" }, tools: [tool], tool_choice: "none" });
   let body = buildAnthropicRequest(ctx).body;
   assert.deepEqual(body.thinking, { type: "adaptive", display: "omitted" });
   assert.deepEqual(body.output_config, { effort: "low" });
@@ -130,7 +178,7 @@ test("Messages uses adaptive thinking and permits explicit endpoint options", ()
   assert.deepEqual(body.thinking, { type: "enabled", budget_tokens: 2048 });
 });
 
-test("Messages rejects unavailable selected tools and respects explicit auto choice", () => {
+test("Messages rejects unavailable selected tools and lets configured tool choice override the request", () => {
   for (const tool_choice of [
     { type: "function", name: "missing" }, { type: "custom", name: "lookup" },
     { type: "function", name: "look.up" },
@@ -139,14 +187,14 @@ test("Messages rejects unavailable selected tools and respects explicit auto cho
   }
   const ctx = context({ tools: [tool], tool_choice: "auto" });
   const body = buildAnthropicRequest({ ...ctx, route: { ...route, upstream: { ...route.upstream, options: { tool_choice: { type: "any" } } } } }).body;
-  assert.deepEqual(body.tool_choice, { type: "auto" });
+  assert.deepEqual(body.tool_choice, { type: "any" });
 });
 
-test("Messages gives explicit output limits priority over configured defaults", () => {
+test("Messages applies endpoint options after generated output limits", () => {
   const ctx = context();
   const configured = { ...route, config: { ...route.config, max_output_tokens: 2000, options: { max_tokens: 1000 } }, upstream: { ...route.upstream, options: { max_tokens: 500 } } };
-  assert.equal(buildAnthropicRequest({ ...ctx, route: configured }).body.max_tokens, 2000);
-  assert.equal(buildAnthropicRequest({ ...ctx, request: { ...ctx.request, max_output_tokens: 3000 }, route: configured }).body.max_tokens, 3000);
+  assert.equal(buildAnthropicRequest({ ...ctx, route: configured }).body.max_tokens, 1000);
+  assert.equal(buildAnthropicRequest({ ...ctx, request: { ...ctx.request, max_output_tokens: 3000 }, route: configured }).body.max_tokens, 1000);
   assert.equal(buildAnthropicRequest({ ...ctx, route: { ...configured, config: { ...configured.config, max_output_tokens: undefined } } }).body.max_tokens, 1000);
   assert.equal(buildAnthropicRequest(ctx).body.max_tokens, 16384);
 });
@@ -177,15 +225,15 @@ test("Messages maps the requested JSON schema and preserves other output options
   });
 });
 
-test("Messages rejects unsupported output formats and text clears a configured format", () => {
-  for (const format of [{ type: "json_object" }, { type: "unknown" }, { type: "json_schema" }]) {
+test("Messages rejects untranslatable output formats and preserves configured output parameters", () => {
+  for (const format of [{ type: "json_object" }, { type: "unknown" }]) {
     assert.throws(() => buildAnthropicRequest(context({ text: { format } })), { code: "invalid_prompt" });
   }
   const output_config = { effort: "high", format: { type: "json_schema", schema: { type: "object" } } };
   const ctx = { ...context({ text: { format: { type: "text" } } }), route: { ...route, config: { ...route.config, options: { output_config } } } };
-  assert.deepEqual(buildAnthropicRequest(ctx).body.output_config, { effort: "high" });
+  assert.deepEqual(buildAnthropicRequest(ctx).body.output_config, output_config);
   assert.ok(output_config.format);
-  assert.equal(buildAnthropicRequest(context({ text: { format: { type: "text" } } })).body.output_config, undefined);
+  assert.deepEqual(buildAnthropicRequest(context({ text: { format: { type: "text" } } })).body.output_config, { effort: "medium" });
 });
 
 test("Messages streams text, restores reasoning, and totals cached usage", async () => {
@@ -202,7 +250,7 @@ test("Messages streams text, restores reasoning, and totals cached usage", async
     capture.writer.complete(result.usage);
     const out = capture.output();
     const stored = out.find((e) => e.type === "response.output_item.done" && e.item.type === "reasoning").item;
-    assert.deepEqual(decodeJsonPayload(decodeReasoning(stored.encrypted_content)!.payload), thinking);
+    assert.deepEqual(decodeReasoning(stored.encrypted_content)!.data, thinking);
     assert.equal(out.at(-1).response.output.at(-1).phase, "final_answer");
     assert.equal(requests[0].path, "/v1/messages");
   });
@@ -300,6 +348,47 @@ test("Messages preserves redacted thinking and requests continuation on pause_tu
     const result = await runAnthropic({ ...context(), route: { ...route, upstream: { ...route.upstream, base_url: base } } }, capture.writer);
     assert.equal(result.endTurn, false);
     const stored = capture.output().find((e) => e.type === "response.output_item.done").item;
-    assert.deepEqual(decodeJsonPayload(decodeReasoning(stored.encrypted_content)!.payload), redacted);
+    assert.deepEqual(decodeReasoning(stored.encrypted_content)!.data, redacted);
+  });
+});
+
+test("Messages restores allowed foreign thinking without a second backend identity check", () => {
+  const shared = resolveModel(config, "shared");
+  const { body } = buildAnthropicRequest({ ...context({ input: [reasoning, message("assistant", "Done.")] }), route: shared });
+  assert.deepEqual(body.messages[0].content[0], thinking);
+});
+
+test("Messages sends disabled thinking, custom effort maps, and unknown efforts to the endpoint", () => {
+  const disabled = buildAnthropicRequest(context({ reasoning: { effort: "none" } })).body;
+  assert.deepEqual(disabled.thinking, { type: "disabled" });
+  assert.equal(disabled.output_config, undefined);
+  const customConfig = validateConfig({ ...config, models: { ...config.models, "messages-model": {
+    ...config.models["messages-model"], reasoning: { default_effort: "brief", effort_map: { brief: "low" } },
+  } } });
+  const custom = resolveModel(customConfig, "messages-model");
+  assert.equal(buildAnthropicRequest({ ...context(), route: custom }).body.output_config.effort, "low");
+  assert.equal(buildAnthropicRequest({ ...context({ reasoning: { effort: "future" } }), route: custom }).body.output_config.effort, "future");
+  const overridden = buildAnthropicRequest({ ...context(), route: { ...custom, config: { ...custom.config, options: {
+    max_tokens: 500, model: "wrong", messages: [], system: "wrong", tools: ["wrong"], stream: false,
+  } } } }).body;
+  assert.equal(overridden.max_tokens, 500);
+  assert.equal(overridden.model, "claude-sonnet-5-5");
+  assert.equal(overridden.messages[0].content[0].text, "Hello");
+  assert.equal(overridden.system, undefined);
+  assert.equal(overridden.tools, undefined);
+  assert.equal(overridden.stream, true);
+});
+
+test("Messages stream errors preserve the original upstream event", async () => {
+  const failure = { type: "error", error: { type: "overloaded_error", message: "Capacity unavailable.", headers: { "Retry-After": "12" } }, request_id: "synthetic_request" };
+  await withUpstream(events(start, failure), async (base) => {
+    const { writer } = writerCapture();
+    await assert.rejects(runAnthropic({ ...context(), route: { ...route, upstream: { ...route.upstream, base_url: base } } }, writer), (error: any) => {
+      assert.equal(error.message, "Capacity unavailable.");
+      assert.equal(error.code, "server_is_overloaded");
+      assert.deepEqual(error.headers, { "retry-after": "12" });
+      assert.deepEqual(error.upstream.body, failure);
+      return true;
+    });
   });
 });

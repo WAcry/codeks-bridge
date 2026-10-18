@@ -80,7 +80,7 @@ function nativeItem(output: readonly unknown[]): Record<string, unknown> {
   if (items.length !== 1 || typeof items[0]?.encrypted_content !== "string" || !items[0].encrypted_content) {
     throw new BridgeError("Native compaction must return exactly one nonempty compaction item.");
   }
-  return { ...items[0], type: "compaction" };
+  return items[0];
 }
 
 function combinedUsage(first: Usage, second?: Usage): Usage {
@@ -113,7 +113,7 @@ export async function compact(context: BackendContext, backend: Backend): Promis
   };
   // Both requests read the same original history. Neither receives the other's output.
   const summaryPromise = run(prompt, summaryText);
-  const nativePromise = context.route.upstream.api === "responses"
+  const nativePromise = context.route.compaction.mode === "dual"
     ? run({ ...context.request, stream: true }, nativeItem)
     : Promise.resolve(undefined);
   const results = await Promise.allSettled([summaryPromise, nativePromise]);
@@ -127,9 +127,12 @@ export async function compact(context: BackendContext, backend: Backend): Promis
       type: "compaction",
       id: newId("cmp"),
       encrypted_content: encodeCompaction({
-        v: 1,
         summary: summary.value,
-        ...(native ? { native: { key: context.route.key, item: native.value } } : {}),
+        ...(native ? { native: {
+          source: context.route.origin,
+          format: context.route.profile.native_compaction_format!,
+          data: native.value,
+        } } : {}),
       }),
     },
     usage: combinedUsage(summary.usage, native?.usage),

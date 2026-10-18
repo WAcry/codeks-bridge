@@ -1,8 +1,9 @@
-import { decodeJsonPayload, decodeReasoning, encodeJsonPayload, encodeReasoning } from "../carrier.ts";
-import { BridgeError } from "../errors.ts";
+import { encodeReasoning } from "../carrier.ts";
+import { BridgeError, upstreamError } from "../errors.ts";
 import { prepareHistory } from "../history.ts";
+import { reasoningEffort } from "../profiles.ts";
 import { parseJsonSse } from "../sse.ts";
-import { buildToolSet, safeCallId } from "../tools.ts";
+import { buildToolSet, normalizeToolDeclarations, safeCallId } from "../tools.ts";
 import type { ToolSet } from "../tools.ts";
 import type { Backend, BackendContext } from "../types.ts";
 import { upstreamFetch } from "../upstream.ts";
@@ -46,19 +47,19 @@ function toolChoice(value: any, tools: ToolSet): Record<string, unknown> | undef
   if (value === "none") return { type: "none" };
   if (value === "required") return { type: "any" };
   if (value && ["function", "custom"].includes(value.type) && typeof value.name === "string") {
-    const name = tools.flatFor(value.namespace, value.name);
-    const selected = tools.resolve(name);
-    if (!selected || selected.name !== value.name || (selected.namespace ?? "") !== (value.namespace ?? "") || selected.kind !== value.type) {
+    const selected = tools.get(value.namespace, value.name);
+    if (!selected || selected.kind !== value.type) {
       throw new BridgeError("The selected tool is not available on the Messages backend.");
     }
-    return { type: "tool", name };
+    return { type: "tool", name: selected.flatName };
   }
   throw new BridgeError("Unsupported Messages tool_choice.");
 }
 
 /** Convert only request-owned copies; stored history remains unchanged. */
 export function buildAnthropicRequest(context: BackendContext): { body: Record<string, any>; tools: ToolSet } {
-  const { request, route } = context;
+  const { route } = context;
+  const request = normalizeToolDeclarations(context.request);
   const tools = buildToolSet(request.tools);
   const system: Block[] = request.instructions ? [{ type: "text", text: request.instructions }] : [];
   const messages: Message[] = [];
@@ -69,10 +70,8 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
     else messages.push({ role, content: blocks });
   };
   for (const item of prepareHistory(request.input, route)) {
-    if (item.type === "reasoning") {
-      const carrier = decodeReasoning(item.encrypted_content);
-      if (!carrier || carrier.key !== route.key) continue;
-      const block = decodeJsonPayload<Block>(carrier.payload);
+    if (item.type === "bridge_reasoning") {
+      const block = item.state.data;
       if (!block || !["thinking", "redacted_thinking"].includes(block.type)) {
         throw new BridgeError("Invalid Messages reasoning carrier.");
       }
@@ -98,8 +97,6 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
       } else throw new BridgeError(`Unsupported Messages role: ${String(item.role)}.`);
     } else throw new BridgeError(`Unsupported Messages history item: ${String(item.type)}.`);
   }
-  if (!messages.length) throw new BridgeError("Messages requires at least one conversation message.");
-
   const definitions: Block[] = tools.entries.map((tool) => ({
     name: tool.flatName, description: tool.description, input_schema: tool.parameters,
   }));
@@ -114,31 +111,37 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
     cache(message.content.at(-1), context.compacting && message === userMessages.at(-1) ? "5m" : "1h");
   }
 
-  const effort = request.reasoning?.effort;
-  const options = { ...route.upstream.options, ...route.config.options };
+  const effort = reasoningEffort(route, request.reasoning?.effort);
   const body: Record<string, any> = {
-    thinking: { type: "adaptive", display: request.reasoning?.summary === "none" ? "omitted" : "summarized" },
-    ...(effort ? { output_config: { effort: ["minimal", "none"].includes(effort) ? "low" : effort } } : {}),
-    ...options,
-    max_tokens: request.max_output_tokens ?? route.config.max_output_tokens ?? options.max_tokens ?? 16384,
-    model: route.config.model, messages, stream: true,
+    thinking: effort === "none" ? { type: "disabled" } : {
+      type: "adaptive", display: request.reasoning?.summary === "none" ? "omitted" : "summarized",
+    },
+    ...(effort !== "none" ? { output_config: { effort } } : {}),
+    max_tokens: request.max_output_tokens ?? route.config.max_output_tokens ?? 16384,
   };
-  if (system.length) body.system = system;
-  if (definitions.length) body.tools = definitions;
-  const choice = toolChoice(context.compacting ? "none" : request.tool_choice, tools);
+  for (const name of ["temperature", "top_p"] as const) {
+    if (request[name] !== undefined) body[name] = request[name];
+  }
+  const choice = toolChoice(request.tool_choice, tools);
   if (choice) body.tool_choice = choice;
   const format = request.text?.format;
-  if (context.compacting || format?.type === "text") {
+  if (format !== undefined && format.type !== "text") {
+    if (format.type !== "json_schema") throw new BridgeError(`Messages does not support text format ${String(format.type)}.`);
+    body.output_config = { ...body.output_config, format: { type: "json_schema", schema: format.schema } };
+  }
+  Object.assign(body, route.upstream.options, route.config.options, {
+    model: route.config.model, messages, stream: true,
+  });
+  if (system.length) body.system = system;
+  else delete body.system;
+  if (definitions.length) body.tools = definitions;
+  else delete body.tools;
+  if (context.compacting) {
+    body.tool_choice = { type: "none" };
     if (body.output_config) {
       body.output_config = { ...body.output_config };
       delete body.output_config.format;
     }
-  } else if (format !== undefined) {
-    if (format?.type !== "json_schema") throw new BridgeError(`Messages does not support text format ${String(format?.type)}.`);
-    if (!format.schema || typeof format.schema !== "object" || Array.isArray(format.schema)) {
-      throw new BridgeError("Messages json_schema format requires a schema object.");
-    }
-    body.output_config = { ...body.output_config, format: { type: "json_schema", schema: format.schema } };
   }
   return { body, tools };
 }
@@ -158,18 +161,6 @@ function validateUsage(value: any, required: string[]): void {
   if (value?.output_tokens_details?.thinking_tokens !== undefined) tokenCount(value.output_tokens_details.thinking_tokens);
 }
 
-function streamError(error: any): BridgeError {
-  const message = String(error?.message ?? "Messages stream failed.");
-  const type = error?.type;
-  if (type === "overloaded_error") return new BridgeError(message, "server_is_overloaded", 503);
-  if (type === "rate_limit_error") return new BridgeError(message, "rate_limit_exceeded", 429);
-  if (/prompt is too long|context.*(?:length|window)|too many tokens/i.test(message)) {
-    return new BridgeError(message, "context_length_exceeded", 400);
-  }
-  if (type === "api_error") return new BridgeError(message, "upstream_error", 502);
-  return new BridgeError(message);
-}
-
 export const runAnthropic: Backend = async (context, writer) => {
   const { body, tools } = buildAnthropicRequest(context);
   const response = await upstreamFetch(context.route, "/messages", body, context.signal);
@@ -182,7 +173,7 @@ export const runAnthropic: Backend = async (context, writer) => {
   let stopped = false;
   const calls: Block[] = [];
   for await (const { json: event } of parseJsonSse(response.body)) {
-    if (event.type === "error") throw streamError(event.error);
+    if (event.type === "error") throw upstreamError(undefined, event, response.headers);
     if (event.type === "ping") { writer.keepalive(); continue; }
     if (event.type === "message_start") {
       validateUsage(event.message?.usage, ["input_tokens", "output_tokens"]);
@@ -214,7 +205,7 @@ export const runAnthropic: Backend = async (context, writer) => {
       const block = blocks.get(event.index);
       if (!block) throw new BridgeError("Messages stopped an unknown block.", "upstream_error", 502);
       if (block.value.type === "thinking" || block.value.type === "redacted_thinking") {
-        writer.endReasoning(encodeReasoning(context.route.key, encodeJsonPayload(block.value)));
+        writer.endReasoning(encodeReasoning({ source: context.route.origin, format: context.route.profile.reasoning_format, data: block.value }));
       } else if (block.value.type === "tool_use") {
         if (block.json) block.value.input = parseArguments(block.json);
         calls.push(block.value);

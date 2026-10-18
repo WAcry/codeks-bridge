@@ -330,13 +330,13 @@ export class ResponseWriter {
   }
 
   /** Fails the response. Tool calls that were not emitted yet are dropped. */
-  fail(code: string, message: string, headers?: Record<string, string>): void {
+  fail(code: string, message: string, headers?: Record<string, string>, upstream?: unknown): void {
     if (this.finished) return;
     this.start();
     this.toolCalls.length = 0;
     this.finished = true;
     this.emit("response.failed", {
-      response: this.responseObject("failed", { error: { code, message, ...(headers ? { headers } : {}) } }),
+      response: this.responseObject("failed", { error: { code, message, ...(headers ? { headers } : {}), ...(upstream ? { upstream } : {}) } }),
     });
   }
 

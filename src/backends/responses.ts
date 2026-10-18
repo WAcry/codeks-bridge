@@ -1,6 +1,7 @@
-import { decodeReasoning, encodeReasoning } from "../carrier.ts";
-import { BridgeError } from "../errors.ts";
+import { encodeReasoning } from "../carrier.ts";
+import { BridgeError, upstreamError } from "../errors.ts";
 import { prepareHistory } from "../history.ts";
+import { reasoningEffort } from "../profiles.ts";
 import { parseJsonSse } from "../sse.ts";
 import { upstreamFetch } from "../upstream.ts";
 import type { Backend, BackendContext } from "../types.ts";
@@ -15,23 +16,25 @@ export function responsesBody({ request, route, compacting }: BackendContext): R
     // An assistant message id can reference a reasoning item that was filtered
     // during a model switch or an agent fork. Full content needs neither id.
     delete item.id;
-    if (item.type === "reasoning") {
-      item.encrypted_content = decodeReasoning(item.encrypted_content)!.payload;
-      delete item.content;
+    if (item.type === "bridge_reasoning") {
+      if (typeof item.state.data !== "string") throw new BridgeError("Invalid Responses reasoning data.");
+      return { type: "reasoning", summary: item.summary, encrypted_content: item.state.data };
     }
     return item;
   });
   const body: Record<string, any> = {
     ...(route.config.max_output_tokens ? { max_output_tokens: route.config.max_output_tokens } : {}),
     ...request,
+    reasoning: { ...request.reasoning, effort: reasoningEffort(route, request.reasoning?.effort) },
     ...route.upstream.options,
     ...route.config.options,
     model: route.config.model,
     input,
+    tools: request.tools,
     store: false,
     stream: true,
-    include: [...new Set([...(Array.isArray(request.include) ? request.include : []), "reasoning.encrypted_content"])],
   };
+  body.include = [...new Set([...(Array.isArray(body.include) ? body.include : []), "reasoning.encrypted_content"])];
   delete body.previous_response_id;
   if (input.some((item) => item.type === "compaction_trigger")) {
     // Native compaction has its own output budget requirements. An ordinary
@@ -61,12 +64,6 @@ function usageFrom(value: any): Usage {
   };
 }
 
-function responseError(response: any): BridgeError {
-  const error = response?.error ?? response;
-  const code = typeof error?.code === "string" ? error.code : "stream_error";
-  return new BridgeError(String(error?.message ?? "The upstream response failed"), code, 502, error?.headers);
-}
-
 interface ItemState {
   item: Record<string, any>;
   text: string;
@@ -75,7 +72,8 @@ interface ItemState {
 }
 
 export const runResponses: Backend = async (context, writer) => {
-  const response = await upstreamFetch(context.route, "/responses", responsesBody(context), context.signal);
+  const response = await upstreamFetch(context.route, "/responses", responsesBody(context), context.signal,
+    context.responsesLite ? { "x-openai-internal-codex-responses-lite": "true" } : undefined);
   const states = new Map<number, ItemState>();
   const byId = new Map<string, ItemState>();
   const calls: Record<string, any>[] = [];
@@ -101,7 +99,7 @@ export const runResponses: Backend = async (context, writer) => {
           .map((part: any) => part.text ?? "").join("\n\n");
         if (!state.summary && summary) writer.reasoningDelta(summary);
         const content = typeof item.encrypted_content === "string" && item.encrypted_content
-          ? encodeReasoning(context.route.key, item.encrypted_content) : undefined;
+          ? encodeReasoning({ source: context.route.origin, format: context.route.profile.reasoning_format, data: item.encrypted_content }) : undefined;
         writer.endReasoning(content, summary || state.summary);
         break;
       }
@@ -133,7 +131,7 @@ export const runResponses: Backend = async (context, writer) => {
   }
 
   function finishResponse(result: any): { usage: Usage; endTurn: boolean } {
-    if (result?.status === "failed" || result?.error) throw responseError(result);
+    if (result?.status === "failed" || result?.error) throw upstreamError(undefined, result, response.headers);
     if (result?.status === "incomplete") {
       throw new BridgeError(`The upstream response is incomplete: ${String(result.incomplete_details?.reason ?? "unknown")}`, "invalid_prompt");
     }
@@ -194,7 +192,7 @@ export const runResponses: Backend = async (context, writer) => {
         return finishResponse(event.response);
       case "response.failed":
       case "error":
-        throw responseError(event.response ?? event.error ?? event);
+        throw upstreamError(undefined, event.response ?? event, response.headers);
       case "response.incomplete":
         throw new BridgeError(`The upstream response is incomplete: ${String(event.response?.incomplete_details?.reason ?? "unknown")}`, "invalid_prompt");
     }

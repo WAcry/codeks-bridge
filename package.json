@@ -1,7 +1,7 @@
 {
   "name": "@wacry/codeks-bridge",
   "version": "0.0.0",
-  "description": "Local Responses API bridge that lets codeks use Anthropic Messages and OpenAI-compatible Chat Completions models.",
+  "description": "Configurable local Responses API bridge for codeks with GPT, Claude Messages, and DeepSeek Chat adapters.",
   "license": "Apache-2.0",
   "author": "David Zhang",
   "repository": {

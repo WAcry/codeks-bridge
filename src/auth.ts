@@ -1,12 +1,13 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { UpstreamConfig } from "./types.ts";
+import type { Api, UpstreamConfig } from "./types.ts";
 import { BridgeError } from "./errors.ts";
 const execute = promisify(execFile);
 
-export async function upstreamHeaders(config: UpstreamConfig, signal: AbortSignal): Promise<Headers> {
-  const headers = new Headers({ "content-type": "application/json", ...config.headers });
-  if (config.api === "anthropic" && !headers.has("anthropic-version")) headers.set("anthropic-version", "2023-06-01");
+export async function upstreamHeaders(config: UpstreamConfig, api: Api, signal: AbortSignal): Promise<Headers> {
+  const headers = new Headers(config.headers);
+  if (!headers.has("content-type")) headers.set("content-type", "application/json");
+  if (api === "anthropic" && !headers.has("anthropic-version")) headers.set("anthropic-version", "2023-06-01");
   let credential: string | undefined;
   if (config.api_key_env) {
     credential = process.env[config.api_key_env]?.trim();
@@ -25,7 +26,7 @@ export async function upstreamHeaders(config: UpstreamConfig, signal: AbortSigna
   }
   if (credential) {
     if (/[\r\n]/.test(credential)) throw new BridgeError("Credential must be a single line", "invalid_prompt", 500);
-    const header = config.auth_header ?? (config.api === "anthropic" ? "x-api-key" : "authorization");
+    const header = config.auth_header ?? (api === "anthropic" ? "x-api-key" : "authorization");
     headers.set(header, header.toLowerCase() === "authorization" ? `Bearer ${credential}` : credential);
   }
   return headers;

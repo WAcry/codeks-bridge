@@ -1,39 +1,39 @@
-# Anthropic Messages 转换
+# Claude Messages
 
-`api: "anthropic"` 把 Responses 请求转换为 `POST <base_url>/messages`。`base_url` 包含版本前缀，例如 `https://api.anthropic.com/v1`。默认发送 `x-api-key` 和 `anthropic-version: 2023-06-01`；兼容端点可用通用鉴权配置覆盖。
+模型设置 `adapter: "claude-messages"`，请求转换为 `POST <base_url>/messages`。官方端点的 `base_url` 为 `https://api.anthropic.com/v1`；默认使用 `x-api-key` 和 `anthropic-version: 2023-06-01`，可通过连接配置覆盖。
 
-## 历史与思考
+## 历史与 thinking
 
-开头的 `instructions`、system 和 developer 消息组成顶层 `system`。会话中途的 system/developer 消息保留原位置，转换成 user 文本中的 `<system-reminder>`。这保留内容和时间顺序，但不具备原生 system 角色的优先级。当前 Messages 的中途 system 角色有位置限制，不能直接承接任意 Responses 历史；把新指令搬到顶部又会改变已有 reasoning 的签名前缀。因此这里选择固定、可回放的通用转换。[官方位置规则](https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages)
+开头的 `instructions`、system 和 developer 消息组成顶层 `system`。会话中途的 system/developer 消息留在原位置，转换成 user 文本中的 `<system-reminder>`。新指令不会搬到会话顶部，因此已有前缀稳定；这保留时间顺序，但不具有原生 system 角色的优先级。
 
-相邻的同角色消息合并，reasoning、文本和工具调用成为同一 assistant 消息的内容块。工具输出成为下一条 user 消息中的 `tool_result`。原始历史不会被修改。
+相邻同角色消息合并；reasoning、文本和工具调用成为 assistant 内容块，工具输出成为下一条 user 消息中的 `tool_result`。原历史不变。
 
-默认使用 `thinking: {type: "adaptive", display: "summarized"}`。`reasoning.summary: "none"` 改用 `display: "omitted"`；两种情况都保留签名。effort 原样转发，只有 `minimal`/`none` 映射为 `low`。上游或模型的 `options` 可显式覆盖 `thinking`、`output_config`，以接入需要手动 budget 的旧模型。输出上限优先级为：请求 `max_output_tokens`、模型 `max_output_tokens`、模型 `options.max_tokens`、上游 `options.max_tokens`、默认 16384。不同模型接受的 effort、强制工具选择和 thinking 模式不完全一致，配置必须符合所选模型。[官方 thinking 文档](https://platform.claude.com/docs/en/build-with-claude/thinking)
+默认 effort 为 `medium`，默认映射支持 `none`、`low`、`medium`、`high`、`xhigh`、`max` 并保留同名值。映射后为 `none` 时设置 `thinking: {type: "disabled"}`；其他值使用 adaptive thinking 并写入 `output_config.effort`。`reasoning.summary: "none"` 选择 `display: "omitted"`，否则为 `summarized`。
 
-`thinking` 的文本与签名、`redacted_thinking` 的数据整体放入 bridge reasoning carrier。再次请求时只恢复当前端点与模型的 carrier，其余模型的 reasoning 过滤规则见 [reasoning.md](reasoning.md)。不伪造签名，也不把可见摘要当成可回放的完整思考。
+`reasoning.effort_map` 可以替换映射，`options.thinking` 和 `options.output_config` 可以覆盖完整原生对象，例如手动 budget。未映射的显式 effort 原样发送，端点自己判断是否支持。输出预算先取请求 `max_output_tokens`、模型默认值、默认 16384，再接受上游和模型 options 的覆盖。[配置优先级](config.md)
 
-## 输出格式
+完整 `thinking`/`redacted_thinking` block，包括签名或隐藏数据，存入 `anthropic.thinking.v1` carrier。请求按 `replay.reasoning_from` 恢复允许来源，签名完整保留；其他来源只在当前请求过滤。允许配对不意味着上游一定接受其签名。[Reasoning 策略](reasoning.md)
 
-Responses 的 `text.format: {type: "json_schema", schema: ...}` 转换为 Messages 的 `output_config.format: {type: "json_schema", schema: ...}`，保留其他 output_config 设置。schema 原样传递，Responses 的 name/strict 字段不转发；不支持的 schema 约束由上游明确报错。`type: "text"` 使用普通文本并清除配置中的格式限制；`json_object` 和其他未知格式明确拒绝。压缩始终移除格式限制。实际模型与端点还需支持此能力。[官方结构化输出协议](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)
+## 输出格式、工具与图片
 
-## 工具与图片
+Responses `text.format: {type: "json_schema", schema: ...}` 转为 `output_config.format: {type: "json_schema", schema: ...}`；name/strict 不转发。schema 内容直接交给上游，随后 options 仍可覆盖原生格式。普通 `text` 不添加约束；无法表达为 Messages 的未知格式报错。
 
-namespace、普通函数和 custom 工具使用共享名称映射。指定 `tool_choice` 的工具必须存在且种类匹配，否则请求在 bridge 内失败。custom 工具输入转换成 `{input: string}`，Lark/regex 约束进入描述，返回时恢复原始字符串；没有工具专属的额外提示词。
+namespace 和 custom tool 使用共享映射。自由文本工具转换成 `{input: string}`，Lark/regex 放入描述，返回时恢复原始字符串；不添加工具专属提示词。指定工具必须能在当前工具表中解析，thinking 与强制工具选择是否兼容由上游判断。
 
-图片支持 HTTP(S) URL 和 JPEG、PNG、GIF、WebP 的 base64 data URL。图片可以出现在 user 消息或 `tool_result.content` 中。bridge 不下载 URL 图片，实际获取和校验由上游负责。不支持的内容类型会明确失败，不静默丢弃。
+用户与工具结果都可带图片。HTTP(S) URL 和 JPEG、PNG、GIF、WebP 的 base64 data URL 转为原生 image block，bridge 不下载图片。图片能力、尺寸和 schema 限制交给上游，不能转换的内容类型明确报错。
 
-工具 JSON 分片先拼接、解析，直到完整 `message_stop` 才交给 Responses writer；流中断时不发出待执行工具。`tool_use`、`pause_turn` 返回 `end_turn: false`，让客户端继续。max_tokens 截断或 refusal 作为失败返回，避免把不完整调用当成成功。[流协议](https://platform.claude.com/docs/en/build-with-claude/streaming)
+工具参数分片先拼接、解析，完整 `message_stop` 后才交给 writer。`tool_use`、`pause_turn` 返回 `end_turn: false`；输出截断或 refusal 返回失败，不交付部分工具调用。
 
-## 缓存、压缩与 usage
+## 缓存与压缩
 
-最多设置四个显式缓存断点：最后一个工具、最后一段顶层 system、最近两条 user 消息的末块。正常请求 TTL 都是 `1h`。压缩时保留公共前缀的 `1h`，仅把最后的摘要请求末块设为 `5m`；因此长 TTL 始终在短 TTL 前面，且不直接缓存 thinking 块。短于上游最低长度的请求即使设置断点也可能没有缓存命中。[缓存规则](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+最多四个显式缓存断点：最后一个工具、最后一段顶层 system、最近两条 user 消息的末块。普通请求 TTL 为 `1h`。压缩保留公共前缀的 `1h`，只将最后的摘要请求末块设为 `5m`，使长 TTL 位于短 TTL 之前。thinking 块不直接设置缓存断点。
 
-压缩沿用原工具定义，强制设置 `tool_choice: none`，并移除 `output_config.format`，避免常规任务的结构化输出约束限制摘要。其他 output_config 选项保留。这保留已有 reasoning 的相关上下文；转换后的摘要作为可跨模型使用的 compaction carrier 保存，详见 [compaction.md](compaction.md)。
+压缩只生成文字摘要，保留工具定义，固定 `tool_choice: none` 并移除 `output_config.format`，其他参数保留。摘要封装为客户端 V2 compaction item，可供其他模型恢复。缓存是否命中由上游决定，不影响正确性。
 
-输入 usage 是 `input_tokens + cache_read_input_tokens + cache_creation_input_tokens`，避免把缓存部分误当成不占上下文。输出 usage 使用最终累计值，不把每个增量事件相加；如果提供 `thinking_tokens`，同步记录到 reasoning usage。`message_start` 必须包含输入和输出计数，`message_delta` 必须包含累计输出计数；计数必须是非负有限整数。缺失或无效的 usage 作为上游错误返回，不伪造零用量。可选缓存计数缺省为零。
+## Usage 与错误
 
-HTTP 错误经过统一分类。流内 overload 映射到 `server_is_overloaded`，限流映射到 `rate_limit_exceeded`，上下文过长映射到 `context_length_exceeded`。未完成的流是可重试的上游错误；重试由客户端控制。
+input 为 `input_tokens + cache_read_input_tokens + cache_creation_input_tokens`，output 使用最终累计值，不累加流事件；可得的 thinking 用量记录到 reasoning 分项。缺失或无效的计数返回错误，不伪造零值。
 
-## 验证
+HTTP 与流内错误经共享层分类，同时保留上游原始错误体；未完整结束的流返回错误。bridge 不改参数重试，容量与限流退避由 codeks 决定。[错误结构](responses-stream.md)
 
-`test/anthropic.test.ts` 用合成签名和本地 HTTP 服务验证请求转换、工具 JSON 分片、图片、reasoning 回放、缓存断点、usage、结束状态和流中断。真实端点验证结果记录在 [testing.md](testing.md)；真实凭据、地址和响应样本放在仓库外。
+实现与测试：[`src/backends/anthropic.ts`](../src/backends/anthropic.ts)、[`test/anthropic.test.ts`](../test/anthropic.test.ts)。协议参考：[thinking](https://platform.claude.com/docs/en/build-with-claude/thinking)、[结构化输出](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)、[缓存](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)。

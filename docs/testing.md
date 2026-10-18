@@ -13,9 +13,13 @@ npm run check
 ## 测试覆盖什么
 
 - 工具：普通函数、namespace、自定义工具的原始字符串、Lark/regex 描述、名称冲突与超长名称、加密 schema 关键字的清理。
+- Lite：工具声明原位传给 GPT；Claude/DeepSeek 提取增量 schema，保留原历史与默认 namespace 身份；header、all-turns 和双压缩前缀保持。
 - 流：跨字节分块的 UTF-8、CR/LF、SSE 多行数据、结束标记、非法 JSON。
 - Responses 输出：先 added 后 delta/done、完整历史项、usage、reasoning carrier、消息 phase、明文多代理参数、重试提示、失败时不执行尚未提交的工具。
-- 后端与历史：各 API 的消息、工具、图片、reasoning、压缩及错误转换。专项测试与转换实现放在同一轮审查。
+- 配置与目录：显式 adapter、部署别名、effort 映射和默认值、catalog 与出站参数一致、options 覆盖顺序。
+- 状态：reasoning 与原生压缩的独立允许来源、定向非传递关系、配置改变后恢复已有 carrier、身份与显示别名分离、输入历史不变。
+- 压缩：生成模式与 native replay 独立、双分支成功才交付、失败取消另一分支、上游拒绝时原错误直传。
+- 后端与历史：各 API 的消息、工具、图片、schema、thinking、usage 与错误转换。错误测试检查原始 status/body 和重试提示，验证没有额外请求或自动降级。
 
 这些测试检查协议和客户端行为；假上游不会验证模型是否理解提示词，也不会验证真实服务的缓存命中率、容量和区域之间的密文兼容性。
 
@@ -37,17 +41,40 @@ CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts
 | Code Mode 与多代理 V2 | 自定义 `exec` 执行；namespace 工具回传；明文 `spawn_agent` 创建真实子代理；子代理收到任务，父代理收到最终答复 |
 | 远程压缩 V2 | 高 usage 触发 `compaction_trigger`；桥接器生成可回放摘要；codeks 替换旧工具历史；退出后 resume 仍读到摘要 |
 
-模型目录来自被测二进制的 `debug models --bundled`。测试将 `use_responses_lite` 设为 `false`，让请求携带可转换的工具 schema；Code Mode 与多代理 V2 属性继续由原目录提供。测试不依赖固定的 namespace 拼写。
+模型目录来自被测二进制的 `debug models --bundled`，启用 `use_responses_lite: true`；Code Mode 与多代理 V2 属性继续由原目录提供。测试观察真实客户端 HTTP 请求，断言 Lite header、`additional_tools` 中的完整 schema、`reasoning.context: "all_turns"`、`parallel_tool_calls: false` 和省略顶层 tools。测试不依赖其他 namespace 的固定拼写。
+
+最新正式版 `@openai/codex@0.163.0` 的现成二进制另外通过普通工具/图片及压缩/resume 两项测试。它用于核对最新客户端 Lite 契约；明文多代理由上述 codeks fork 二进制验证，不将原生客户端验证等同于 fork 补丁验证。
 
 ## 真实上游验证
 
 真实端点的配置、鉴权、请求与响应只保存在仓库外。公开测试数据必须是合成内容，不能复制真实密钥、端点、签名、密文、对话或账号信息。
 
-真实验证应区分：单次请求、工具回环、图片、切换模型后 reasoning 隔离、压缩后续接。Responses 的双重压缩还需要检查两个分支都成功后才提交结果；换端点或模型时使用可读摘要，同端点同模型时才恢复原生压缩内容。某一服务上的成功不代表另一服务也支持同样的字段。
+真实验证应区分：单次请求、工具回环、图片、切换模型后 reasoning 隔离、压缩后续接。Responses 的双重压缩还需要检查两个分支都成功后才提交结果；未允许的端点或模型使用可读摘要，允许来源且目标开启 native replay 时恢复原生压缩内容；分别测允许与不允许的配对。某一服务上的成功不代表另一服务也支持同样的字段。
 
-### 本轮实测结果
+### Responses Lite 验证
 
-2026-10-17（America/Los_Angeles）最终检查通过：90 个测试全部通过（含 3 个真实 codeks 进程测试，无跳过），TypeScript 检查、构建和公开内容检查通过。完成了下列真实端点验证。结果是协议互操作证据，不是模型任务质量排名，也不代表其他端点默认兼容。
+2026-10-18（America/Los_Angeles）通过实际 bridge HTTP 入口完成以下验证：
+
+- AWS GPT-6.1 Sol、Azure GPT-5.6 Sol、Claude Sonnet 5.5、DeepSeek Flash 均通过 Lite 工具往返与 reasoning 载荷回放。
+- GPT 出站请求实际保留 Lite header、原位 `additional_tools`、`reasoning.context: "all_turns"` 和 `parallel_tool_calls: false`，没有增加顶层 `tools` 或改用其他协议重试。
+- Claude/DeepSeek 提取完整工具声明，返回调用的身份可供客户端继续执行。
+- AWS GPT 双压缩及同目标原生检查点续聊成功。
+
+上述场景包含 11 次成功上游请求。原生 OpenAI 订阅端点未实测；官方 Codex 二进制与假上游的协议测试不能替代该端点验证。
+
+### 配置重构验证
+
+2026-10-18（America/Los_Angeles）通过实际 bridge HTTP 入口发送了 10 次真实上游请求：
+
+- GPT-6.1 Sol、Claude Sonnet 5.5、DeepSeek Flash 均生成了新的 reasoning carrier，并成功完成同源 reasoning 回放。
+- GPT-6.1 Sol 双压缩成功，检查点同时包含原生压缩与文字摘要。
+- 显式允许另一连接上的 GPT-5.6 恢复该原生检查点后，bridge 确实发送了原密文；目标返回 HTTP 400 解密不兼容。原始错误完整传回，没有额外重试或改用文字摘要。
+
+这验证配置能控制尝试的配对，不能让上游原本不兼容的密文变得兼容。Claude 对简单任务可以不生成 thinking；本次改用需要推理的任务验证载荷回放，没有把普通成功回答算作 reasoning 回放成功。
+
+### 既有真实端点证据
+
+2026-10-17（America/Los_Angeles）在当时的默认隔离策略下完成以下真实端点验证。这些是既有协议互操作证据，不代表新的共享配对已得到验证；每次配置共享来源仍需验证具体目标。当前代码的验证以本次运行的测试结果为准。
 
 | 后端 | 已通过 |
 | --- | --- |

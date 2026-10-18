@@ -5,13 +5,20 @@ import test from "node:test";
 import { responsesBody, runResponses } from "../src/backends/responses.ts";
 import { decodeReasoning, encodeReasoning } from "../src/carrier.ts";
 import { formatSse } from "../src/sse.ts";
-import type { BackendContext, ResolvedModel } from "../src/types.ts";
+import { resolveModel, validateConfig } from "../src/config.ts";
+import type { BackendContext } from "../src/types.ts";
 import { ResponseWriter } from "../src/writer.ts";
 
-const route: ResolvedModel = {
-  slug: "test", key: "endpoint-a/model-a", config: { upstream: "test", model: "model-a" },
-  upstream: { api: "responses", base_url: "https://example.com/v1" },
-};
+const config = validateConfig({
+  upstreams: { test: { base_url: "https://example.com/v1" } },
+  models: {
+    test: { upstream: "test", model: "model-a", adapter: "gpt-responses" },
+    other: { upstream: "test", model: "model-b", adapter: "gpt-responses" },
+    shared: { upstream: "test", model: "model-c", adapter: "gpt-responses", replay: { reasoning_from: ["test"] } },
+  },
+});
+const route = resolveModel(config, "test");
+const carrier = (source = route, data = "cipher-a") => encodeReasoning({ source: source.origin, format: source.profile.reasoning_format, data });
 const context = (extra: Partial<BackendContext> = {}): BackendContext => ({
   route, request: { model: "test", input: "Hello" }, signal: new AbortController().signal, ...extra,
 });
@@ -47,8 +54,8 @@ async function fakeUpstream(payload: any[] | Record<string, any>, run: (base: st
 
 test("request replay unwraps only matching reasoning and removes linked item ids", () => {
   const input = [
-    { type: "reasoning", id: "rs_old", encrypted_content: encodeReasoning(route.key, "cipher-a") },
-    { type: "reasoning", id: "rs_foreign", encrypted_content: encodeReasoning("other", "cipher-b") },
+    { type: "reasoning", id: "rs_old", encrypted_content: carrier() },
+    { type: "reasoning", id: "rs_foreign", encrypted_content: carrier(resolveModel(config, "other"), "cipher-b") },
     { type: "message", id: "msg_orphan", role: "assistant", content: [{ type: "output_text", text: "Answer" }] },
     { type: "function_call", id: "fc_old", namespace: "actions", name: "read", call_id: "call_a", arguments: "{}" },
     { type: "function_call_output", id: "fco_old", call_id: "call_a", output: "42" },
@@ -101,7 +108,7 @@ test("SSE reasoning and text stream once; the completed carrier is replayable", 
     writer.complete(result.usage, result.endTurn);
     const done = events.filter((event) => event.type === "response.output_item.done").map((event) => event.item);
     assert.equal(done.length, 2);
-    assert.deepEqual(decodeReasoning(done[0].encrypted_content), { key: route.key, payload: "cipher-a" });
+    assert.deepEqual(decodeReasoning(done[0].encrypted_content), { source: route.origin, format: route.profile.reasoning_format, data: "cipher-a" });
     assert.equal(done[1].content[0].text, "Hello world");
     assert.equal(events.filter((event) => event.type === "response.output_text.delta").map((event) => event.delta).join(""), "Hello world");
     assert.deepEqual(result, { usage: { input_tokens: 80, cached_tokens: 40, output_tokens: 12, reasoning_tokens: 7 }, endTurn: true });
@@ -205,5 +212,39 @@ test("zero token counts are valid and detail counts remain optional", async () =
     const { writer } = capture();
     const result = await runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer);
     assert.deepEqual(result.usage, { input_tokens: 0, output_tokens: 0 });
+  });
+});
+
+test("Responses restores explicitly shared reasoning and honors configured request parameters", () => {
+  const shared = resolveModel(config, "shared");
+  const input = [{ type: "reasoning", encrypted_content: carrier() }];
+  assert.equal(responsesBody(context({ route: shared, request: { model: "shared", input } })).input[0].encrypted_content, "cipher-a");
+  const customConfig = validateConfig({
+    ...config,
+    models: { ...config.models, test: { ...config.models.test, reasoning: { default_effort: "brief", effort_map: { brief: "low" } } } },
+  });
+  const custom = resolveModel(customConfig, "test");
+  assert.equal(responsesBody(context({ route: custom })).reasoning.effort, "low");
+  const request = { model: "test", input, reasoning: { effort: "future-level" } };
+  assert.equal(responsesBody(context({ route: custom, request })).reasoning.effort, "future-level");
+  const body = responsesBody(context({ request, route: { ...custom, upstream: { ...custom.upstream, options: { max_output_tokens: 100, reasoning: { effort: "high" } } }, config: { ...custom.config, options: { reasoning: { effort: "custom" }, model: "wrong", input: [], tools: ["wrong"], stream: false } } } }));
+  assert.equal(body.reasoning.effort, "custom");
+  assert.equal(body.model, "model-a");
+  assert.equal(body.input[0].encrypted_content, "cipher-a");
+  assert.equal(body.tools, undefined);
+  assert.equal(body.stream, true);
+});
+
+test("Responses stream errors preserve upstream details and retry hints", async () => {
+  const failure = { error: { code: "server_is_overloaded", message: "Capacity unavailable.", headers: { "Retry-After": "12" }, request_id: "synthetic_request" } };
+  await fakeUpstream([{ type: "response.failed", response: failure }], async (base) => {
+    const { writer } = capture();
+    await assert.rejects(runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer), (error: any) => {
+      assert.equal(error.message, "Capacity unavailable.");
+      assert.equal(error.code, "server_is_overloaded");
+      assert.deepEqual(error.headers, { "retry-after": "12" });
+      assert.deepEqual(error.upstream.body, failure);
+      return true;
+    });
   });
 });

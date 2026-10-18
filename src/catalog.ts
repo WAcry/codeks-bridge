@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { resolveModel } from "./config.ts";
 import type { BridgeConfig } from "./types.ts";
 import { BridgeError } from "./errors.ts";
 const execute = promisify(execFile);
@@ -12,12 +13,17 @@ export function buildCatalog(config: BridgeConfig, bundled: any, templateSlug?: 
   if (!template) throw new BridgeError("Catalog template model was not found");
   return { models: Object.entries(config.models).map(([slug, model], index) => {
     if (!model.context_window) throw new BridgeError(`Set context_window for ${slug} before generating the catalog`);
+    const { profile } = resolveModel(config, slug);
     const entry = structuredClone(template);
     Object.assign(entry, {
       slug, display_name: slug, description: `Configured model: ${slug}`, priority: index,
       visibility: "list", supported_in_api: true,
       context_window: model.context_window, max_context_window: model.context_window,
-      use_responses_lite: false, supports_search_tool: false,
+      default_reasoning_level: profile.default_effort,
+      multi_agent_reasoning_effort: profile.multi_agent_effort ?? null,
+      supported_reasoning_levels: Object.entries(profile.effort_map).map(([effort, native]) => ({ effort, description: `Upstream effort: ${native}` })),
+      input_modalities: profile.input_modalities,
+      use_responses_lite: true, supports_search_tool: false,
       support_verbosity: false, default_reasoning_summary: "auto",
       supports_reasoning_effort_updates: false, supports_image_detail_original: false,
       service_tiers: [], additional_speed_tiers: [], availability_nux: null, upgrade: null,

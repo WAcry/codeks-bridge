@@ -2,45 +2,68 @@
 
 ## 独立 provider
 
-本项目是独立本地 HTTP 服务和未来的独立 npm 包。它不启动、不包裹也不修改客户端，客户端仍负责工具执行、子代理、权限、工作区与历史持久化。一个服务可以配置多个上游；请求中的模型别名决定上游连接及实际模型。
+bridge 是独立本地 HTTP 服务。codeks 负责工具执行、子代理、权限、工作区和会话持久化；bridge 负责模型协议转换。客户端只配置一个 Responses provider，每条请求的模型别名选择独立上游。
 
 ```mermaid
 flowchart LR
-  C[codeks / Responses] --> B[bridge]
-  B --> R[Responses]
-  B --> A[Anthropic Messages]
-  B --> H[Chat Completions]
-  B --> E[Responses SSE 返回客户端]
+  C[codeks Responses] --> R[按模型别名选路]
+  R --> G[GPT Responses]
+  R --> A[Claude Messages]
+  R --> D[DeepSeek Chat]
+  G --> W[Responses writer]
+  A --> W
+  D --> W
+  W --> C
 ```
 
-运行时零第三方依赖，Node 提供 HTTP、fetch、SSE 字节处理、加密哈希和子进程鉴权命令。构建只使用 TypeScript，测试使用 node:test。实现分为配置/鉴权、历史选择、工具映射、后端转换、压缩协调和 Responses writer。
+运行时只用 Node 内置模块，构建使用 TypeScript，测试使用 node:test。桥接器不依赖客户端启动方式，也不需要修改 codeks 源码。
 
-选择独立 provider 是因为转换完全位于模型接口边界。它不需要跟随客户端的进程管理、UI 或安装方式同步，也可以连接多个上游。模型目录从当前客户端的 bundled catalog 派生，以保留客户端所需字段，避免在本仓库复制一套容易过时的工具和指令元数据。
+## 客户端协议跟随 Codex
 
-## 历史归客户端
+优先匹配最新 Codex 的 GPT 默认行为，以 OpenAI 订阅、AWS 和 Azure 的使用场景为基准。bridge 统一采用 Responses Lite，生成的模型目录设置 `use_responses_lite: true`；模板中的客户端指令、Code Mode 和多代理信息继续来自本机 codeks，而不是维护静态副本。
 
-bridge 不维护数据库或响应 ID 索引。Reasoning 与压缩封装写进 Responses item 的 `encrypted_content`，客户端原样持久化并在后续请求带回。因而重启服务、恢复客户端会话和子代理 fork 都不需要另一个状态服务。
+Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于历史中的 `additional_tools` 项，普通函数和 custom 工具归入默认 `functions` namespace。GPT 路径保留这些声明的位置、顺序、schema 和 grammar，并发送 `x-openai-internal-codex-responses-lite: true`。Claude/DeepSeek 只在各自协议转换入口提取声明，组合为原生工具表；声明不会变成 user reminder，其余消息保持原顺序。
 
-这个字段名来自协议，不能据此认为封装提供保密性。只有原生 GPT ciphertext 本身仍由上游加密。文字 reasoning、签名与可移植压缩摘要的保存权限和普通聊天历史相同。
+已核对 Codex `0.163.0`：Lite 设置 `reasoning.context: "all_turns"` 和 `parallel_tool_calls: false`。bridge 保留客户端传入值，原生 options 仍可按配置覆盖普通参数。reasoning 的来源筛选与服务端 context 语义是两件事：前者决定发送哪些载荷，后者决定 GPT 如何使用它们。双压缩的原生与文字分支都延续同一 Lite 工具前缀及 transport 标记。
 
-Reasoning 身份包含上游配置 ID、API 类型、端点和实际模型。显示别名不同但指向同一身份可共享；模型或连接身份不同则在请求构建时过滤。原存储不变，切回可恢复。压缩也按该身份选择原生 checkpoint，否则使用文字摘要。
+该版本最新 OpenAI GPT 目录启用 Lite，但原生 AWS Bedrock 目录仍主动关闭 Lite 和 Code Mode。统一启用是本项目的明确选择，不能把它描述为所有官方 provider 当前完全相同的默认值。上游是否接受请求由端点裁决，错误直接返回；bridge 不自动转回另一种协议。升级时复核 `core/src/client.rs`、`tools/src/tool_spec.rs`、`core/src/context/world_state/top_level_tools.rs` 和 provider 的模型目录处理。
+
+## 配置表达策略，adapter 负责协议
+
+`upstreams` 只包含连接与鉴权，`models.adapter` 明确选择方言。实际模型名可以是云端部署别名，不参与方言推断。模型窗口、输入模态、effort 映射、状态复用范围和压缩模式都在配置中表达。
+
+`src/profiles.ts` 是三个 adapter 的格式与默认值来源。配置覆盖后的 profile 同时用于 catalog 和出站请求，避免界面显示一套 effort、实际发送另一套。客户端指令、code mode 和多代理元数据仍取自当前 codeks 的 bundled catalog。
+
+底层 Chat 负责消息、工具、图片和 SSE；DeepSeek 方言只负责 thinking 参数、reasoning 字段和 usage。新增方言时复用稳定的协议部分，把差异留在对应 adapter。协议相同的模型版本可共用 adapter，参数差异先用配置；真正改变载荷结构时再增加转换代码和格式版本。当前实现三类 adapter，不为尚未接入的模型维护空接口或版本矩阵。
+
+## 历史保存事实，配置决定恢复
+
+Reasoning 载荷记录来源、格式和原始数据；压缩载荷保存文字摘要及可选原生状态。它们写入 Responses item 的 `encrypted_content`，由 codeks 原样持久化。bridge 无需数据库、响应 ID 索引或跨请求状态缓存。
+
+来源包括连接指纹、adapter 和实际模型，独立于显示别名和复用配置。端点与凭据不写进载荷。外层编码不提供加密：文字 reasoning、签名、压缩摘要的保存权限与普通聊天历史相同。
+
+每次请求按当前配置选取历史，不改写已保存载荷。Reasoning 和原生压缩有独立的允许来源列表，默认只接受自身，关系有方向且不传递。修改配置即可改变已有历史的恢复方式；格式版本负责解释数据，不编码“永远隔离”这类策略。
+
+明文 reasoning 使用可共享的文本格式；不同 adapter 将来可把同一格式恢复到各自字段。密文与签名保留各自原生结构，不把格式可解码等同于上游允许使用。
+
+## 进攻式发送，保留错误
+
+bridge 检查自身必须维持的不变量：配置引用存在、历史能转换、工具调用完整、usage 可用、压缩检查点完整。这些检查避免静默丢失上下文或执行半段工具调用。
+
+上游负责判定模型能力：effort、thinking、强制工具选择、schema、图片以及允许复用的密文是否可接受。bridge 不预先维护这些能力的限制列表，也不在失败后自动移除 reasoning、关闭 thinking、换端点或改压缩模式。原生参数可通过 options 显式覆盖。
+
+HTTP 和流内失败保留原始上游内容及可得的状态码，同时规范为 codeks 可识别的错误分类。重试和退避由客户端控制，bridge 不叠加第二层重试。详见 [Responses 流](responses-stream.md)。
+
+## 压缩的生成和恢复分开
+
+`compaction.mode` 决定生成文字摘要，或并行生成原生结果与摘要；`native_replay` 和来源列表决定恢复已有检查点时是否使用原生表示。支持原生格式不等于每个部署都提供生成能力，因此同一 GPT adapter 可配置不同模式。
+
+双压缩两条请求都成功才发布检查点。恢复时，原生格式可读、来源允许且开启 native replay，便优先使用原生；其他情况按配置选择文字摘要。这是发送前的表示选择，已经发送的原生状态被上游拒绝时不会自动降级。[压缩细节](compaction.md)
 
 ## 协议边界
 
-客户端和 bridge 使用完整 Responses 协议。Responses Lite 省略工具定义，无法用于通用转换，因此生成的 catalog 设置 `use_responses_lite: false`。此设置保留模板的 code mode、多代理版本等客户端能力。
+客户端发送完整 Responses Lite 历史。Responses 后端保留 namespace 与 grammar；Claude/DeepSeek 将它们转换成普通函数并恢复调用身份。Lark/regex 只转换为描述约束，不追加特定工具的提示词。
 
-- Responses 后端保留原生工具定义和语法，清理依赖上游存储的 item ID。
-- Messages 与 Chat 后端把 namespace/custom tools 转成普通函数，收到调用后还原到客户端工具身份。
-- backend 在完整成功前缓存工具调用。错误或截断不能让半段工具参数进入执行。
-- HTTP 错误、流内错误和重试提示统一映射回 Responses。bridge 自己不叠加重试；客户端控制预算与退避。
-- 对不支持且会丢失语义的输入明确报错。Messages/Chat 不广告不在范围内的 hosted tools。
+后端在完整成功前缓存工具调用，Responses writer 统一交付历史项和 usage。Reasoning item 的载荷必须出现在 `output_item.done`，确保 codeks 可以保存。远程 V2 压缩也由同一个 writer 返回，客户端继续执行自己的历史保留规则。
 
-## 压缩与模型切换
-
-GPT 的 native compaction 与文字摘要读同一份原历史，并行执行。只有两者都完成才对客户端发布一个 checkpoint。其他后端只生成文字摘要，仍通过客户端的远程 V2 压缩通道返回，因此客户端继续使用它自己的保留消息预算。参见[压缩](compaction.md)。
-
-窗口、输出上限与模型名字由用户配置，bridge 不猜测上游容量。不能根据协议转换推断模型质量或同等任务表现；合成协议测试和实际工具回环验证的是互操作行为。
-
-## 借鉴与来源
-
-设计调研比较了现有 Responses↔Messages 和 Responses↔Chat 转换实践，采用边界适配、函数工具转换和完整响应后提交工具调用。没有复制其他项目的运行时代码。文字压缩使用完整的交接摘要提示词；摘要恢复前缀逐字来自 Apache-2.0 许可的 OpenAI Codex，出处列在 `NOTICE`。
+设计参考了现有 Responses、Messages 和 Chat 转换实践，没有复制其他项目的运行时代码。文字压缩使用完整的交接摘要提示词；摘要恢复前缀逐字来自 Apache-2.0 许可的 OpenAI Codex，出处列在 `NOTICE`。

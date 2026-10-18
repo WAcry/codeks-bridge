@@ -1,12 +1,20 @@
-import { decodeJsonPayload, decodeReasoning, encodeJsonPayload, encodeReasoning } from "../carrier.ts";
-import { BridgeError } from "../errors.ts";
+import { encodeReasoning } from "../carrier.ts";
+import { BridgeError, transportError, upstreamError } from "../errors.ts";
 import { prepareHistory } from "../history.ts";
 import { parseJsonSse } from "../sse.ts";
-import { buildToolSet } from "../tools.ts";
+import { buildToolSet, normalizeToolDeclarations } from "../tools.ts";
 import type { ToolSet } from "../tools.ts";
-import type { Backend, BackendContext } from "../types.ts";
+import type { BackendContext, BackendResult } from "../types.ts";
 import { upstreamFetch } from "../upstream.ts";
-import type { Usage } from "../writer.ts";
+import type { ResponseWriter, Usage } from "../writer.ts";
+
+/** A wire dialect supplies only the parts that differ from Chat Completions. */
+export interface ChatDialect {
+  reasoningField: string;
+  requestParameters(context: BackendContext): Record<string, unknown>;
+  readUsage(value: any): Usage;
+  failureReason(reason: string): BridgeError | undefined;
+}
 
 type Message = Record<string, any>;
 type Part = Record<string, any>;
@@ -52,18 +60,13 @@ function convertHistory(context: BackendContext, tools: ToolSet, reasoningField:
   if (context.request.instructions) messages.push({ role: "system", content: context.request.instructions });
 
   for (const item of prepareHistory(context.request.input, context.route)) {
-    if (item.type === "reasoning") {
+    if (item.type === "bridge_reasoning") {
       flushImages();
       // A reasoning item starts the next assistant response, even if the
       // previous response ended without a tool or user message.
       flushAssistant();
-      const carrier = decodeReasoning(item.encrypted_content);
-      if (!carrier || carrier.key !== context.route.key) continue;
-      const payload = decodeJsonPayload<{ type: string; text: string }>(carrier.payload);
-      if (!payload || payload.type !== "chat" || typeof payload.text !== "string") {
-        throw new BridgeError("Invalid Chat reasoning carrier.");
-      }
-      getAssistant()[reasoningField] = payload.text;
+      if (typeof item.state.data !== "string") throw new BridgeError("Invalid Chat reasoning data.");
+      getAssistant()[reasoningField] = item.state.data;
     } else if (item.type === "message" || (!item.type && item.role)) {
       const parts = contentParts(item.content);
       if (item.role === "assistant") {
@@ -118,80 +121,48 @@ function toolChoice(choice: unknown, tools: ToolSet): unknown {
   if (choice && typeof choice === "object") {
     const selected = choice as Record<string, any>;
     if (["function", "custom"].includes(selected.type) && typeof selected.name === "string") {
-      const name = tools.flatFor(selected.namespace, selected.name);
-      const tool = tools.resolve(name);
-      if (!tool || tool.name !== selected.name || tool.namespace !== selected.namespace || tool.kind !== selected.type) {
+      const tool = tools.get(selected.namespace, selected.name);
+      if (!tool || tool.kind !== selected.type) {
         throw new BridgeError("The selected tool is not available on the Chat backend.");
       }
-      return { type: "function", function: { name } };
+      return { type: "function", function: { name: tool.flatName } };
     }
   }
   throw new BridgeError("Chat does not support this tool_choice.");
 }
 
-export function buildChatRequest(context: BackendContext): { body: Record<string, any>; tools: ToolSet; reasoningField: string } {
+export function buildChatRequest(context: BackendContext, dialect: ChatDialect): { body: Record<string, any>; tools: ToolSet } {
+  context = { ...context, request: normalizeToolDeclarations(context.request) };
   const { request, route } = context;
   const tools = buildToolSet(request.tools);
-  const options = { ...route.upstream.options, ...route.config.options };
-  const reasoningField = options.reasoning_field ?? "reasoning_content";
-  if (typeof reasoningField !== "string" || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(reasoningField) || ["role", "content", "tool_calls", "refusal"].includes(reasoningField)) {
-    throw new BridgeError("options.reasoning_field must name a separate Chat message field.");
-  }
-  delete options.reasoning_field;
-  const body: Record<string, any> = {
-    ...options,
-    model: route.config.model,
-    messages: convertHistory(context, tools, reasoningField),
-    stream: true,
-    stream_options: { include_usage: true },
-  };
+  const body: Record<string, any> = { ...dialect.requestParameters(context) };
   const limit = request.max_output_tokens ?? route.config.max_output_tokens;
   if (limit !== undefined) body.max_tokens = limit;
   for (const name of ["temperature", "top_p", "parallel_tool_calls"] as const) {
     if (request[name] !== undefined) body[name] = request[name];
   }
-  const effort = request.reasoning?.effort;
-  if (effort !== undefined) {
-    if (route.config.model.startsWith("deepseek-")) {
-      const levels: Record<string, string> = { minimal: "low", low: "low", medium: "high", high: "high", xhigh: "high", max: "max", ultra: "max" };
-      if (effort === "none") {
-        body.thinking = { type: "disabled" };
-        delete body.reasoning_effort;
-      } else {
-        if (!levels[effort]) throw new BridgeError(`Unsupported Chat reasoning effort ${effort}.`);
-        body.thinking = { type: "enabled" };
-        body.reasoning_effort = levels[effort];
-      }
-    } else body.reasoning_effort = effort;
-  }
+  const choice = toolChoice(request.tool_choice, tools);
+  if (choice !== undefined) body.tool_choice = choice;
+  const format = request.text?.format;
+  if (format?.type === "json_object") body.response_format = { type: "json_object" };
+  else if (format?.type === "json_schema") {
+    body.response_format = { type: "json_schema", json_schema: { name: format.name, schema: format.schema, strict: format.strict } };
+  } else if (format && format.type !== "text") throw new BridgeError(`Chat does not support text format ${String(format.type)}.`);
+  Object.assign(body, route.upstream.options, route.config.options, {
+    model: route.config.model,
+    messages: convertHistory(context, tools, dialect.reasoningField),
+    stream: true,
+  });
+  body.stream_options = { ...body.stream_options, include_usage: true };
   if (tools.entries.length) body.tools = tools.entries.map((tool) => ({
     type: "function", function: { name: tool.flatName, description: tool.description, parameters: tool.parameters },
   }));
   else delete body.tools;
-  const choice = toolChoice(context.compacting ? "none" : request.tool_choice, tools);
-  if (choice !== undefined) body.tool_choice = choice;
-  if (route.config.model.startsWith("deepseek-") && body.thinking?.type !== "disabled" &&
-      (choice === "required" || (choice && typeof choice === "object"))) {
-    throw new BridgeError("DeepSeek thinking mode does not support forced tool_choice; use reasoning.effort=none.");
+  if (context.compacting) {
+    body.tool_choice = "none";
+    delete body.response_format;
   }
-  const format = request.text?.format;
-  if (format?.type === "json_object") body.response_format = { type: "json_object" };
-  else if (format?.type === "json_schema" && !route.config.model.startsWith("deepseek-")) {
-    body.response_format = { type: "json_schema", json_schema: { name: format.name, schema: format.schema, strict: format.strict } };
-  } else if (format && format.type !== "text") throw new BridgeError(`Chat does not support text format ${String(format.type)} for this model.`);
-  return { body, tools, reasoningField };
-}
-
-function readUsage(value: any): Usage {
-  if (!Number.isFinite(value?.prompt_tokens) || !Number.isFinite(value?.completion_tokens)) {
-    throw new BridgeError("Chat stream has no valid token usage.", "upstream_error", 502);
-  }
-  return {
-    input_tokens: value.prompt_tokens,
-    output_tokens: value.completion_tokens,
-    cached_tokens: value.prompt_cache_hit_tokens ?? value.prompt_tokens_details?.cached_tokens ?? 0,
-    reasoning_tokens: value.completion_tokens_details?.reasoning_tokens,
-  };
+  return { body, tools };
 }
 
 async function* chatEvents(body: AsyncIterable<Uint8Array>, signal: AbortSignal) {
@@ -199,13 +170,13 @@ async function* chatEvents(body: AsyncIterable<Uint8Array>, signal: AbortSignal)
     yield* parseJsonSse(body);
   } catch (error) {
     if (signal.aborted) throw signal.reason;
-    if (error instanceof BridgeError) throw error;
-    throw new BridgeError("Chat stream was interrupted or contained invalid JSON.", "upstream_error", 502);
+    throw transportError(error);
   }
 }
 
-export const runChat: Backend = async (context, writer) => {
-  const { body, tools, reasoningField } = buildChatRequest(context);
+export async function runChat(context: BackendContext, writer: ResponseWriter, dialect: ChatDialect): Promise<BackendResult> {
+  const { body, tools } = buildChatRequest(context, dialect);
+  const { reasoningField } = dialect;
   const response = await upstreamFetch(context.route, "chat/completions", body, context.signal);
   if (!response.body) throw new BridgeError("Chat upstream returned no stream.", "upstream_error", 502);
   let reasoning = "";
@@ -217,18 +188,13 @@ export const runChat: Backend = async (context, writer) => {
   const calls = new Map<number, { id: string; name: string; arguments: string }>();
   const closeReasoning = () => {
     if (reasoningSeen && !reasoningClosed) {
-      writer.endReasoning(encodeReasoning(context.route.key, encodeJsonPayload({ type: "chat", text: reasoning })));
+      writer.endReasoning(encodeReasoning({ source: context.route.origin, format: context.route.profile.reasoning_format, data: reasoning }));
       reasoningClosed = true;
     }
   };
   for await (const { json } of chatEvents(response.body, context.signal)) {
-    if (json.error) {
-      const err = json.error;
-      const code = err.code ?? err.type;
-      const normalized = /quota|balance/.test(code) ? "insufficient_quota" : /rate_limit/.test(code) ? "rate_limit_exceeded" : /overload/.test(code) ? "server_is_overloaded" : /context.*length/.test(code) ? "context_length_exceeded" : /invalid/.test(code) ? "invalid_prompt" : "upstream_error";
-      throw new BridgeError(String(err.message ?? "Chat stream failed."), normalized, 502);
-    }
-    if (json.usage) usage = readUsage(json.usage);
+    if (json.error) throw upstreamError(undefined, json, response.headers);
+    if (json.usage) usage = dialect.readUsage(json.usage);
     for (const choice of json.choices ?? []) {
       if (choice.index !== 0) throw new BridgeError("Chat returned more than one completion.", "upstream_error", 502);
       if (choice.finish_reason) finish = choice.finish_reason;
@@ -260,9 +226,8 @@ export const runChat: Backend = async (context, writer) => {
   }
   if (!finish) throw new BridgeError("Chat stream ended before a finish_reason.", "upstream_error", 502);
   if (finish === "length") throw new BridgeError("Chat output reached its token limit; increase max_output_tokens.");
-  if (finish === "insufficient_system_resource" || finish === "aborted") {
-    throw new BridgeError("Chat generation was interrupted by the upstream.", "server_is_overloaded", 503);
-  }
+  const failure = dialect.failureReason(finish);
+  if (failure) throw failure;
   if (finish !== "stop" && finish !== "tool_calls") throw new BridgeError(`Chat stopped with ${finish}.`);
   if (!usage) throw new BridgeError("Chat stream ended without token usage.", "upstream_error", 502);
   if (finish === "tool_calls" && !calls.size) throw new BridgeError("Chat ended with tool_calls but returned no calls.", "upstream_error", 502);
@@ -283,4 +248,4 @@ export const runChat: Backend = async (context, writer) => {
     else writer.addFunctionCall({ call_id: call.id, name: tool.name, namespace: tool.namespace, arguments: call.arguments });
   }
   return { usage, endTurn: calls.size === 0 };
-};
+}

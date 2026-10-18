@@ -17,15 +17,20 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
       throw new BridgeError("Each input item must be an object");
     }
     const item = structuredClone(original);
+    if (item.type === "bridge_reasoning") {
+      throw new BridgeError("Internal reasoning items cannot be supplied as request history");
+    }
     if (item.type === "item_reference") {
       throw new BridgeError("Stored item references are unsupported; send the complete conversation items");
     }
     if (item.type === "reasoning") {
       const carrier = decodeReasoning(item.encrypted_content);
-      if (carrier?.key === route.key) result.push(item);
+      if (carrier && route.replay.reasoning.has(carrier.source.id) && carrier.format === route.profile.reasoning_format) {
+        result.push({ type: "bridge_reasoning", state: carrier, summary: item.summary ?? [] });
+      }
       continue;
     }
-    if (item.type === "agent_message" && route.upstream.api !== "responses") {
+    if (item.type === "agent_message" && route.profile.api !== "responses") {
       if (typeof item.author !== "string" || typeof item.recipient !== "string" || !Array.isArray(item.content)) {
         throw new BridgeError("An agent message requires author, recipient, and content");
       }
@@ -48,11 +53,13 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
     }
     if (item.type === "compaction" || item.type === "compaction_summary") {
       const carrier = decodeCompaction(item.encrypted_content);
-      if (!carrier || carrier.v !== 1) {
+      if (!carrier) {
         throw new BridgeError("This compaction item has no portable summary; start with history created through this bridge");
       }
-      if (carrier.native?.key === route.key && route.upstream.api === "responses") {
-        result.push(structuredClone(carrier.native.item));
+      if (carrier.native && route.compaction.native_replay &&
+          route.replay.native_compaction.has(carrier.native.source.id) &&
+          carrier.native.format === route.profile.native_compaction_format) {
+        result.push(carrier.native.data as Record<string, any>);
       } else {
         result.push({
           type: "message",

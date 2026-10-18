@@ -1,37 +1,66 @@
-# Reasoning 与模型切换
+# Reasoning 与状态复用
 
-每条 reasoning 都属于生成它的具体模型及上游端点。即使两个模型属于同一厂商，即使 reasoning 是明文，也不互相重放。显示别名不改变身份；更换上游配置 ID、实际模型、API 类型或上游端点会改变身份。身份用哈希表示，不把端点写进载荷。
+Reasoning 默认只恢复给产生它的目标，配置可以允许其他来源。是否允许复用和如何解码是两件事：来源策略由 `replay.reasoning_from` 决定，载荷的 `format` 告诉 adapter 如何还原内容。
 
-桥接器把身份和内容放进 Responses reasoning item 的 `encrypted_content` 字段：
+## 保存格式
+
+Responses reasoning item 的 `encrypted_content` 保存：
 
 ```text
-cxbr1:<base64url(identity)>:<payload>
+cxbr2:<base64url(JSON)>
 ```
 
-这是一层可读封装，不是加密。GPT 的 payload 是上游原有的密文；其他后端保存各自需要的 thinking、签名或明文 reasoning。不要把这些载荷当作普通日志输出。
+JSON 的结构如下，示例指纹为占位值：
 
-codeks 会保留并再次发送 `encrypted_content`。相比只放在 reasoning 的 `content` 字段，这条路径能跨请求、会话恢复和进程重启保留模型需要的内容。
+```json
+{
+  "source": {
+    "id": "source-fingerprint",
+    "connection": "connection-fingerprint",
+    "model": "deployment-name",
+    "adapter": "gpt-responses"
+  },
+  "format": "responses.reasoning.v1",
+  "data": "original-encrypted-content"
+}
+```
 
-## 请求时选择，不修改历史
+| adapter | format | data |
+| --- | --- | --- |
+| `gpt-responses` | `responses.reasoning.v1` | 上游原始 `encrypted_content` 字符串 |
+| `claude-messages` | `anthropic.thinking.v1` | 完整 `thinking` 或 `redacted_thinking` block，包含签名或隐藏数据 |
+| `deepseek-chat` | `reasoning.text.v1` | 明文 reasoning 字符串 |
 
-`src/history.ts` 的 `prepareHistory` 每次复制输入，再按当前路由选择 reasoning：
+一个 carrier 对应一项 reasoning；格式可以保存字符串或结构化数据，不限于可见文字。外层只是编码，不是加密。GPT 密文本身不变；Claude 可见 thinking 和 DeepSeek 文本仍可解码。
 
-- 身份完全匹配：保留 carrier，由对应后端解包。
-- 身份不同或没有可识别 carrier：本次请求忽略。
-- 普通消息、工具调用、工具结果和图片继续保留。
+codeks 会再次发送 `encrypted_content`，因此载荷可以跨请求、会话恢复、服务重启和子代理 fork 保留。只放在 reasoning 的可见 `content` 中不足以完成这种回放。
 
-Multi-agent V2 的明文 `agent_message` 在 Responses 后端保留原格式；Messages 和 Chat 后端将其转换为 user message，在内容开头标明 `author` 和 `recipient`，后面依次保留文本和图片。无法解密的 agent message 会明确报错，不会被当作空白消息丢弃。
+## 来源身份
 
-例如 A → B → A：B 看不到 A 的 reasoning，切回 A 后仍可重放历史中 A 的 reasoning。保存的历史没有被删改。已经被压缩掉的原始 reasoning 则遵循压缩后的检查点，无法从旧 carrier 重新找回。
+连接指纹是 `SHA256(JSON.stringify([upstream ID, 去除末尾斜杠的 base_url]))`。来源指纹再对 `[连接指纹, adapter, 实际模型]` 做同样的 SHA256。两个指纹用十六进制表示。
 
-原生 Responses item ID 也可能引用与其关联的 reasoning。Responses 后端发送完整内容时移除顶层 `id`，保留工具配对使用的 `call_id`，并使用 `store: false`。这样切换模型或继承子代理历史时，普通 assistant 消息不会继续引用已被过滤的 reasoning。
+载荷保留实际模型名和 adapter，端点和凭据不进入历史。显示别名及 replay 配置不参与身份，所以改显示名称或允许范围不需要重写历史。若同一 URL 背后通过 header/凭据区分不兼容目标，应使用不同 upstream ID。
 
-## 压缩是另一种状态
+## 定向允许来源
 
-reasoning 丢弃不会丢掉普通对话；压缩检查点却可能是早期对话的唯一副本。因此压缩使用独立的 `cxbc1:` carrier，其中始终有通用文本摘要，GPT 还包含原生压缩结果。切换到不匹配的路由时使用文本摘要，切回原路由可继续使用原生结果。详见 [compaction.md](compaction.md)。
+例如在 B 的配置中设置：
 
-从外部直接带入、没有通用摘要的原生压缩项会明确报错。桥接器不猜测密文归属，也不静默删除仅存的历史。只包含服务器引用的 `item_reference` 和 `previous_response_id` 同样不支持；请求必须携带完整历史内容。
+```json
+{ "replay": { "reasoning_from": ["a"] } }
+```
 
-## 验证
+B 可以接收自身及 A 的 reasoning；A 不会因此接收 B。A 接受 C 也不会让 B 自动接受 C。别名在加载配置时解析为实际来源身份。
 
-`test/history.test.ts` 覆盖 A → B → A、无来源 reasoning、原生/通用压缩选择、输入不可变性、图片与工具配对。`test/responses.test.ts` 覆盖载荷封装、解包和移除可能悬空的 item ID。
+加载配置只检查引用存在且格式可解码。两个 GPT 模型的 reasoning、同一 DeepSeek 模型的不同部署均可配置复用；上游是否真正接受，交给实际请求验证。失败按上游错误返回，不删掉 reasoning 再发送。
+
+`prepareHistory` 每次复制输入，恢复来源允许且格式匹配的 carrier，其他 reasoning 只在本次请求中过滤。普通消息、工具调用、结果和图片继续保留。没有来源包装的 reasoning 不归属到当前目标。
+
+例如默认 A → B → A 时，B 不接收 A 的 reasoning，切回 A 后仍可恢复。若后来配置 B 接受 A，无需重写历史，后续请求即可使用其中 A 的载荷。被新的压缩检查点取代的旧历史则不再可恢复。
+
+## 消息与工具历史
+
+codeks 的明文 `agent_message` 在 GPT Responses 中保持原格式；Claude/DeepSeek 将其转成 user 消息，在内容开头标明 author、recipient，后面保留文本和图片。它不是 reasoning，不受 reasoning 来源列表控制。
+
+GPT 出站请求移除 item 顶层 `id`，保留工具配对的 `call_id`，使用 `store: false`。这样消息不会继续通过服务器 item ID 引用已过滤的 reasoning。请求必须包含完整历史，不能只带 `item_reference` 或 `previous_response_id`。
+
+原生压缩另用 `cxbc2:`，有独立的允许来源和文字摘要，详见[压缩](compaction.md)。

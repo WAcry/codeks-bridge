@@ -2,13 +2,40 @@
   "host": "127.0.0.1",
   "port": 8787,
   "upstreams": {
-    "openai": { "api": "responses", "base_url": "https://api.openai.com/v1", "api_key_env": "OPENAI_API_KEY" },
-    "anthropic": { "api": "anthropic", "base_url": "https://api.anthropic.com/v1", "api_key_env": "ANTHROPIC_API_KEY" },
-    "deepseek": { "api": "chat", "base_url": "https://api.deepseek.com", "api_key_env": "DEEPSEEK_API_KEY" }
+    "openai": {
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY"
+    },
+    "anthropic": {
+      "base_url": "https://api.anthropic.com/v1",
+      "api_key_env": "ANTHROPIC_API_KEY"
+    },
+    "deepseek": {
+      "base_url": "https://api.deepseek.com",
+      "api_key_env": "DEEPSEEK_API_KEY"
+    }
   },
   "models": {
-    "gpt": { "upstream": "openai", "model": "gpt-6.1-sol", "context_window": 272000, "max_output_tokens": 16384 },
-    "claude": { "upstream": "anthropic", "model": "claude-sonnet-5-5", "context_window": 131072, "max_output_tokens": 16384 },
-    "deepseek": { "upstream": "deepseek", "model": "deepseek-flash", "context_window": 131072, "max_output_tokens": 16384 }
+    "gpt": {
+      "upstream": "openai",
+      "model": "gpt-6.1-sol",
+      "context_window": 272000,
+      "max_output_tokens": 16384,
+      "adapter": "gpt-responses"
+    },
+    "claude": {
+      "upstream": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "context_window": 131072,
+      "max_output_tokens": 16384,
+      "adapter": "claude-messages"
+    },
+    "deepseek": {
+      "upstream": "deepseek",
+      "model": "deepseek-flash",
+      "context_window": 131072,
+      "max_output_tokens": 16384,
+      "adapter": "deepseek-chat"
+    }
   }
 }

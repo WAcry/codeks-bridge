@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import test, { type TestContext } from "node:test";
 import { createBridgeServer } from "../src/server.ts";
-import { decodeCompaction } from "../src/carrier.ts";
+import { decodeCompaction, decodeReasoning } from "../src/carrier.ts";
 import type { BridgeConfig } from "../src/types.ts";
 
 type Handler = (body: any, req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
@@ -37,16 +37,16 @@ async function fixture(t: TestContext, handler: Handler, patch: Partial<BridgeCo
   const origin = await listen(upstream);
   const config: BridgeConfig = {
     upstreams: {
-      native: { api: "responses", base_url: `${origin}/native` },
-      alternate: { api: "responses", base_url: `${origin}/alternate` },
-      messages: { api: "anthropic", base_url: `${origin}/messages` },
-      chat: { api: "chat", base_url: `${origin}/chat` },
+      native: { base_url: `${origin}/native` },
+      alternate: { base_url: `${origin}/alternate` },
+      messages: { base_url: `${origin}/messages` },
+      chat: { base_url: `${origin}/chat` },
     },
     models: {
-      gpt: { upstream: "native", model: "gpt-example" },
-      "gpt-region": { upstream: "alternate", model: "gpt-example" },
-      claude: { upstream: "messages", model: "claude-example", max_output_tokens: 1024 },
-      flash: { upstream: "chat", model: "deepseek-flash", max_output_tokens: 1024 },
+      gpt: { adapter: "gpt-responses", upstream: "native", model: "gpt-example" },
+      "gpt-region": { adapter: "gpt-responses", upstream: "alternate", model: "gpt-example" },
+      claude: { adapter: "claude-messages", upstream: "messages", model: "claude-example", max_output_tokens: 1024 },
+      flash: { adapter: "deepseek-chat", upstream: "chat", model: "deepseek-flash", max_output_tokens: 1024 },
     },
     ...patch,
   };
@@ -146,6 +146,7 @@ test("HTTP validates requests before opening an SSE stream or calling upstream",
 test("HTTP nonstream and SSE responses contain complete output and usage", async (t) => {
   const f = await fixture(t, (_body, req, res) => {
     if (req.url!.endsWith("chat/completions")) chatSuccess(res, "Chat answer");
+    else if (req.url!.endsWith("/messages")) messagesSuccess(res, "Messages answer");
     else nativeSuccess(res, [message("Native answer")]);
   });
   const response = await post(f.url, { model: "gpt", input: "Hello" });
@@ -163,6 +164,48 @@ test("HTTP nonstream and SSE responses contain complete output and usage", async
   assert.equal(completed.output[0].phase, "final_answer");
   assert.equal(completed.usage.input_tokens_details.cached_tokens, 10);
   assert.equal(completed.end_turn, true);
+  const anthropic = await responseJson(await post(f.url, { model: "claude", input: "Hello" }));
+  assert.equal(anthropic.output[0].content[0].text, "Messages answer");
+  assert.equal(anthropic.usage.total_tokens, 23);
+  assert.equal(anthropic.end_turn, true);
+});
+
+test("GPT keeps Lite declarations, transport and reasoning through dual compaction", async (t) => {
+  const headers: (string | string[] | undefined)[] = [];
+  const f = await fixture(t, (body, req, res) => {
+    headers.push(req.headers["x-openai-internal-codex-responses-lite"]);
+    const output = body.input?.some?.((item: any) => item.type === "compaction_trigger")
+      ? [{ type: "compaction", encrypted_content: "synthetic-native-checkpoint" }]
+      : [message("Portable summary")];
+    nativeSuccess(res, output);
+  });
+  const declaration = {
+    type: "additional_tools", role: "developer", tools: [{ type: "namespace", name: "functions", tools: [
+      { type: "custom", name: "exec", description: "Run code", format: { type: "grammar", syntax: "lark", definition: "start: /.+/" } },
+    ] }],
+  };
+  const input = [declaration, { type: "message", role: "user", content: "Hello" }];
+  const body = { model: "gpt", input, reasoning: { effort: "high", context: "all_turns" }, parallel_tool_calls: false };
+  assert.equal((await responseJson(await post(f.url, body))).status, "completed");
+  // The header also identifies Lite when the client declares no tools.
+  assert.equal((await responseJson(await post(f.url, { model: "gpt-region", input: "Hello" }, {
+    headers: { "content-type": "application/json", "x-openai-internal-codex-responses-lite": "true" },
+  }))).status, "completed");
+  const compacted = await responseJson(await post(f.url, { ...body, input: [...input, { type: "compaction_trigger" }] }));
+  assert.equal(compacted.status, "completed");
+  const checkpoint = decodeCompaction(compacted.output[0].encrypted_content)!;
+  assert.equal(checkpoint.summary, "Portable summary");
+  assert.equal((checkpoint.native!.data as Record<string, unknown>).encrypted_content, "synthetic-native-checkpoint");
+  assert.deepEqual(headers, ["true", "true", "true", "true"]);
+  assert.deepEqual(f.seen[0].body.input, input);
+  for (const { body: sent } of [f.seen[0], ...f.seen.slice(2)]) {
+    assert.equal(Object.hasOwn(sent, "tools"), false);
+    assert.deepEqual(sent.input[0], declaration);
+    assert.equal(sent.reasoning.context, "all_turns");
+    assert.equal(sent.parallel_tool_calls, false);
+  }
+  assert(f.seen.slice(2).some(({ body: sent }) => sent.input.at(-1).type === "compaction_trigger"));
+  assert(f.seen.slice(2).some(({ body: sent }) => sent.tool_choice === "none"));
 });
 
 test("HTTP and SSE errors preserve capacity classification and Retry-After", async (t) => {
@@ -186,12 +229,56 @@ test("HTTP and SSE errors preserve capacity classification and Retry-After", asy
   }
 });
 
+test("all adapters complete tool calls and report usage through the HTTP stream", async (t) => {
+  const f = await fixture(t, (_body, req, res) => {
+    if (req.url!.startsWith("/native")) {
+      nativeSuccess(res, [{ type: "function_call", call_id: "call_lookup", name: "lookup", arguments: '{"query":"example"}' }]);
+    } else if (req.url!.startsWith("/messages")) {
+      sse(res, [
+        { type: "message_start", message: { id: "msg_synthetic", content: [], usage: { input_tokens: 20, output_tokens: 0, cache_read_input_tokens: 10 } } },
+        { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "call_lookup", name: "lookup", input: {} } },
+        { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"query":"example"}' } },
+        { type: "content_block_stop", index: 0 },
+        { type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 3 } },
+        { type: "message_stop" },
+      ]);
+    } else {
+      sse(res, [
+        { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_lookup", type: "function", function: { name: "lookup", arguments: '{"query":"example"}' } }] }, finish_reason: "tool_calls" }] },
+        { choices: [], usage: { prompt_tokens: 20, completion_tokens: 3, prompt_cache_hit_tokens: 10 } },
+      ]);
+    }
+  });
+  for (const model of ["gpt", "claude", "flash"]) {
+    const frames = await events(await post(f.url, {
+      model, input: "Use lookup", stream: true,
+      tools: [{ type: "function", name: "lookup", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } }],
+    }));
+    const completed = frames.at(-1).response;
+    assert.equal(frames.at(-1).type, "response.completed");
+    assert.equal(completed.end_turn, false);
+    assert.equal(completed.output.length, 1);
+    assert.equal(completed.output[0].type, "function_call");
+    assert.equal(completed.output[0].name, "lookup");
+    assert.deepEqual(JSON.parse(completed.output[0].arguments), { query: "example" });
+    assert.equal(completed.usage.total_tokens, model === "claude" ? 33 : 23);
+    assert.equal(completed.usage.input_tokens_details.cached_tokens, 10);
+  }
+});
+
 test("a failed SSE response exposes no executable tool calls", async (t) => {
   const f = await fixture(t, (_body, req, res) => {
     if (req.url!.startsWith("/chat")) {
       sse(res, [
         { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_synthetic", type: "function", function: { name: "lookup", arguments: "{}" } }] }, finish_reason: null }] },
         { error: { code: "server_is_overloaded", message: "Capacity interrupted the stream" } },
+      ]);
+    } else if (req.url!.startsWith("/messages")) {
+      sse(res, [
+        { type: "message_start", message: { id: "msg_synthetic", role: "assistant", content: [], usage: { input_tokens: 20, output_tokens: 0 } } },
+        { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "call_synthetic", name: "lookup", input: {} } },
+        { type: "content_block_stop", index: 0 },
+        { type: "error", error: { type: "overloaded_error", message: "Capacity interrupted the stream" } },
       ]);
     } else {
       const item = { type: "function_call", id: "fc_synthetic", call_id: "call_synthetic", name: "lookup", arguments: "{}" };
@@ -202,7 +289,7 @@ test("a failed SSE response exposes no executable tool calls", async (t) => {
       ]);
     }
   });
-  for (const model of ["gpt", "flash"]) {
+  for (const model of ["gpt", "claude", "flash"]) {
     const frames = await events(await post(f.url, { model, input: "Use lookup", tools: [{ type: "function", name: "lookup", parameters: { type: "object", properties: {} } }], stream: true }));
     assert.equal(frames.at(-1).type, "response.failed");
     assert.equal(frames.some((frame) => ["function_call", "custom_tool_call"].includes(frame.item?.type)), false);
@@ -210,23 +297,30 @@ test("a failed SSE response exposes no executable tool calls", async (t) => {
   }
 });
 
-test("client cancellation closes the active upstream stream", { timeout: 5000 }, async (t) => {
-  let upstreamStarted!: () => void;
-  let upstreamClosed!: () => void;
-  const started = new Promise<void>((resolve) => { upstreamStarted = resolve; });
-  const closed = new Promise<void>((resolve) => { upstreamClosed = resolve; });
-  const f = await fixture(t, (_body, _req, res) => {
-    res.on("close", upstreamClosed);
-    sse(res, [{ choices: [{ index: 0, delta: { content: "Starting" }, finish_reason: null }] }], false);
-    upstreamStarted();
+for (const model of ["gpt", "claude", "flash"]) {
+  test(`${model}: client cancellation closes the active upstream stream`, { timeout: 5000 }, async (t) => {
+    let upstreamStarted!: () => void;
+    let upstreamClosed!: () => void;
+    const started = new Promise<void>((resolve) => { upstreamStarted = resolve; });
+    const closed = new Promise<void>((resolve) => { upstreamClosed = resolve; });
+    const f = await fixture(t, (_body, _req, res) => {
+      res.on("close", upstreamClosed);
+      const first = model === "gpt"
+        ? { type: "response.created", response: { id: "resp_synthetic" } }
+        : model === "claude"
+          ? { type: "message_start", message: { id: "msg_synthetic", content: [], usage: { input_tokens: 20, output_tokens: 0 } } }
+          : { choices: [{ index: 0, delta: { content: "Starting" }, finish_reason: null }] };
+      sse(res, [first], false);
+      upstreamStarted();
+    });
+    const controller = new AbortController();
+    const response = await post(f.url, { model, input: "Hello", stream: true }, { signal: controller.signal });
+    await started;
+    controller.abort();
+    await assert.rejects(response.text(), /abort/i);
+    await closed;
   });
-  const controller = new AbortController();
-  const response = await post(f.url, { model: "flash", input: "Hello", stream: true }, { signal: controller.signal });
-  await started;
-  controller.abort();
-  await assert.rejects(response.text(), /abort/i);
-  await closed;
-});
+}
 
 for (const stage of ["headers", "body"] as const) {
   test(`idle upstream ${stage} time out despite downstream keepalives`, { timeout: 5000 }, async (t) => {
@@ -266,7 +360,7 @@ test("native and portable checkpoints survive server restart and switches betwee
   const checkpoint = JSON.parse(JSON.stringify(completed.output[0]));
   assert.equal(checkpoint.type, "compaction");
   assert.equal(decodeCompaction(checkpoint.encrypted_content)?.summary, summary);
-  assert.equal(decodeCompaction(checkpoint.encrypted_content)?.native?.item.encrypted_content, "native-checkpoint-synthetic");
+  assert.equal((decodeCompaction(checkpoint.encrypted_content)?.native?.data as any)?.encrypted_content, "native-checkpoint-synthetic");
   assert.equal(completed.usage.input_tokens, 40);
   assert.equal(f.seen.length, 2);
   await f.restart();
@@ -286,7 +380,7 @@ test("native and portable checkpoints survive server restart and switches betwee
     } else {
       assert.ok(serialized.includes(summary));
       assert.equal(serialized.includes("native-checkpoint-synthetic"), false);
-      assert.equal(serialized.includes("cxbc1:"), false);
+      assert.equal(serialized.includes("cxbc2:"), false);
     }
     assert.equal(JSON.stringify(input), snapshot);
   }
@@ -301,6 +395,120 @@ test("native and portable checkpoints survive server restart and switches betwee
     const resumed = await post(f.url, { model: "gpt", input: [portable, { type: "message", role: "user", content: "Continue" }] });
     assert.equal(resumed.status, 200);
     assert.ok(JSON.stringify(f.seen.at(-1)!.body.input).includes(summary));
-    assert.equal(JSON.stringify(f.seen.at(-1)!.body.input).includes("cxbc1:"), false);
+    assert.equal(JSON.stringify(f.seen.at(-1)!.body.input).includes("cxbc2:"), false);
   }
+});
+
+test("replay policy changes apply to saved state independently and only in the configured direction", async (t) => {
+  const summary = "Portable checkpoint summary.";
+  const f = await fixture(t, (body, req, res) => {
+    const source = req.url!.startsWith("/native") ? "first" : "second";
+    nativeSuccess(res, body.input.some((item: any) => item.type === "compaction_trigger")
+      ? [{ type: "compaction", encrypted_content: `${source}-native-checkpoint` }]
+      : [{ type: "reasoning", encrypted_content: `${source}-reasoning`, summary: [] }, message(summary)]);
+  });
+  const normal = await responseJson(await post(f.url, { model: "gpt", input: "Remember this." }));
+  const reasoning = normal.output.find((item: any) => item.type === "reasoning");
+  assert.ok(decodeReasoning(reasoning.encrypted_content));
+  const compacted = await responseJson(await post(f.url, { model: "gpt", input: [message("Previous answer"), { type: "compaction_trigger" }] }));
+  const checkpoint = compacted.output[0];
+  const saved = JSON.stringify([checkpoint, reasoning, message("Previous answer")]);
+
+  async function replay(model: string, history: string, expectedReasoning: boolean, expectedNative: boolean) {
+    const response = await post(f.url, { model, input: JSON.parse(history) });
+    assert.equal(response.status, 200);
+    const outbound = f.seen.at(-1)!.body.input;
+    assert.equal(outbound.some((item: any) => item.type === "reasoning"), expectedReasoning);
+    assert.equal(outbound.some((item: any) => item.type === "compaction"), expectedNative);
+    assert.equal(JSON.stringify(outbound).includes(summary), !expectedNative);
+    assert.doesNotMatch(JSON.stringify(outbound), /cxbr2:|cxbc2:/);
+    return responseJson(response);
+  }
+
+  await replay("gpt-region", saved, false, false);
+  f.config.models["gpt-region"].replay = { reasoning_from: ["gpt"] };
+  await f.restart();
+  await replay("gpt-region", saved, true, false);
+  f.config.models["gpt-region"].replay!.native_compaction_from = ["gpt"];
+  await f.restart();
+  const reverse = await replay("gpt-region", saved, true, true);
+  const reversedCheckpoint = await responseJson(await post(f.url, {
+    model: "gpt-region", input: [message("Other answer"), { type: "compaction_trigger" }],
+  }));
+  await replay("gpt", JSON.stringify([
+    reversedCheckpoint.output[0], reverse.output.find((item: any) => item.type === "reasoning"),
+  ]), false, false);
+
+  // A third target accepting the second does not implicitly accept the first.
+  f.config.models.third = {
+    upstream: "alternate", adapter: "gpt-responses", model: "gpt-third",
+    replay: { reasoning_from: ["gpt-region"], native_compaction_from: ["gpt-region"] },
+  };
+  await f.restart();
+  await replay("third", saved, false, false);
+  await replay("third", JSON.stringify([
+    reversedCheckpoint.output[0], reverse.output.find((item: any) => item.type === "reasoning"),
+  ]), true, true);
+
+  f.config.models["gpt-region"].replay!.reasoning_from = [];
+  f.config.models["gpt-region"].compaction = { mode: "summary", native_replay: true };
+  await f.restart();
+  await replay("gpt-region", saved, false, true);
+  f.config.models["gpt-region"].compaction.native_replay = false;
+  await f.restart();
+  await replay("gpt-region", saved, false, false);
+  assert.equal(JSON.stringify([checkpoint, reasoning, message("Previous answer")]), saved);
+});
+
+test("explicitly shared native state rejected upstream returns its original error without retry or summary fallback", async (t) => {
+  const f = await fixture(t, (body, req, res) => {
+    if (req.url!.startsWith("/alternate")) {
+      assert.ok(body.input.some((item: any) => item.type === "compaction"));
+      res.writeHead(400, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: { code: "invalid_encrypted_content", message: "Synthetic endpoint cannot decrypt this checkpoint." } }));
+      return;
+    }
+    nativeSuccess(res, body.input.some((item: any) => item.type === "compaction_trigger")
+      ? [{ type: "compaction", encrypted_content: "first-native-checkpoint" }]
+      : [message("Portable checkpoint summary.")]);
+  }, {}, (config) => {
+    config.models["gpt-region"].replay = { native_compaction_from: ["gpt"] };
+  });
+  const compacted = await responseJson(await post(f.url, { model: "gpt", input: [{ type: "compaction_trigger" }] }));
+  for (const stream of [false, true]) {
+    const before = f.seen.length;
+    const response = await post(f.url, { model: "gpt-region", input: compacted.output, stream });
+    let error;
+    if (stream) {
+      const frames = await events(response);
+      assert.equal(frames.at(-1).type, "response.failed");
+      error = frames.at(-1).response.error;
+    } else {
+      assert.equal(response.status, 400);
+      error = (await responseJson(response)).error;
+    }
+    assert.equal(error.code, "invalid_prompt");
+    assert.deepEqual(error.upstream, {
+      status: 400,
+      body: { error: { code: "invalid_encrypted_content", message: "Synthetic endpoint cannot decrypt this checkpoint." } },
+    });
+    assert.equal(error.message, "Synthetic endpoint cannot decrypt this checkpoint.");
+    assert.equal(f.seen.length, before + 1);
+  }
+});
+
+test("a Responses model configured for summary compaction sends exactly one ordinary request", async (t) => {
+  const f = await fixture(t, (_body, _req, res) => nativeSuccess(res, [message("Portable summary only.")]), {}, (config) => {
+    config.models.gpt.compaction = { mode: "summary" };
+  });
+  const response = await post(f.url, { model: "gpt", input: [{ type: "message", role: "user", content: "Remember this." }, { type: "compaction_trigger" }] });
+  assert.equal(response.status, 200);
+  const result = await responseJson(response);
+  const checkpoint = decodeCompaction(result.output[0].encrypted_content);
+  assert.equal(checkpoint?.summary, "Portable summary only.");
+  assert.equal(checkpoint?.native, undefined);
+  assert.equal(f.seen.length, 1);
+  assert.equal(f.seen[0].body.input.some((item: any) => item.type === "compaction_trigger"), false);
+  assert.equal(f.seen[0].body.tool_choice, "none");
+  assert.equal(result.usage.input_tokens, 20);
 });
