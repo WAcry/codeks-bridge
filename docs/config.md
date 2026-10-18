@@ -73,14 +73,14 @@
 | `model` | 实际上游模型名；可以是部署别名 |
 | `catalog` | 必填，已审阅条目的 key；条目决定 adapter |
 | `context_window` | 可选窗口预算；设置时同时覆盖客户端的 `context_window` 和 `max_context_window` |
-| `max_output_tokens` | 默认回答输出上限；请求中的显式值优先于此默认值 |
+| `max_output_tokens` | 覆盖目录的默认回答输出预算；请求中的显式值优先于模型配置 |
 | `input_modalities` | 可选，覆盖条目中的 `text`/`image` 能力声明 |
 | `reasoning` | 默认 effort 及其到原生值的映射 |
 | `replay` | 分别允许哪些来源的 reasoning、原生压缩 |
 | `compaction` | 本目标如何生成压缩，以及是否接收原生压缩 |
 | `options` | 原生请求参数，覆盖上游级 options |
 
-不设置窗口时，原条目的两个窗口字段各自保留。当前 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；第三方条目默认工作预算为 `131072`，并非上游容量上限。
+不设置窗口时，原条目的两个窗口字段各自保留。当前 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；Opus 5.5、Sonnet 5.5 和 DeepSeek Flash 的两个字段均为 `1000000`。Claude 的目录默认输出预算为 `128000`，DeepSeek Flash 为 `393216`（384K）；输出预算保存在 bridge 目录条目的外层元数据中，Codex 的模型元数据没有对应字段。请求、模型配置和原生 options 可以调整预算，实际限制由部署端点裁决。
 
 请求先由 adapter 转换，再浅层合并 `upstream.options`、`model.options`；后者优先，嵌套对象整体替换。例如模型 `options.output_config` 会替换推导值和上游同名对象。由此可以显式调整 thinking budget、原生 effort 或端点专有字段。
 
@@ -102,7 +102,15 @@
 
 请求没有 effort 时使用配置默认值；有映射则转换，未列出的显式 effort 直接透传，交给上游判断。catalog 与实际请求使用同一份配置；通过原生 `options` 再覆盖 thinking/effort 时，应同时调整这里的展示设置。
 
-codeks 的 `ultra` 是客户端特殊档位：优先使用条目的 `multi_agent_reasoning_effort`，未配置时按客户端规则选择 `max` 或其他可用普通档位。GPT 条目保留各自原值；例如 GPT-6.1 Sol 使用 `xhigh`，不会统一改为 `max`。若显式覆盖 `effort_map` 并提供 `ultra`，映射中还须有一个非 `ultra`/`persistent` 档位指向相同原生值；bridge 据此填写客户端字段，不能表达时明确报错。例如 `ultra: "max"` 与 `max: "max"` 配对。直接 HTTP 请求中的未知 effort 仍按上述规则透传。
+codeks 的 `ultra` 是客户端特殊档位：注入多代理提示词，并优先使用条目的 `multi_agent_reasoning_effort`，未配置时按客户端规则选择 `max` 或其他可用普通档位。GPT 条目保留各自原值；GPT-6.1 Sol 和 Opus 5.5 使用 `xhigh`，Sonnet 5.5 和 DeepSeek Flash 使用 `max`。若显式覆盖 `effort_map` 并提供 `ultra`，映射中还须有一个非 `ultra`/`persistent` 档位指向相同原生值；bridge 据此填写客户端字段，不能表达时明确报错。例如 `ultra: "max"` 与 `max: "max"` 配对。直接 HTTP 请求中的未知 effort 仍按上述规则透传。
+
+摘要显示由 codeks 的顶层配置控制，bridge 不强制打开：
+
+```toml
+model_reasoning_summary = "auto"
+```
+
+也可选择 `concise`、`detailed` 或 `none`。Claude 和 DeepSeek 目录沿用 GPT-6.1 Sol 的 `default_reasoning_summary: "none"`；客户端配置为 `none` 时省略请求的 summary 字段。bridge 对缺省或 `none` 不展示可见摘要，对其他上述值请求或展示可用内容；Claude 使用原生 summarized 显示，DeepSeek 展示原生 reasoning 文本。它不承诺所有模型区分摘要长度，也不因此关闭实际推理或历史载荷回放。
 
 `input_modalities` 用于客户端能力声明，不是 bridge 的模型能力预检。bridge 负责转换能表达的输入，具体模型能否处理由上游裁决。
 

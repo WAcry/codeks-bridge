@@ -33,6 +33,7 @@ export interface BridgeConfig {
 }
 export interface ModelProfile {
   model_info: Record<string, any>;
+  max_output_tokens?: number;
   id: AdapterId;
   api: Api;
   reasoning_format: string;

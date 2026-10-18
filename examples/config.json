@@ -25,13 +25,11 @@
     "claude": {
       "upstream": "anthropic",
       "model": "claude-sonnet-5-5",
-      "max_output_tokens": 16384,
       "catalog": "claude-sonnet-5-5"
     },
     "deepseek": {
       "upstream": "deepseek",
       "model": "deepseek-flash",
-      "max_output_tokens": 16384,
       "catalog": "deepseek-flash"
     }
   }

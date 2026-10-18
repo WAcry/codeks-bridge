@@ -1,5 +1,5 @@
 import { getCatalogEntry } from "./model-catalog.ts";
-import type { AdapterId, ModelConfig, ModelProfile, ResolvedModel } from "./types.ts";
+import type { AdapterId, ModelConfig, ModelProfile, ResolvedModel, ResponsesRequest } from "./types.ts";
 
 /** Protocol representations belong to adapters; model defaults belong to the catalog. */
 const FORMATS: Record<AdapterId, Pick<ModelProfile, "id" | "api" | "reasoning_format" | "native_compaction_format">> = {
@@ -46,6 +46,7 @@ export function modelProfile(model: ModelConfig): ModelProfile {
   if (model.input_modalities !== undefined) info.input_modalities = [...model.input_modalities];
   return {
     ...FORMATS[entry.adapter], model_info: info, effort_map, multi_agent_effort,
+    max_output_tokens: model.max_output_tokens ?? entry.max_output_tokens,
     default_effort: info.default_reasoning_level, input_modalities: [...info.input_modalities],
   };
 }
@@ -54,4 +55,10 @@ export function modelProfile(model: ModelConfig): ModelProfile {
 export function reasoningEffort(route: ResolvedModel, requested?: string): string {
   const effort = requested ?? route.profile.default_effort;
   return Object.hasOwn(route.profile.effort_map, effort) ? route.profile.effort_map[effort] : effort;
+}
+
+/** Codex omits reasoning.summary when its effective setting is none. */
+export function reasoningSummaryRequested(request: ResponsesRequest): boolean {
+  const summary = request.reasoning?.summary;
+  return summary != null && summary !== "none";
 }

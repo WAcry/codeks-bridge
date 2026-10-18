@@ -196,7 +196,7 @@ test("Messages applies endpoint options after generated output limits", () => {
   assert.equal(buildAnthropicRequest({ ...ctx, route: configured }).body.max_tokens, 1000);
   assert.equal(buildAnthropicRequest({ ...ctx, request: { ...ctx.request, max_output_tokens: 3000 }, route: configured }).body.max_tokens, 1000);
   assert.equal(buildAnthropicRequest({ ...ctx, route: { ...configured, config: { ...configured.config, max_output_tokens: undefined } } }).body.max_tokens, 1000);
-  assert.equal(buildAnthropicRequest(ctx).body.max_tokens, 16384);
+  assert.equal(buildAnthropicRequest(ctx).body.max_tokens, 128000);
 });
 
 test("Messages compaction forces no tools and removes only the structured format", () => {
@@ -391,4 +391,15 @@ test("Messages stream errors preserve the original upstream event", async () => 
       return true;
     });
   });
+});
+
+test("Messages summary display follows the request without disabling thinking or replay", () => {
+  for (const summary of [undefined, "none", "auto", "concise", "detailed"]) {
+    const { body } = buildAnthropicRequest(context({
+      reasoning: { effort: "medium", ...(summary ? { summary } : {}) },
+      input: [message("user", "Earlier task"), reasoning, message("assistant", "Done"), message("user", "Continue")],
+    }));
+    assert.deepEqual(body.thinking, { type: "adaptive", display: summary && summary !== "none" ? "summarized" : "omitted" });
+    assert.deepEqual(body.messages[1].content[0], thinking);
+  }
 });

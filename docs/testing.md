@@ -29,7 +29,7 @@ npm run check
 可选集成测试启动已经安装的 codeks，并让它通过桥接器访问本地假上游。指定要验证的二进制即可，测试不会下载或编译 codeks：
 
 ```sh
-CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/catalog-e2e.test.ts
+CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/catalog-e2e.test.ts test/reasoning-e2e.test.ts
 ```
 
 未设置 `CODEKS_BIN` 时，这些测试自动跳过。它们为每个场景创建独立的 `CODEX_HOME` 和工作目录，监听随机的回环端口。临时目录路径会写入测试输出，保留会话和进程输出便于复查。退出时关闭本轮创建的服务器。
@@ -56,6 +56,17 @@ CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/cata
 - 模型通过 `ALL_TOOLS` 按描述找到延迟 MCP 工具，再调用 `tools[name]`。真实客户端执行 MCP 请求并把结果回传模型上游。
 
 同轮 codeks 二进制还重新通过了上表中的普通工具/图片、明文多代理 V2、远程压缩/resume 三个场景。TypeScript 检查、122 项普通测试、构建与打包解包后的 CLI 检查通过；包中包含全部八个目录文件。这里验证客户端协议与包的完整性，不代表新增了真实模型端点或缓存时长的实测。
+
+### 摘要显示与 Ultra
+
+2026-10-18（America/Los_Angeles），两个上述客户端版本均通过 `test/reasoning-e2e.test.ts` 的四个新增场景：
+
+- 默认配置及显式 `model_reasoning_summary = "none"` 都省略出站 summary 字段，Claude 请求 `display: "omitted"`。
+- 显式 `auto`、`detailed` 请求可见摘要，bridge 返回客户端可识别的 reasoning 事件。
+- 关闭显示仍保存载荷，包括只有签名、thinking 文本为空的块，并在后续请求中回放。
+- `ultra` 的多代理提示词由真实客户端注入一次；Opus 使用 `xhigh`，Sonnet 与 DeepSeek 使用 `max`。
+
+本轮 TypeScript 检查和 125 项普通测试通过；未设置 `CODEKS_BIN` 的完整测试清单共 133 项，其中 8 项客户端集成测试跳过。新增客户端场景各在两个现成二进制上单独运行，不将本地假上游结果当作真实模型规格验证。
 
 ## 真实上游验证
 

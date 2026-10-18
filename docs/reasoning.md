@@ -2,6 +2,10 @@
 
 Reasoning 默认只恢复给产生它的目标，配置可以允许其他来源。是否允许复用和如何解码是两件事：来源策略由 `replay.reasoning_from` 决定，载荷的 `format` 告诉 adapter 如何还原内容。
 
+## 显示与推理分开
+
+目录的 `default_reasoning_summary`、客户端的 `model_reasoning_summary` 和请求的 `reasoning.summary` 控制可见摘要，不决定是否进行推理。Claude / DeepSeek 沿用 GPT-6.1 Sol 的摘要默认值 `none`；在 codeks 配置 `model_reasoning_summary = "auto"` 可打开显示，也可使用 `concise` 或 `detailed`。缺省或 `none` 不输出可见摘要，仍保存原生载荷，并按来源策略回放。启用显示时，Claude 请求 summarized thinking，DeepSeek 展示上游 reasoning 文本，不另外调用模型生成摘要。
+
 ## 保存格式
 
 Responses reasoning item 的 `encrypted_content` 保存：

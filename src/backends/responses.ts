@@ -23,7 +23,7 @@ export function responsesBody({ request, route, compacting }: BackendContext): R
     return item;
   });
   const body: Record<string, any> = {
-    ...(route.config.max_output_tokens ? { max_output_tokens: route.config.max_output_tokens } : {}),
+    ...(route.profile.max_output_tokens ? { max_output_tokens: route.profile.max_output_tokens } : {}),
     ...request,
     reasoning: { ...request.reasoning, effort: reasoningEffort(route, request.reasoning?.effort) },
     ...route.upstream.options,

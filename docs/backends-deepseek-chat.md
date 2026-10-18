@@ -14,19 +14,17 @@
     "flash": {
       "upstream": "deepseek",
       "catalog": "deepseek-flash",
-      "model": "deepseek-flash",
-      "context_window": 131072,
-      "max_output_tokens": 16384
+      "model": "deepseek-flash"
     }
   }
 }
 ```
 
-窗口是示例配置值，以实际端点限制为准。`base_url` 可包含 `/v1` 等前缀。`max_output_tokens` 转为 `max_tokens`，上游的输出预算包含 thinking 与可见输出；达到上限返回失败，不执行不完整工具调用。
+目录的默认及最大上下文窗口为 `1000000`；默认输出预算为 `393216`，对应官方 API 的 384K 上限。请求中的 `max_output_tokens` 优先于模型配置和目录默认值，并转为 `max_tokens`；原生 options 仍可覆盖。上游的输出预算包含 thinking 与可见输出，预算不要求模型用满；达到上限返回失败，不执行不完整工具调用。`base_url` 可包含 `/v1` 等前缀。[官方参数范围](https://api-docs.deepseek.com/api/create-chat-completion/)
 
 ## Reasoning 与参数
 
-思考从 `delta.reasoning_content` 读取，作为 `reasoning.text.v1` 的字符串 data 保存。下次请求把允许来源的文本恢复到 assistant 的 `reasoning_content`。是否同模型、是否同上游都由来源策略决定，不能只凭文本格式推断应该共享。[复用配置](reasoning.md)
+思考从 `delta.reasoning_content` 读取，作为 `reasoning.text.v1` 的字符串 data 保存。下次请求把允许来源的文本恢复到 assistant 的 `reasoning_content`。`reasoning.summary` 为 `auto`、`concise` 或 `detailed` 时，将原生 reasoning 文本作为可见摘要输出；缺省或 `none` 时不展示，但仍保存和回放载荷，不关闭 thinking。目录沿用 GPT-6.1 Sol 的摘要默认值 `none`；可在 codeks 中设置 `model_reasoning_summary = "auto"`。是否同模型、是否同上游都由来源策略决定，不能只凭文本格式推断应该共享。[复用配置](reasoning.md)
 
 没有可恢复 reasoning 的 assistant 历史使用 `reasoning_content: ""`，不编造思考。它使带有其他目标历史的工具循环仍具备 DeepSeek 要求的字段。
 
@@ -39,7 +37,7 @@
 | `medium`、`high`、`xhigh` | `thinking.type: "enabled"`，`reasoning_effort: "high"` |
 | `max`、`ultra` | `thinking.type: "enabled"`，`reasoning_effort: "max"` |
 
-映射可由 `reasoning.effort_map` 整体替换，目录中可选档位来自同一配置。未映射的显式 effort 原样发送。上游和模型 `options` 随后覆盖推导参数，允许直接设置端点专有选项；桥接器最终固定 model、messages、工具定义、流模式和 usage 开关。
+codeks 的 `ultra` 由客户端注入多代理提示词，并使用原生 `max` effort。映射可由 `reasoning.effort_map` 整体替换，目录中可选档位来自同一配置。未映射的显式 effort 原样发送。上游和模型 `options` 随后覆盖推导参数，允许直接设置端点专有选项；桥接器最终固定 model、messages、工具定义、流模式和 usage 开关。
 
 强制工具选择、JSON Schema 与 thinking 能否组合由上游判断。bridge 转换可表达的请求后直接发送，上游不支持时保留错误，不自动关闭 thinking 或改成普通文本输出。
 
@@ -55,7 +53,7 @@ assistant/system/developer 图片、文件 ID、音频和视频没有本轮转�
 
 ## 流、用量与压缩
 
-出站开启 `stream: true`、`stream_options.include_usage: true`。文字与 reasoning 随到随发，工具参数按索引拼接，只有流结束且所有调用完整时才交给 codeks。未结束的连接、缺失 usage、未知工具或不完整参数不能构成成功响应。
+出站开启 `stream: true`、`stream_options.include_usage: true`。文字和启用展示的 reasoning 随到随发，工具参数按索引拼接，只有流结束且所有调用完整时才交给 codeks。未结束的连接、缺失 usage、未知工具或不完整参数不能构成成功响应。
 
 `stop` 完成，`tool_calls` 要求继续执行工具。`length` 和内容过滤返回错误；DeepSeek 的 `insufficient_system_resource`、`aborted` 归为容量错误。HTTP 与流内错误保留原始上游详情，bridge 不叠加重试。[错误结构](responses-stream.md)
 

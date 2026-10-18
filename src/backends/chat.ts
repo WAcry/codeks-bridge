@@ -136,7 +136,7 @@ export function buildChatRequest(context: BackendContext, dialect: ChatDialect):
   const { request, route } = context;
   const tools = buildToolSet(request.tools);
   const body: Record<string, any> = { ...dialect.requestParameters(context) };
-  const limit = request.max_output_tokens ?? route.config.max_output_tokens;
+  const limit = request.max_output_tokens ?? route.profile.max_output_tokens;
   if (limit !== undefined) body.max_tokens = limit;
   for (const name of ["temperature", "top_p", "parallel_tool_calls"] as const) {
     if (request[name] !== undefined) body[name] = request[name];

@@ -562,3 +562,48 @@ test("a Responses model configured for summary compaction sends exactly one ordi
   assert.equal(f.seen[0].body.tool_choice, "none");
   assert.equal(result.usage.input_tokens, 20);
 });
+
+test("HTTP summary opt-in controls visible reasoning while preserving replay carriers", async (t) => {
+  const text = "Synthetic visible reasoning";
+  const f = await fixture(t, (_body, req, res) => {
+    if (req.url!.endsWith("chat/completions")) {
+      sse(res, [
+        { choices: [{ index: 0, delta: { reasoning_content: text }, finish_reason: null }] },
+        { choices: [{ index: 0, delta: { content: "Answer" }, finish_reason: "stop" }] },
+        { choices: [], usage: { prompt_tokens: 20, completion_tokens: 3 } },
+      ]);
+    } else if (req.url!.endsWith("/messages")) {
+      sse(res, [
+        { type: "message_start", message: { usage: { input_tokens: 20, output_tokens: 0 } } },
+        { type: "content_block_start", index: 0, content_block: { type: "thinking", thinking: text, signature: "synthetic-signature" } },
+        { type: "content_block_stop", index: 0 },
+        { type: "content_block_start", index: 1, content_block: { type: "text", text: "Answer" } },
+        { type: "content_block_stop", index: 1 },
+        { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 3 } },
+        { type: "message_stop" },
+      ]);
+    } else nativeSuccess(res, [
+      { type: "reasoning", summary: [{ type: "summary_text", text }], encrypted_content: "synthetic-encrypted-reasoning" },
+      message("Answer"),
+    ]);
+  });
+  for (const model of ["gpt", "claude", "flash"]) {
+    for (const [summary, stream] of [[undefined, true], ["none", false], ["auto", true], ["concise", false], ["detailed", true]] as const) {
+      const visible = summary !== undefined && summary !== "none";
+      const response = await post(f.url, { model, input: "Hello", reasoning: { effort: "medium", ...(summary ? { summary } : {}) }, stream });
+      assert.equal(response.status, 200);
+      let result;
+      if (stream) {
+        const received = await events(response);
+        assert.equal(received.some((event) => event.type === "response.reasoning_summary_text.delta"), visible);
+        result = received.at(-1).response;
+      } else result = await responseJson(response);
+      const item = result.output.find((item: any) => item.type === "reasoning");
+      assert.deepEqual(item.summary, visible ? [{ type: "summary_text", text }] : []);
+      const carrier = decodeReasoning(item.encrypted_content);
+      assert(carrier, "Hidden reasoning still has a carrier for future turns");
+      if (model === "flash") assert.equal(carrier.data, text);
+      if (model === "claude") assert.equal((carrier.data as any).signature, "synthetic-signature");
+    }
+  }
+});

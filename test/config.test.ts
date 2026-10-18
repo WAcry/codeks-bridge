@@ -5,6 +5,8 @@ import { buildCatalog, configSnippet } from "../src/catalog.ts";
 import { upstreamHeaders } from "../src/auth.ts";
 import { reasoningEffort } from "../src/profiles.ts";
 import { getCatalogEntry } from "../src/model-catalog.ts";
+import { buildAnthropicRequest } from "../src/backends/anthropic.ts";
+import { buildDeepSeekRequest } from "../src/backends/deepseek.ts";
 
 const config = () => validateConfig({
   upstreams: { a: { base_url: "https://example.com/v1" } },
@@ -150,7 +152,7 @@ test("catalog keys select reviewed models while deployments and window aliases r
   assert.equal(small.context_window, 256000);
   assert.equal(small.max_context_window, 256000);
   assert.deepEqual(large.model_messages, small.model_messages);
-  assert.equal(large.default_reasoning_summary, "auto");
+  assert.equal(large.default_reasoning_summary, "none");
   assert.equal(small.slug, "small");
   assert(!JSON.stringify(buildCatalog(c)).includes("vendor/custom-deployment-v3"));
   c.models.large.catalog = "unknown-model";
@@ -188,4 +190,37 @@ test("client snippets use the HTTP catalog by default and permit a static catalo
   const local = configSnippet(c, "/tmp/catalog.json");
   assert.match(local, /model_catalog_json = "\/tmp\/catalog.json"/);
   assert.doesNotMatch(local, /model_catalog_url/);
+});
+
+test("third-party defaults retain the Codex role and provide model-specific Ultra and budgets", () => {
+  const template = getCatalogEntry("gpt-6.1-sol").model;
+  for (const [key, vendor, ultra, output] of [
+    ["claude-opus-5-5", "Claude", "xhigh", 128000],
+    ["claude-sonnet-5-5", "Claude", "max", 128000],
+    ["deepseek-flash", "DeepSeek", "max", 393216],
+  ] as const) {
+    const c = validateConfig({ upstreams: { a: { base_url: "https://example.com/v1" } }, models: {
+      selected: { catalog: key, upstream: "a", model: "deployment" },
+    } });
+    const info = buildCatalog(c).models[0];
+    const expectedMessages = structuredClone(template.model_messages);
+    expectedMessages.instructions_template = expectedMessages.instructions_template.replace("based on GPT-6", `based on ${vendor}`);
+    assert.deepEqual(info.model_messages, expectedMessages);
+    assert.equal(info.default_reasoning_summary, template.default_reasoning_summary);
+    assert.equal(info.context_window, 1000000);
+    assert.equal(info.max_context_window, 1000000);
+    assert.equal(info.multi_agent_reasoning_effort, ultra);
+    assert(info.supported_reasoning_levels.some((level: any) => level.effort === "ultra"));
+    const route = resolveModel(c, "selected");
+    assert.equal(reasoningEffort(route, "ultra"), ultra);
+    const build = key === "deepseek-flash" ? buildDeepSeekRequest : buildAnthropicRequest;
+    const ctx = { route, request: { model: "selected", input: "Hello" }, signal: new AbortController().signal };
+    assert.equal(build(ctx).body.max_tokens, output);
+    c.models.selected.max_output_tokens = 8192;
+    ctx.route = resolveModel(c, "selected");
+    assert.equal(build(ctx).body.max_tokens, 8192);
+    assert.equal(build({ ...ctx, request: { ...ctx.request, max_output_tokens: 2048 } }).body.max_tokens, 2048);
+    // Endpoint capabilities remain the upstream's decision, not a local hard cap.
+    assert.equal(build({ ...ctx, request: { ...ctx.request, max_output_tokens: 500000 } }).body.max_tokens, 500000);
+  }
 });

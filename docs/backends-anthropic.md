@@ -8,9 +8,11 @@
 
 相邻同角色消息合并；reasoning、文本和工具调用成为 assistant 内容块，工具输出成为下一条 user 消息中的 `tool_result`。原历史不变。
 
-默认 effort 为 `medium`，默认映射支持 `none`、`low`、`medium`、`high`、`xhigh`、`max` 并保留同名值。映射后为 `none` 时设置 `thinking: {type: "disabled"}`；其他值使用 adaptive thinking 并写入 `output_config.effort`。`reasoning.summary: "none"` 选择 `display: "omitted"`，否则为 `summarized`。
+默认 effort 为 `medium`，普通映射支持 `none`、`low`、`medium`、`high`、`xhigh`、`max` 并保留同名值。codeks 的 `ultra` 注入多代理提示词，并将 Opus 5.5 的原生 effort 设为 `xhigh`、Sonnet 5.5 设为 `max`。映射后为 `none` 时设置 `thinking: {type: "disabled"}`；其他值使用 adaptive thinking 并写入 `output_config.effort`。
 
-`reasoning.effort_map` 可以替换映射，`options.thinking` 和 `options.output_config` 可以覆盖完整原生对象，例如手动 budget。未映射的显式 effort 原样发送，端点自己判断是否支持。输出预算先取请求 `max_output_tokens`、模型默认值、默认 16384，再接受上游和模型 options 的覆盖。[配置优先级](config.md)
+`reasoning.summary` 缺省或为 `none` 时选择 `display: "omitted"`；`auto`、`concise`、`detailed` 选择 `summarized`，不保证上游区分摘要长度。目录默认值与 GPT-6.1 Sol 一样为 `none`；要显示摘要，在 codeks 配置中设置 `model_reasoning_summary = "auto"`。显示开关不关闭 thinking 或载荷回放。
+
+`reasoning.effort_map` 可以替换映射，`options.thinking` 和 `options.output_config` 可以覆盖完整原生对象，例如手动 budget。未映射的显式 effort 原样发送，端点自己判断是否支持。Opus / Sonnet 5.5 目录的默认及最大上下文窗口为 `1000000`，默认输出预算为 `128000`，对应官方的 1M 上下文、128K 标准最大输出。输出预算依次取请求 `max_output_tokens`、模型配置、目录默认值，再接受上游和模型 options 的覆盖；这是允许的上限，不要求每次生成同样长度。[模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[配置优先级](config.md)
 
 完整 `thinking`/`redacted_thinking` block，包括签名或隐藏数据，存入 `anthropic.thinking.v1` carrier。请求按 `replay.reasoning_from` 恢复允许来源，签名完整保留；其他来源只在当前请求过滤。允许配对不意味着上游一定接受其签名。[Reasoning 策略](reasoning.md)
 

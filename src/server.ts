@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { createHash, timingSafeEqual } from "node:crypto";
 import { validateConfig, resolveModel } from "./config.ts";
 import { buildCatalog } from "./catalog.ts";
+import { reasoningSummaryRequested } from "./profiles.ts";
 import { BridgeError, transportError } from "./errors.ts";
 import { ResponseWriter, usageJson } from "./writer.ts";
 import { runResponses } from "./backends/responses.ts";
@@ -81,7 +82,7 @@ export function createBridgeServer(value: BridgeConfig): Server {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", "x-accel-buffering": "no" });
         res.flushHeaders();
       }
-      writer = new ResponseWriter(streaming ? res : { write() {} }, { model: request.model, showSummary: request.reasoning?.summary !== "none" });
+      writer = new ResponseWriter(streaming ? res : { write() {} }, { model: request.model, showSummary: reasoningSummaryRequested(request) });
       writer.start();
       if (streaming) keepalive = setInterval(() => writer?.keepalive(), 15_000).unref();
       let result;

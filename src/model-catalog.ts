@@ -7,6 +7,7 @@ export interface CatalogEntry {
   adjustments: string[];
   adapter: AdapterId;
   effort_map?: Record<string, string>;
+  max_output_tokens?: number;
   model: Record<string, any>;
 }
 
