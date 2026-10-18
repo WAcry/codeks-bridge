@@ -2,7 +2,7 @@ import { encodeReasoning } from "../carrier.ts";
 import { BridgeError, transportError, upstreamError } from "../errors.ts";
 import { prepareHistory } from "../history.ts";
 import { parseJsonSse } from "../sse.ts";
-import { buildToolSet } from "../tools.ts";
+import { buildToolSet, normalizeToolDeclarations } from "../tools.ts";
 import type { ToolSet } from "../tools.ts";
 import type { BackendContext, BackendResult } from "../types.ts";
 import { upstreamFetch } from "../upstream.ts";
@@ -121,18 +121,18 @@ function toolChoice(choice: unknown, tools: ToolSet): unknown {
   if (choice && typeof choice === "object") {
     const selected = choice as Record<string, any>;
     if (["function", "custom"].includes(selected.type) && typeof selected.name === "string") {
-      const name = tools.flatFor(selected.namespace, selected.name);
-      const tool = tools.resolve(name);
-      if (!tool || tool.name !== selected.name || tool.namespace !== selected.namespace || tool.kind !== selected.type) {
+      const tool = tools.get(selected.namespace, selected.name);
+      if (!tool || tool.kind !== selected.type) {
         throw new BridgeError("The selected tool is not available on the Chat backend.");
       }
-      return { type: "function", function: { name } };
+      return { type: "function", function: { name: tool.flatName } };
     }
   }
   throw new BridgeError("Chat does not support this tool_choice.");
 }
 
 export function buildChatRequest(context: BackendContext, dialect: ChatDialect): { body: Record<string, any>; tools: ToolSet } {
+  context = { ...context, request: normalizeToolDeclarations(context.request) };
   const { request, route } = context;
   const tools = buildToolSet(request.tools);
   const body: Record<string, any> = { ...dialect.requestParameters(context) };

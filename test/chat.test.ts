@@ -91,6 +91,46 @@ test("Chat combines matching reasoning, assistant text and parallel tool calls i
   assert.equal(body.max_tokens, 2048);
 });
 
+test("DeepSeek round trips Lite tools, keeps instruction order, and does not mutate the request", async () => {
+  const ctx = context([
+    { type: "additional_tools", role: "developer", tools: [
+      toolDefinitions[0], { type: "namespace", name: "functions", tools: [toolDefinitions[1]] },
+    ] },
+    { type: "message", role: "user", content: "Do the task." },
+    { type: "custom_tool_call", call_id: "earlier", name: "apply_patch", input: "hello" },
+    { type: "custom_tool_call_output", call_id: "earlier", output: "Applied." },
+    { type: "additional_tools", role: "developer", tools: [
+      { type: "namespace", name: "agents", tools: [{ ...toolDefinitions[0].tools![0], description: "Updated task." }] },
+    ] },
+    { type: "message", role: "developer", content: "New rule." },
+  ]);
+  delete ctx.request.tools;
+  ctx.request.tool_choice = { type: "custom", name: "apply_patch" };
+  const before = structuredClone(ctx.request);
+  await exchange(ctx, [
+    delta({ tool_calls: [
+      { index: 0, id: "next", type: "function", function: { name: "functions__apply_patch", arguments: '{"input":"hello"}' } },
+      { index: 1, id: "agent", type: "function", function: { name: "agents__spawn_agent", arguments: '{"prompt":"Task"}' } },
+    ] }, "tool_calls"), { choices: [], usage },
+  ], (events, body) => {
+    assert.deepEqual(body.tools.map((tool: any) => tool.function.name), ["agents__spawn_agent", "functions__apply_patch"]);
+    assert.equal(body.tools[0].function.description, "Updated task.");
+    assert.match(body.tools[1].function.description, /start: "hello"/);
+    assert.deepEqual(body.tool_choice, { type: "function", function: { name: "functions__apply_patch" } });
+    assert.deepEqual(body.messages.map((item: any) => item.role), ["user", "assistant", "tool", "system"]);
+    assert.equal(body.messages[1].tool_calls[0].function.name, "functions__apply_patch");
+    assert.equal(body.messages[3].content, "New rule.");
+    const output = events.at(-1).response.output;
+    assert.equal(output[0].type, "custom_tool_call");
+    assert.equal(output[0].namespace, "functions");
+    assert.equal(output[0].name, "apply_patch");
+    assert.equal(output[0].input, "hello");
+    assert.equal(output[1].namespace, "agents");
+    assert.equal(output[1].name, "spawn_agent");
+    assert.deepEqual(ctx.request, before);
+  });
+});
+
 test("DeepSeek filters foreign reasoning by default and restores explicitly allowed state", () => {
   const ctx = context();
   const foreign = reasoning(resolveModel(modelConfig(), "other"), "Foreign reasoning");

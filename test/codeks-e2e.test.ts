@@ -55,6 +55,7 @@ function sendChat(res: ServerResponse, reply: Reply) {
 
 async function fixture(t: TestContext, template: string, respond: (body: any, index: number) => Reply, compactLimit?: number) {
   const requests: any[] = [];
+  const clientRequests: any[] = [];
   const failures: unknown[] = [];
   const upstream = createServer(async (req, res) => {
     try {
@@ -78,6 +79,27 @@ async function fixture(t: TestContext, template: string, respond: (body: any, in
     models: { "test-model": { adapter: "deepseek-chat", upstream: "fake", model: "test-model", context_window: 272_000, max_output_tokens: 4096 } },
   };
   const bridge = createBridgeServer(config);
+  // Observe the real client's wire request before the bridge translates it.
+  bridge.on("request", (req) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => {
+      try {
+        const body = JSON.parse(Buffer.concat(chunks).toString());
+        clientRequests.push(body);
+        assert.equal(req.headers["x-openai-internal-codex-responses-lite"], "true");
+        assert.equal(body.tools, undefined, "Lite tools belong to input, not the top-level tools field");
+        assert.equal(body.reasoning.context, "all_turns");
+        assert.equal(body.parallel_tool_calls, false);
+        const declarations = body.input.filter((item: any) => item.type === "additional_tools");
+        assert.equal(declarations.length, 1);
+        assert.equal(declarations[0].role, "developer");
+        assert.ok(declarations[0].tools.length > 0, "Lite carries the actual tool definitions");
+      } catch (error) {
+        failures.push(error);
+      }
+    });
+  });
   const bridgeUrl = await listen(bridge);
   t.after(() => stop(bridge));
   const scratch = await mkdtemp(join(tmpdir(), "codeks-bridge-e2e-"));
@@ -89,7 +111,7 @@ async function fixture(t: TestContext, template: string, respond: (body: any, in
   t.diagnostic(`Scratch directory: ${scratch}`);
   bundled ??= readBundledCatalog(binary!);
   const catalog = buildCatalog(config, await bundled, template);
-  assert.equal(catalog.models[0].use_responses_lite, false);
+  assert.equal(catalog.models[0].use_responses_lite, true);
   if (compactLimit) catalog.models[0].auto_compact_token_limit = compactLimit;
   const modelsPath = join(home, "models.json");
   await writeFile(modelsPath, JSON.stringify(catalog));
@@ -119,17 +141,18 @@ remote_compaction = "v2"
       const pending = run(binary!, args, { cwd: work, env, timeout: 90_000, maxBuffer: 8 * 1024 * 1024 });
       pending.child.stdin?.end();
       const result = await pending;
-      assert.deepEqual(failures, [], "fake upstream assertions");
+      assert.deepEqual(failures, [], "client and upstream wire assertions");
+      assert.ok(clientRequests.length > 0, "A real Lite request must reach the bridge");
       await writeFile(join(scratch, resume ? "resume.stdout" : "exec.stdout"), result.stdout);
       return result.stdout;
     } catch (error) {
       const output = error as { stdout?: string; stderr?: string };
       await writeFile(join(scratch, "failure.txt"), `${output.stdout ?? ""}\n${output.stderr ?? ""}`);
-      assert.deepEqual(failures, [], "fake upstream assertions");
+      assert.deepEqual(failures, [], "client and upstream wire assertions");
       throw error;
     }
   };
-  return { requests, invoke, work };
+  return { requests, clientRequests, invoke, work };
 }
 
 function findTool(body: any, name: string): string {
@@ -144,7 +167,7 @@ function toolReply(body: any, id: string): any {
 
 const pixel = "89504e470d0a1a0a0000000d4948445200000004000000040802000000269309290000001049444154789c63f8cfc000470cc47100ae930ff1d05f239e0000000049454e44ae426082";
 
-test("real codeks: function/custom tools execute and image results reach Chat", { skip: !binary, timeout: 120_000 }, async (t) => {
+test("real codeks Lite: function/custom tools execute and image results reach Chat", { skip: !binary, timeout: 120_000 }, async (t) => {
   const { requests, invoke, work } = await fixture(t, "gpt-5.5", (body, index) => {
     if (index === 1) {
       assert.ok(body.messages.some((message: any) => Array.isArray(message.content) && message.content.some((part: any) => part.type === "image_url")));
@@ -171,7 +194,7 @@ test("real codeks: function/custom tools execute and image results reach Chat", 
   assert.equal(requests[1].messages.find((message: any) => message.role === "assistant").reasoning_content, "Synthetic reasoning.");
 });
 
-test("real codeks: code mode and plaintext multi-agent v2 calls round-trip", { skip: !binary, timeout: 120_000 }, async (t) => {
+test("real codeks Lite: code mode and plaintext multi-agent v2 calls round-trip", { skip: !binary, timeout: 120_000 }, async (t) => {
   let parentStep = 0;
   let children = 0;
   const { requests, invoke } = await fixture(t, "gpt-6-sol", (body) => {
@@ -207,10 +230,10 @@ test("real codeks: code mode and plaintext multi-agent v2 calls round-trip", { s
   assert.ok(requests.length >= 5);
 });
 
-test("real codeks: remote compaction V2 replaces history and survives resume", { skip: !binary, timeout: 120_000 }, async (t) => {
+test("real codeks Lite: remote compaction V2 replaces history and survives resume", { skip: !binary, timeout: 120_000 }, async (t) => {
   let normal = 0;
   let summaries = 0;
-  const { requests, invoke } = await fixture(t, "gpt-5.5", (body) => {
+  const { requests, clientRequests, invoke } = await fixture(t, "gpt-5.5", (body) => {
     if (body.tool_choice === "none" && body.messages.some((message: any) => message.content === SUMMARIZATION_PROMPT)) {
       summaries++;
       assert.ok(toolReply(body, "call_before_compact"));
@@ -229,4 +252,6 @@ test("real codeks: remote compaction V2 replaces history and survives resume", {
   assert.match(await invoke("Continue after restarting the client.", true), /RESUME_DONE/);
   assert.equal(summaries, 1);
   assert.equal(requests.length, 4);
+  assert.equal(clientRequests.filter((body) => body.input.some((item: any) => item.type === "compaction_trigger")).length, 1);
+  assert.ok(clientRequests.at(-1).input.some((item: any) => item.type === "compaction"), "Resume replays the stored compaction carrier alongside Lite tool definitions");
 });

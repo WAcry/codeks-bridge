@@ -6,6 +6,8 @@
 
 普通 Responses 参数、namespace 和 custom grammar 工具保留原始格式。模型名替换为配置的实际名称，reasoning effort 使用 profile 默认值和配置映射。`max_output_tokens` 优先使用请求值，再使用模型默认值。
 
+客户端默认发送 Responses Lite：工具声明保留在 `input[].additional_tools` 的原位置，不提升到顶层 `tools`。保留 `reasoning.context: "all_turns"` 和 `parallel_tool_calls: false`，并向所有 GPT 上游发送 Lite header。入口从客户端 header 或 `additional_tools` 识别 Lite；只有 header、没有工具的请求也能保持标记。后端不通过模型名称或云厂商猜测协议。
+
 随后浅层合并上游和模型 `options`，后者覆盖前者，也可覆盖推导出的普通参数。最后由 bridge 固定 `model`、`input`、`tools`、`store: false`、`stream: true`，`include` 至少包含 `reasoning.encrypted_content`。上游状态由完整历史承载，不依赖服务器保存的会话。
 
 历史 reasoning 按允许来源选择，将 `responses.reasoning.v1` 的 data 还原为原生密文；原生压缩按独立策略选择。每条输入项移除顶层 `id`，工具配对的 `call_id` 保留，避免引用已过滤的 reasoning。图片、普通消息、工具结果和明文 agent message 保留原格式。[状态规则](reasoning.md)

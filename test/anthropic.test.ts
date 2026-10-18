@@ -93,6 +93,48 @@ test("Messages preserves reminders between an assistant reply and the next user 
   assert.deepEqual(body.messages[2].content.map((b: any) => b.text), ["<system-reminder>\nNew constraint.\n</system-reminder>", "Next."]);
 });
 
+test("Messages round trips Lite namespaced tools and consumes declarations without reminders", async () => {
+  const custom = { type: "custom", name: "exec", format: { type: "grammar", syntax: "lark", definition: 'start: "hello"' } };
+  const ctx = context({ tool_choice: { type: "custom", name: "exec" }, input: [
+    { type: "additional_tools", role: "developer", tools: [
+      { type: "namespace", name: "functions", tools: [custom] },
+      { type: "namespace", name: "agents", tools: [tool] },
+    ] },
+    message("developer", "Initial rules."), message("user", "Start."),
+    { type: "custom_tool_call", call_id: "earlier", name: "exec", input: "hello" },
+    { type: "custom_tool_call_output", call_id: "earlier", output: "Done." },
+    { type: "additional_tools", role: "developer", tools: [
+      { type: "namespace", name: "agents", tools: [{ ...tool, description: "Updated lookup." }] },
+    ] },
+    message("developer", "New rule."),
+  ] });
+  const before = structuredClone(ctx.request);
+  const stream = events(start,
+    { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "next", name: "functions__exec", input: { input: "hello" } } },
+    { type: "content_block_stop", index: 0 }, ...finish("tool_use"));
+  await withUpstream(stream, async (base, requests) => {
+    const capture = writerCapture();
+    const result = await runAnthropic({ ...ctx, route: { ...route, upstream: { ...route.upstream, base_url: base } } }, capture.writer);
+    capture.writer.complete(result.usage);
+    const body = requests[0].body;
+    assert.deepEqual(body.tools.map((tool: any) => tool.name), ["functions__exec", "agents__lookup"]);
+    assert.match(body.tools[0].description, /start: "hello"/);
+    assert.equal(body.tools[1].description, "Updated lookup.");
+    assert.deepEqual(body.tool_choice, { type: "tool", name: "functions__exec" });
+    assert.deepEqual(body.system.map((block: any) => block.text), ["Initial rules."]);
+    assert.deepEqual(body.messages.map((item: any) => item.role), ["user", "assistant", "user"]);
+    assert.equal(body.messages[1].content[0].name, "functions__exec");
+    assert.deepEqual(body.messages[2].content.map((block: any) => block.type), ["tool_result", "text"]);
+    assert.equal(body.messages[2].content[1].text, "<system-reminder>\nNew rule.\n</system-reminder>");
+    const call = capture.output().at(-1).response.output[0];
+    assert.equal(call.type, "custom_tool_call");
+    assert.equal(call.namespace, "functions");
+    assert.equal(call.name, "exec");
+    assert.equal(call.input, "hello");
+    assert.deepEqual(ctx.request, before);
+  });
+});
+
 test("Messages converts custom grammar tools and images in tool results", () => {
   const custom = { type: "custom", name: "edit", description: "Edit a file.", format: { type: "grammar", syntax: "regex", definition: "EDIT .+" } };
   const { body } = buildAnthropicRequest(context({ tools: [custom], input: [

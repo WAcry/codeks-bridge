@@ -170,6 +170,44 @@ test("HTTP nonstream and SSE responses contain complete output and usage", async
   assert.equal(anthropic.end_turn, true);
 });
 
+test("GPT keeps Lite declarations, transport and reasoning through dual compaction", async (t) => {
+  const headers: (string | string[] | undefined)[] = [];
+  const f = await fixture(t, (body, req, res) => {
+    headers.push(req.headers["x-openai-internal-codex-responses-lite"]);
+    const output = body.input?.some?.((item: any) => item.type === "compaction_trigger")
+      ? [{ type: "compaction", encrypted_content: "synthetic-native-checkpoint" }]
+      : [message("Portable summary")];
+    nativeSuccess(res, output);
+  });
+  const declaration = {
+    type: "additional_tools", role: "developer", tools: [{ type: "namespace", name: "functions", tools: [
+      { type: "custom", name: "exec", description: "Run code", format: { type: "grammar", syntax: "lark", definition: "start: /.+/" } },
+    ] }],
+  };
+  const input = [declaration, { type: "message", role: "user", content: "Hello" }];
+  const body = { model: "gpt", input, reasoning: { effort: "high", context: "all_turns" }, parallel_tool_calls: false };
+  assert.equal((await responseJson(await post(f.url, body))).status, "completed");
+  // The header also identifies Lite when the client declares no tools.
+  assert.equal((await responseJson(await post(f.url, { model: "gpt-region", input: "Hello" }, {
+    headers: { "content-type": "application/json", "x-openai-internal-codex-responses-lite": "true" },
+  }))).status, "completed");
+  const compacted = await responseJson(await post(f.url, { ...body, input: [...input, { type: "compaction_trigger" }] }));
+  assert.equal(compacted.status, "completed");
+  const checkpoint = decodeCompaction(compacted.output[0].encrypted_content)!;
+  assert.equal(checkpoint.summary, "Portable summary");
+  assert.equal((checkpoint.native!.data as Record<string, unknown>).encrypted_content, "synthetic-native-checkpoint");
+  assert.deepEqual(headers, ["true", "true", "true", "true"]);
+  assert.deepEqual(f.seen[0].body.input, input);
+  for (const { body: sent } of [f.seen[0], ...f.seen.slice(2)]) {
+    assert.equal(Object.hasOwn(sent, "tools"), false);
+    assert.deepEqual(sent.input[0], declaration);
+    assert.equal(sent.reasoning.context, "all_turns");
+    assert.equal(sent.parallel_tool_calls, false);
+  }
+  assert(f.seen.slice(2).some(({ body: sent }) => sent.input.at(-1).type === "compaction_trigger"));
+  assert(f.seen.slice(2).some(({ body: sent }) => sent.tool_choice === "none"));
+});
+
 test("HTTP and SSE errors preserve capacity classification and Retry-After", async (t) => {
   let status = 429;
   let code = "rate_limit_exceeded";

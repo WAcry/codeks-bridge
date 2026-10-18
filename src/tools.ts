@@ -6,6 +6,8 @@
 // with names matching [a-zA-Z0-9_-]{1,64}. See docs/tools.md.
 
 import { createHash } from "node:crypto";
+import { BridgeError } from "./errors.ts";
+import type { ResponsesRequest } from "./types.ts";
 
 export const MAX_TOOL_NAME = 64;
 
@@ -25,6 +27,8 @@ export interface ToolSet {
   byFlat: Map<string, ToolEntry>;
   /** Upstream name for a call found in history. */
   flatFor(namespace: string | undefined, name: string): string;
+  /** Looks up the original identity, including codeks' default namespace. */
+  get(namespace: string | undefined, name: string): ToolEntry | undefined;
   /** Resolves a call made by the upstream model. */
   resolve(flatName: string): ToolEntry | undefined;
 }
@@ -50,7 +54,20 @@ export function baseFlatName(namespace: string | undefined, name: string): strin
 }
 
 function identity(namespace: string | undefined, name: string): string {
-  return `${namespace ?? ""}\u0000${name}`;
+  return `${namespace === "functions" ? "" : namespace ?? ""}\u0000${name}`;
+}
+
+/** Extracts Lite declarations for APIs whose tools live outside the conversation. */
+export function normalizeToolDeclarations(request: ResponsesRequest): ResponsesRequest {
+  if (!Array.isArray(request.input)) return request;
+  const tools = [...(request.tools ?? [])];
+  const input = request.input.filter((item) => {
+    if (item?.type !== "additional_tools") return true;
+    if (!Array.isArray(item.tools)) throw new BridgeError("additional_tools requires a tools array.");
+    tools.push(...item.tools);
+    return false;
+  });
+  return { ...request, input, tools };
 }
 
 const SCHEMA_CHILD_MAPS = ["properties", "patternProperties", "$defs", "definitions", "dependentSchemas"];
@@ -117,7 +134,13 @@ export function buildToolSet(tools: unknown[] | undefined): ToolSet {
 
   const add = (entry: Omit<ToolEntry, "flatName">) => {
     const id = identity(entry.namespace, entry.name);
-    if (byIdentity.has(id)) return;
+    const previous = byIdentity.get(id);
+    if (previous) {
+      // Lite updates contain only changed members. Replace that definition
+      // without losing siblings or changing its established upstream name.
+      Object.assign(previous, entry);
+      return;
+    }
     let flatName = baseFlatName(entry.namespace, entry.name);
     // Add a suffix only when two different tools would get the same name.
     for (let n = 2; byFlat.has(flatName); n++) {
@@ -162,6 +185,9 @@ export function buildToolSet(tools: unknown[] | undefined): ToolSet {
     byFlat,
     flatFor(namespace, name) {
       return byIdentity.get(identity(namespace, name))?.flatName ?? baseFlatName(namespace, name);
+    },
+    get(namespace, name) {
+      return byIdentity.get(identity(namespace, name));
     },
     resolve(flatName) {
       return byFlat.get(flatName);

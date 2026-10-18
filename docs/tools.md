@@ -2,6 +2,12 @@
 
 客户端负责执行工具，bridge 只转换定义、调用和结果。Responses 后端保留原生定义；Messages 与 Chat 后端只向模型提供普通函数。
 
+## Lite 工具声明
+
+客户端默认把完整工具 schema 放在 `input[].additional_tools`。GPT 保留原始声明项；Messages/Chat 共用提取逻辑，在转换消息前消费声明，避免产生空消息或 reminder。顶层 `tools` 也可参与转换，随后按历史顺序合并各批声明。
+
+增量声明只包含新增或变更的成员，按 namespace 与工具名覆盖旧定义，保留未变的其他成员和已分配的上游名字。工具移除的 developer 通知保留原位置，不从提示词文字推断删工具。codeks 将默认 `functions` namespace、空 namespace 和省略 namespace 视为同一身份，因此历史调用和显式工具选择均按此规则查找；返回调用保留声明中的原 namespace。
+
 ## 名字
 
 普通函数保留原名。namespace 中的工具使用 `namespace__name`；namespace 已以 `_` 结尾时直接拼接名字。名字规范化为字母、数字、`_` 和 `-`。只有两个不同工具的规范化结果实际冲突时，才为后来的名字加 `_2`、`_3` 等后缀。返回调用通过该请求的映射恢复原 name/namespace。

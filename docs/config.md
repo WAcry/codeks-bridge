@@ -115,7 +115,9 @@ codeks 的 `ultra` 是客户端特殊档位，会先按 catalog 的 `multi_agent
 
 `catalog` 从指定 codeks 的 `debug models --bundled` 取模板；可通过 `--codeks PATH` 指定二进制，或 `--bundled FILE` 读取已导出的 JSON。`--template SLUG` 选择模板，默认选第一个可见的 V2 多代理模型。
 
-模板提供客户端指令和工具元数据；各模型的别名、窗口、reasoning 档位与输入模态来自 bridge 配置。生成时关闭 Responses Lite，让工具 schema 完整传入；关闭 web search 宣告和服务优先级。输出只包含配置中的别名，不自动合并其他 provider 的模型。`GET /v1/models` 只是别名列表，不是这份完整 catalog。
+模板提供客户端指令和工具元数据；各模型的别名、窗口、reasoning 档位与输入模态来自 bridge 配置。生成时统一启用 Responses Lite，完整工具 schema 随 `input[].additional_tools` 传入；关闭 web search 宣告和服务优先级。输出只包含配置中的别名，不自动合并其他 provider 的模型。`GET /v1/models` 只是别名列表，不是这份完整 catalog。
+
+已有客户端需要重新生成 catalog 并重载会话配置，才能采用 Lite。当前 Codex 会同时发送 `reasoning.context: "all_turns"`、`parallel_tool_calls: false` 和 Lite header；bridge 在 GPT 路径保留这些语义，Claude/DeepSeek 按原生协议转换。详见[协议决策](design.md#客户端协议跟随-codex)。
 
 `config-snippet --catalog ABSOLUTE_PATH` 输出 TOML。顶层设置放在表定义前，并声明 `[model_providers.bridge.capabilities] remote_compaction = "v2"`。bridge 走 V2 `/responses` 压缩协议。
 

@@ -3,9 +3,10 @@ import { BridgeError, transportError, upstreamError } from "./errors.ts";
 import type { ResolvedModel } from "./types.ts";
 
 /** base_url includes any API version prefix; path is appended, never resolved from /. */
-export async function upstreamFetch(route: ResolvedModel, path: string, body: unknown, signal: AbortSignal): Promise<Response> {
+export async function upstreamFetch(route: ResolvedModel, path: string, body: unknown, signal: AbortSignal, requestHeaders?: Record<string, string>): Promise<Response> {
   const url = route.upstream.base_url.replace(/\/+$/, "") + "/" + path.replace(/^\/+/, "");
   const headers = await upstreamHeaders(route.upstream, route.profile.api, signal);
+  for (const [name, value] of Object.entries(requestHeaders ?? {})) headers.set(name, value);
   const idle = new AbortController();
   const combined = AbortSignal.any([signal, idle.signal]);
   const timeoutMs = route.upstream.stream_idle_timeout_ms ?? 300_000;

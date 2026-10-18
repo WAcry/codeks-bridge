@@ -72,7 +72,8 @@ interface ItemState {
 }
 
 export const runResponses: Backend = async (context, writer) => {
-  const response = await upstreamFetch(context.route, "/responses", responsesBody(context), context.signal);
+  const response = await upstreamFetch(context.route, "/responses", responsesBody(context), context.signal,
+    context.responsesLite ? { "x-openai-internal-codex-responses-lite": "true" } : undefined);
   const states = new Map<number, ItemState>();
   const byId = new Map<string, ItemState>();
   const calls: Record<string, any>[] = [];

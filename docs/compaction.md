@@ -17,7 +17,7 @@
 
 ## 客户端契约
 
-codeks 的远程压缩 V2 仍调用 `POST /responses`，输入末项为 `{"type":"compaction_trigger"}`，保留 instructions、tools 和完整历史。bridge 等待所有必需请求成功后，在 `response.completed` 前交付恰好一个 `compaction` item。
+codeks 的远程压缩 V2 仍调用 `POST /responses`，输入末项为 `{"type":"compaction_trigger"}`，保留完整历史及 Lite `additional_tools` 声明。bridge 等待所有必需请求成功后，在 `response.completed` 前交付恰好一个 `compaction` item。
 
 ```toml
 [model_providers.bridge.capabilities]

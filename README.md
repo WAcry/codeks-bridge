@@ -1,6 +1,6 @@
 # codeks-bridge
 
-给 [codeks](https://github.com/WAcry/codeks) 使用的本地模型桥接器。客户端连接一个 Responses provider，通过模型别名选择 GPT Responses、Claude Messages 或 DeepSeek Chat 上游。各模型可以配置不同的连接、参数、reasoning 和原生压缩复用范围。
+给 [codeks](https://github.com/WAcry/codeks) 使用的本地模型桥接器。客户端连接一个 Responses provider，使用 Responses Lite，通过模型别名选择 GPT Responses、Claude Messages 或 DeepSeek Chat 上游。各模型可以配置不同的连接、参数、reasoning 和原生压缩复用范围。
 
 支持工具、图片和流式响应。Reasoning 默认只回放给原目标，可显式允许其他来源；压缩始终保留文字摘要，支持原生压缩的目标还可保存和复用加密检查点。历史由 codeks 保存，bridge 无需数据库。运行时只依赖 Node.js 内置模块。
 

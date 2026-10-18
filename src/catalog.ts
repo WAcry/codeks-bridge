@@ -23,7 +23,7 @@ export function buildCatalog(config: BridgeConfig, bundled: any, templateSlug?: 
       multi_agent_reasoning_effort: profile.multi_agent_effort ?? null,
       supported_reasoning_levels: Object.entries(profile.effort_map).map(([effort, native]) => ({ effort, description: `Upstream effort: ${native}` })),
       input_modalities: profile.input_modalities,
-      use_responses_lite: false, supports_search_tool: false,
+      use_responses_lite: true, supports_search_tool: false,
       support_verbosity: false, default_reasoning_summary: "auto",
       supports_reasoning_effort_updates: false, supports_image_detail_original: false,
       service_tiers: [], additional_speed_tiers: [], availability_nux: null, upgrade: null,

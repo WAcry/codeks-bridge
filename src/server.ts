@@ -67,7 +67,9 @@ export function createBridgeServer(value: BridgeConfig): Server {
       }
       const request = await readRequest(req);
       const route = resolveModel(config, request.model);
-      const context = { request, route, signal: controller.signal };
+      const responsesLite = req.headers["x-openai-internal-codex-responses-lite"] === "true" ||
+        (Array.isArray(request.input) && request.input.some((item) => item.type === "additional_tools"));
+      const context = { request, route, signal: controller.signal, responsesLite };
       const backend = BACKENDS[route.profile.id];
       const streaming = request.stream === true;
       if (streaming) {

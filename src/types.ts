@@ -72,6 +72,8 @@ export interface BackendContext {
   route: ResolvedModel;
   signal: AbortSignal;
   compacting?: boolean;
+  /** Transport mode received from the client, including tool-free Lite requests. */
+  responsesLite?: boolean;
 }
 export interface BackendResult {
   usage: Usage;

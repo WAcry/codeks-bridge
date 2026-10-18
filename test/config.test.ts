@@ -56,7 +56,7 @@ test("catalog and adapter share configured efforts while unknown request values 
   assert.equal(reasoningEffort(route, "new-native-value"), "new-native-value");
   const result = buildCatalog(c, { models: [{ slug: "template", visibility: "list", multi_agent_version: "v2", use_responses_lite: true, tool_mode: "code_mode_only", base_instructions: "Synthetic client instructions", default_reasoning_level: "max", supported_reasoning_levels: [{ effort: "max" }], input_modalities: ["text", "image"] }] });
   const entry = result.models[0];
-  assert.equal(entry.use_responses_lite, false);
+  assert.equal(entry.use_responses_lite, true);
   assert.equal(entry.multi_agent_version, "v2");
   assert.equal(entry.context_window, 100000);
   assert.equal(entry.base_instructions, "Synthetic client instructions");

@@ -3,7 +3,7 @@ import { BridgeError, upstreamError } from "../errors.ts";
 import { prepareHistory } from "../history.ts";
 import { reasoningEffort } from "../profiles.ts";
 import { parseJsonSse } from "../sse.ts";
-import { buildToolSet, safeCallId } from "../tools.ts";
+import { buildToolSet, normalizeToolDeclarations, safeCallId } from "../tools.ts";
 import type { ToolSet } from "../tools.ts";
 import type { Backend, BackendContext } from "../types.ts";
 import { upstreamFetch } from "../upstream.ts";
@@ -47,19 +47,19 @@ function toolChoice(value: any, tools: ToolSet): Record<string, unknown> | undef
   if (value === "none") return { type: "none" };
   if (value === "required") return { type: "any" };
   if (value && ["function", "custom"].includes(value.type) && typeof value.name === "string") {
-    const name = tools.flatFor(value.namespace, value.name);
-    const selected = tools.resolve(name);
-    if (!selected || selected.name !== value.name || (selected.namespace ?? "") !== (value.namespace ?? "") || selected.kind !== value.type) {
+    const selected = tools.get(value.namespace, value.name);
+    if (!selected || selected.kind !== value.type) {
       throw new BridgeError("The selected tool is not available on the Messages backend.");
     }
-    return { type: "tool", name };
+    return { type: "tool", name: selected.flatName };
   }
   throw new BridgeError("Unsupported Messages tool_choice.");
 }
 
 /** Convert only request-owned copies; stored history remains unchanged. */
 export function buildAnthropicRequest(context: BackendContext): { body: Record<string, any>; tools: ToolSet } {
-  const { request, route } = context;
+  const { route } = context;
+  const request = normalizeToolDeclarations(context.request);
   const tools = buildToolSet(request.tools);
   const system: Block[] = request.instructions ? [{ type: "text", text: request.instructions }] : [];
   const messages: Message[] = [];
