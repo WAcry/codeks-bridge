@@ -102,8 +102,10 @@ export async function compact(context: BackendContext, backend: Backend): Promis
   const cancel = new AbortController();
   const signal = AbortSignal.any([context.signal, cancel.signal]);
   let pendingAcceptance = context.route.compaction.mode === "dual" ? 2 : 1;
-  const shared = { ...context, compacting: true, signal, onAccepted: () => {
-    if (--pendingAcceptance === 0 && !signal.aborted) context.onAccepted?.();
+  const shared = { ...context, compacting: true, signal, onAccepted: (headers?: Headers) => {
+    if (--pendingAcceptance === 0 && !signal.aborted) {
+      context.onAccepted?.(context.route.compaction.mode === "summary" ? headers : undefined);
+    }
   } };
   const run = async <T>(request: ResponsesRequest, decode: (output: readonly unknown[]) => T) => {
     try {

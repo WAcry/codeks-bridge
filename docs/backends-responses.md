@@ -14,11 +14,11 @@
 
 ## 流与工具交付
 
-桥接器消费 SSE，也接受完整 JSON response。文本和 reasoning summary 随到随发；reasoning 完成时附带载荷。保留上游消息的 `phase`，包括 `partial_answer`；只有缺失时才按后续输出、工具和 `end_turn` 推断。摘要保留同一 item 内的分段索引及完整 summary 数组，不把多段压成一段。后端不直接关闭客户端响应，服务层统一写 `response.completed` 和 usage。
+桥接器消费 SSE，也接受完整 JSON response。原生事件和 response envelope 保留 ID、时间、usage 和未知元数据，只修改桥接所需字段。完整 JSON 或仅在终止事件提供的输出会补齐 item added/done，供客户端持久化。保留上游消息的 `phase`，包括 `partial_answer`；只有缺失时才按后续输出、工具和 `end_turn` 推断。摘要保留同一 item 内的分段索引及完整 summary 数组，不把多段压成一段。
 
-工具调用仅在上游 `response.completed` 后交给 writer，并在完整成功时释放。function call 保留 namespace，custom tool 保留原始输入。失败、截断和连接中断不会让客户端执行未完成的工具调用。
+第一个工具之前的文字和摘要流式交付；从第一个工具起，所有事件作为有序后缀缓存，完整成功后释放。function call 保留 namespace，custom tool 保留原始输入。失败、截断和连接中断丢弃整个后缀，不让客户端执行未完成的工具调用，也不改变工具与后续消息的相对顺序。
 
-`end_turn` 有显式值时遵从上游，否则有工具调用时返回 false。input/output usage 必须是有效计数，cache/reasoning 分项有则记录；reasoning 不重复叠加到 input。无效 usage 作为错误返回，避免影响 codeks 压缩判断。
+`end_turn` 有显式值时遵从上游，否则有工具调用时返回 false。成功响应的 input/output usage 必须是有效计数，cache read/write、reasoning 分项有则记录；reasoning 不重复叠加到 input。无效 usage 作为错误返回，避免影响 codeks 压缩判断。`response.incomplete` 原样保留原因与可用 usage，由客户端处理继续生成、内容过滤或截断，不统一改成可重试错误。
 
 上游成功响应头到达前，不建立下游 SSE。HTTP 失败保留原始 status、body 和诊断 header；流内错误保留完整 error 对象，不维护 GPT code 白名单。被允许的密文遭拒也直接返回，不自动过滤后重试。[错误结构](responses-stream.md)
 

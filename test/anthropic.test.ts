@@ -455,3 +455,26 @@ test("Messages summary display follows the request without disabling thinking or
     assert.deepEqual(body.messages[1].content[0], thinking);
   }
 });
+
+test("Messages signed thinking and tools retain their exact interleaved replay order", async () => {
+  const blocks = [
+    { type: "thinking", thinking: "Before the first call.", signature: "synthetic_a" },
+    { type: "tool_use", id: "call_a", name: "lookup", input: { q: "first" } },
+    { type: "thinking", thinking: "Before the second call.", signature: "synthetic_b" },
+    { type: "tool_use", id: "call_b", name: "lookup", input: { q: "second" } },
+  ];
+  const stream = events(start, ...blocks.flatMap((content_block, index) => [
+    { type: "content_block_start", index, content_block }, { type: "content_block_stop", index },
+  ]), ...finish("tool_use"));
+  await withUpstream(stream, async (base) => {
+    const capture = writerCapture();
+    const ctx = { ...context({ tools: [tool] }), route: { ...route, upstream: { ...route.upstream, base_url: base } } };
+    const result = await runAnthropic(ctx, capture.writer);
+    assert.deepEqual(capture.output().filter((event) => event.type === "response.output_item.done").map((event) => event.item.type), ["reasoning"]);
+    capture.writer.complete(result.usage, result.endTurn);
+    const input = [...capture.writer.outputItems];
+    assert.deepEqual(input.map((item) => item.type), ["reasoning", "function_call", "reasoning", "function_call"]);
+    const replay = buildAnthropicRequest({ ...ctx, request: { model: ctx.request.model, tools: [tool], input } });
+    assert.deepEqual(replay.body.messages[0].content, blocks);
+  });
+});

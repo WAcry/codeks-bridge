@@ -1,6 +1,9 @@
 import { modelProfile } from "./profiles.ts";
 import type { BridgeConfig } from "./types.ts";
 
+/** Codex bounds downloads from an explicit model_catalog_url to 1 MiB. */
+export const MAX_HTTP_CATALOG_BYTES = 1024 * 1024;
+
 /** Serve only configured aliases, using their own reviewed client behavior. */
 export function buildCatalog(config: BridgeConfig): { models: Record<string, any>[] } {
   return { models: Object.entries(config.models).map(([slug, model], priority) => ({

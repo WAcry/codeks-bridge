@@ -20,10 +20,26 @@ export class UpstreamHttpError extends Error {
 /** A Responses failure belongs to the SSE protocol, not HTTP classification. */
 export class ResponsesStreamError extends Error {
   readonly error: Record<string, unknown>;
-  constructor(error: Record<string, unknown>) {
+  readonly response?: Record<string, any>;
+  readonly event?: Record<string, any>;
+  constructor(error: Record<string, unknown>, response?: Record<string, any>, event?: Record<string, any>) {
     super(typeof error.message === "string" ? error.message : "The upstream response failed");
     this.name = "ResponsesStreamError";
     this.error = error;
+    this.response = response;
+    this.event = event;
+  }
+}
+
+/** An incomplete response has its own client termination and usage semantics. */
+export class ResponsesIncompleteError extends Error {
+  readonly response: Record<string, any>;
+  readonly event?: Record<string, any>;
+  constructor(response: Record<string, any>, event?: Record<string, any>) {
+    super(`The upstream response is incomplete: ${String(response.incomplete_details?.reason ?? "unknown")}`);
+    this.name = "ResponsesIncompleteError";
+    this.response = response;
+    this.event = event;
   }
 }
 
@@ -56,13 +72,16 @@ function retryAfter(value: unknown): string | undefined {
 }
 
 /** Keep native fields; only supplement missing retry advice from HTTP headers. */
-export function responsesStreamError(payload: unknown, headers?: Headers): ResponsesStreamError {
-  const error = record(record(payload)?.error ?? payload) ?? {};
+export function responsesStreamError(payload: unknown, headers?: Headers, event?: Record<string, any>): ResponsesStreamError {
+  const envelope = record(payload);
+  const response = envelope?.error !== undefined && (envelope.object === "response" || typeof envelope.status === "string" ||
+    (event?.type === "response.failed" && event.response !== undefined)) ? envelope : undefined;
+  let error = record(envelope?.error ?? payload) ?? {};
   const delay = retryAfter(headers);
   if (delay !== undefined && retryAfter(error.headers) === undefined) {
-    return new ResponsesStreamError({ ...error, headers: { ...record(error.headers), "retry-after": delay } });
+    error = { ...error, headers: { ...record(error.headers), "retry-after": delay } };
   }
-  return new ResponsesStreamError(error);
+  return new ResponsesStreamError(error, response ? { ...response, error } : undefined, event);
 }
 
 /** Translate non-Responses protocols into errors understood by the client. */

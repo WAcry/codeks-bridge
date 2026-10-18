@@ -75,7 +75,7 @@ export function usageJson(usage: Usage): Record<string, unknown> {
 }
 
 export class ResponseWriter {
-  readonly responseId: string;
+  private id: string;
   private readonly sink: Sink;
   private readonly model: string;
   private readonly showSummary: boolean;
@@ -86,7 +86,12 @@ export class ResponseWriter {
   private reasoning: OpenReasoning | undefined;
   // A finished message waits here until we know whether a tool call follows.
   private pendingMessage: OpenMessage | undefined;
-  private readonly toolCalls: Array<Record<string, unknown>> = [];
+  private calls = 0;
+  // Once a tool appears, preserve its entire ordered suffix until success.
+  private suffix: Array<{ event: Record<string, any>; native: boolean }> | undefined;
+  private suffixOutputStart = 0;
+  private native = false;
+  private nativeEnd: Record<string, any> | undefined;
   private started = false;
   private finished = false;
 
@@ -94,8 +99,12 @@ export class ResponseWriter {
     this.sink = sink;
     this.model = opts.model;
     this.showSummary = opts.showSummary ?? true;
-    this.responseId = opts.responseId ?? newId("resp");
+    this.id = opts.responseId ?? newId("resp");
   }
+
+  get responseId(): string { return this.id; }
+
+  get nativeResponse(): Record<string, any> | undefined { return this.nativeEnd?.response; }
 
   get outputItems(): readonly Record<string, any>[] {
     return this.output as Record<string, any>[];
@@ -106,11 +115,41 @@ export class ResponseWriter {
   }
 
   get hasOutput(): boolean {
-    return this.nextOutputIndex > 0 || this.toolCalls.length > 0 || this.message !== undefined;
+    return this.nextOutputIndex > 0 || this.calls > 0 || this.message !== undefined;
+  }
+
+  private write(event: Record<string, any>, native = false): void {
+    this.sink.write(formatSse(native ? event : { sequence_number: this.seq++, ...event }));
+  }
+
+  private send(event: Record<string, any>, native = false): void {
+    if (this.suffix) this.suffix.push({ event, native });
+    else this.write(event, native);
   }
 
   private emit(type: string, fields: Record<string, unknown>): void {
-    this.sink.write(formatSse({ type, sequence_number: this.seq++, ...fields }));
+    this.send({ type, ...fields });
+  }
+
+  private holdSuffix(): void {
+    if (this.suffix) return;
+    this.suffix = [];
+    this.suffixOutputStart = this.output.length;
+  }
+
+  private releaseSuffix(): void {
+    const suffix = this.suffix;
+    this.suffix = undefined;
+    for (const { event, native } of suffix ?? []) this.write(event, native);
+  }
+
+  private discardSuffix(): void {
+    if (this.suffix) this.output.length = this.suffixOutputStart;
+    this.suffix = undefined;
+    this.message = undefined;
+    this.reasoning = undefined;
+    this.pendingMessage = undefined;
+    this.calls = 0;
   }
 
   private responseObject(status: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -128,13 +167,49 @@ export class ResponseWriter {
   start(): void {
     if (this.started) return;
     this.started = true;
-    this.emit("response.created", { response: this.responseObject("in_progress") });
+    if (!this.native) this.emit("response.created", { response: this.responseObject("in_progress") });
   }
 
   /** An event that codeks ignores but that resets its stream idle timer. */
   keepalive(): void {
     if (!this.started || this.finished) return;
-    this.emit("keepalive", {});
+    // Heartbeats bypass an ordered suffix while the upstream is still working.
+    this.write({ type: "keepalive" }, this.native);
+  }
+
+  /** Native Responses events retain their own ids, envelopes and metadata. */
+  useNativeResponses(): void { this.native = true; }
+
+  nativeEvent(event: Record<string, any>): void {
+    if (this.finished) return;
+    if (typeof event.response?.id === "string") this.id = event.response.id;
+    if (event.type === "response.completed") {
+      this.nativeEnd = event;
+      return;
+    }
+    if (["response.output_item.added", "response.output_item.done"].includes(event.type)) {
+      if (["function_call", "custom_tool_call"].includes(event.item?.type)) this.holdSuffix();
+      if (event.type === "response.output_item.done") this.output.push(event.item);
+      this.nextOutputIndex = Math.max(this.nextOutputIndex, Number(event.output_index ?? 0) + 1);
+    }
+    this.send(event, true);
+  }
+
+  nativeFailed(response: Record<string, any>, event: Record<string, any> = {}): void {
+    this.nativeFailure("response.failed", response, event);
+  }
+
+  nativeIncomplete(response: Record<string, any>, event: Record<string, any> = {}): void {
+    this.nativeFailure("response.incomplete", response, event);
+  }
+
+  private nativeFailure(type: string, response: Record<string, any>, event: Record<string, any>): void {
+    if (this.finished) return;
+    this.discardSuffix();
+    this.finished = true;
+    if (typeof response.id === "string") this.id = response.id;
+    this.nativeEnd = { ...event, type, response };
+    this.write(this.nativeEnd, true);
   }
 
   // Reasoning -----------------------------------------------------------
@@ -303,13 +378,13 @@ export class ResponseWriter {
       status: "completed",
     };
     if (call.namespace) item.namespace = call.namespace;
-    this.toolCalls.push(item);
+    this.addTool(item);
   }
 
   addCustomToolCall(call: CustomToolCallItem): void {
     this.closeMessage();
     if (this.reasoning) this.endReasoning(undefined);
-    this.toolCalls.push({
+    this.addTool({
       type: "custom_tool_call",
       id: newId("ctc"),
       call_id: call.call_id,
@@ -320,8 +395,22 @@ export class ResponseWriter {
     });
   }
 
+  private addTool(item: Record<string, unknown>): void {
+    this.flushPendingMessage("commentary");
+    this.holdSuffix();
+    this.calls++;
+    const outputIndex = this.nextOutputIndex++;
+    const added: Record<string, unknown> = { ...item, status: "in_progress" };
+    if (item.type === "function_call") added.arguments = "";
+    else added.input = "";
+    this.emit("response.output_item.added", { output_index: outputIndex, item: added });
+    this.emit("response.output_item.done", { output_index: outputIndex, item });
+    this.output.push(item);
+  }
+
   get toolCallCount(): number {
-    return this.toolCalls.length;
+    return this.output.slice(0, this.suffix ? this.suffixOutputStart : undefined)
+      .filter((item: any) => ["function_call", "custom_tool_call"].includes(item.type)).length;
   }
 
   /** Emits a complete item as-is (added and done together). */
@@ -338,17 +427,7 @@ export class ResponseWriter {
   private flushAll(endTurn?: boolean): void {
     this.closeMessage();
     if (this.reasoning) this.endReasoning(undefined);
-    this.flushPendingMessage(endTurn === false || this.toolCalls.length > 0 ? "commentary" : "final_answer");
-    for (const item of this.toolCalls) {
-      const outputIndex = this.nextOutputIndex++;
-      const added: Record<string, unknown> = { ...item, status: "in_progress" };
-      if (item.type === "function_call") added.arguments = "";
-      else added.input = "";
-      this.emit("response.output_item.added", { output_index: outputIndex, item: added });
-      this.emit("response.output_item.done", { output_index: outputIndex, item });
-      this.output.push(item);
-    }
-    this.toolCalls.length = 0;
+    this.flushPendingMessage(endTurn === false || this.calls > 0 ? "commentary" : "final_answer");
   }
 
   // Endings ---------------------------------------------------------------
@@ -356,7 +435,15 @@ export class ResponseWriter {
   complete(usage: Usage | undefined, endTurn?: boolean): void {
     if (this.finished) return;
     this.start();
+    if (this.nativeEnd) {
+      this.releaseSuffix();
+      this.finished = true;
+      this.write(this.nativeEnd, true);
+      return;
+    }
+    if (this.native) throw new BridgeError("The upstream stream ended before response.completed", "stream_error", 502);
     this.flushAll(endTurn);
+    this.releaseSuffix();
     this.finished = true;
     const extra: Record<string, unknown> = {};
     if (usage) extra.usage = usageJson(usage);
@@ -368,7 +455,7 @@ export class ResponseWriter {
   fail(error: Record<string, unknown>): void {
     if (this.finished) return;
     this.start();
-    this.toolCalls.length = 0;
+    this.discardSuffix();
     this.finished = true;
     this.emit("response.failed", {
       response: this.responseObject("failed", { error }),
@@ -378,7 +465,7 @@ export class ResponseWriter {
   incomplete(reason: string, usage: Usage | undefined): void {
     if (this.finished) return;
     this.start();
-    this.toolCalls.length = 0;
+    if (this.suffix) this.discardSuffix();
     this.closeMessage();
     if (this.reasoning) this.endReasoning(undefined);
     this.flushPendingMessage("final_answer");

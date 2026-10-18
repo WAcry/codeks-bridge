@@ -178,7 +178,7 @@ export async function runChat(context: BackendContext, writer: ResponseWriter, d
   const { body, tools } = buildChatRequest(context, dialect);
   const { reasoningField } = dialect;
   const response = await upstreamFetch(context.route, "chat/completions", body, context.signal);
-  context.onAccepted?.();
+  context.onAccepted?.(response.headers);
   if (!response.body) throw new BridgeError("Chat upstream returned no stream.", "upstream_error", 502);
   let reasoning = "";
   let reasoningSeen = false;

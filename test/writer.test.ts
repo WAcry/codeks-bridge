@@ -164,3 +164,47 @@ test("failure objects keep native policy and plan details", () => {
   writer.fail(error);
   assert.deepEqual(events.at(-1).response.error, error);
 });
+
+test("tools retain their position and hold the complete following suffix until success", () => {
+  for (const ending of ["completed", "failed", "incomplete"]) {
+    const { writer, events } = fixture();
+    writer.reasoningDelta("Before tool one.");
+    writer.endReasoning("carrier-a");
+    const prefixLength = events.length;
+    writer.addFunctionCall({ name: "read", call_id: "call_a", arguments: "{}" });
+    writer.reasoningDelta("Before tool two.");
+    writer.endReasoning("carrier-b");
+    writer.textDelta("Tool two follows.");
+    writer.addFunctionCall({ name: "write", call_id: "call_b", arguments: "{}" });
+    assert.equal(events.length, prefixLength);
+    writer.keepalive();
+    assert.equal(events.at(-1).type, "keepalive");
+    if (ending === "completed") writer.complete({ input_tokens: 3, output_tokens: 5 }, false);
+    else if (ending === "failed") writer.fail({ code: "server_is_overloaded", message: "Busy" });
+    else writer.incomplete("max_output_tokens", { input_tokens: 3, output_tokens: 5 });
+    validateOrder(events);
+    const output = events.at(-1).response.output;
+    assert.deepEqual(output.map((item: any) => item.type), ending === "completed"
+      ? ["reasoning", "function_call", "reasoning", "message", "function_call"] : ["reasoning"]);
+    assert.deepEqual(events.filter((event) => event.type === "response.output_item.done").map((event) => event.item), output);
+  }
+});
+
+test("native failures keep terminal envelopes and discard held output events", () => {
+  for (const kind of ["failed", "incomplete"]) {
+    const events: any[] = [];
+    const writer = new ResponseWriter({ write: (text) => events.push(JSON.parse(text.slice(6))) }, { model: "test" });
+    writer.useNativeResponses();
+    writer.start();
+    writer.nativeEvent({ type: "response.output_item.added", output_index: 0, item: { type: "function_call", id: "fc_a" } });
+    const response = { id: "resp_upstream", status: kind, usage: { input_tokens: 5 }, diagnostic: { trace: "synthetic" } };
+    const envelope = { sequence_number: 31, extra: "preserved" };
+    if (kind === "failed") writer.nativeFailed(response, envelope);
+    else writer.nativeIncomplete(response, envelope);
+    writer.complete({ input_tokens: 5, output_tokens: 1 });
+    assert.deepEqual(events, [{ ...envelope, type: `response.${kind}`, response }]);
+    assert.equal(writer.nativeResponse, response);
+    assert.equal(writer.responseId, "resp_upstream");
+    assert.deepEqual(writer.outputItems, []);
+  }
+});

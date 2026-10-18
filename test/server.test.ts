@@ -5,6 +5,7 @@ import type { AddressInfo } from "node:net";
 import { gzipSync } from "node:zlib";
 import test, { type TestContext } from "node:test";
 import { createBridgeServer } from "../src/server.ts";
+import { buildCatalog } from "../src/catalog.ts";
 import { decodeCompaction, decodeReasoning } from "../src/carrier.ts";
 import type { BridgeConfig } from "../src/types.ts";
 
@@ -74,7 +75,7 @@ function sse(res: ServerResponse, events: any[], finish = true) {
   if (finish) res.end();
 }
 
-const nativeUsage = { input_tokens: 20, output_tokens: 3, input_tokens_details: { cached_tokens: 10 }, output_tokens_details: { reasoning_tokens: 1 } };
+const nativeUsage = { input_tokens: 20, output_tokens: 3, total_tokens: 23, input_tokens_details: { cached_tokens: 10 }, output_tokens_details: { reasoning_tokens: 1 } };
 const message = (text: string) => ({ type: "message", id: "msg_synthetic", role: "assistant", status: "completed", content: [{ type: "output_text", text }] });
 function nativeSuccess(res: ServerResponse, output: any[]) {
   sse(res, [{ type: "response.completed", response: { id: "resp_synthetic", status: "completed", output, usage: nativeUsage } }]);
@@ -140,7 +141,7 @@ test("HTTP entry authentication protects health, models and requests", async (t)
     assert.equal(response.status, 401);
     assert.equal((await responseJson(response)).error.code, "invalid_api_key");
   }
-  const headers = { authorization: "Bearer synthetic-bridge-token" };
+  const headers = { authorization: "Bearer synthetic-bridge-token", origin: "https://client.example" };
   assert.equal((await fetch(`${f.url}/health`, { headers })).status, 200);
   const response = await fetch(`${f.url}/v1/models`, { headers });
   assert.equal(response.status, 200);
@@ -150,6 +151,58 @@ test("HTTP entry authentication protects health, models and requests", async (t)
   const result = await post(f.url, { model: "gpt", input: "Hello" }, { headers });
   assert.equal(result.status, 200);
   assert.equal((await responseJson(result)).output[0].content[0].text, "Hello");
+});
+
+test("anonymous loopback requests with a browser Origin never reach upstream", async (t) => {
+  const f = await fixture(t, (_body, _req, res) => nativeSuccess(res, [message("Hello")]));
+  for (const origin of ["https://unrelated.example", "null", "http://localhost:3000"]) {
+    const response = await post(f.url, { model: "gpt", input: "Hello" }, { headers: { origin, "content-type": "text/plain" } });
+    assert.equal(response.status, 403);
+    assert.match((await responseJson(response)).error.message, /bridge token/);
+  }
+  assert.equal(f.seen.length, 0);
+  assert.equal((await post(f.url, { model: "gpt", input: "Hello" })).status, 200);
+  assert.equal(f.seen.length, 1);
+});
+
+test("oversized HTTP catalogs fail explicitly while static catalogs and inference remain usable", async (t) => {
+  const f = await fixture(t, (_body, _req, res) => nativeSuccess(res, [message("Hello")]), {}, config => {
+    config.models = Object.fromEntries(Array.from({ length: 20 }, (_,index) => [`preset-${index}`, { ...config.models.gpt }]));
+  });
+  const exported = buildCatalog(f.config);
+  assert.equal(exported.models.length, 20);
+  assert(Buffer.byteLength(JSON.stringify(exported)) > 1024 * 1024);
+  const response = await fetch(`${f.url}/v1/models`);
+  assert.equal(response.status, 413);
+  assert.match((await responseJson(response)).error.message, /model_catalog_json/);
+  assert.equal((await fetch(`${f.url}/health`)).status, 200);
+  assert.equal((await post(f.url, { model: "preset-0", input: "Hello" })).status, 200);
+});
+
+test("native success retains response metadata and upstream diagnostic request IDs", async (t) => {
+  const reply = {
+    id: "resp_synthetic_original", object: "response", created_at: 123,
+    status: "completed", model: "gpt-example", output: [message("Hello")],
+    usage: { ...nativeUsage, input_tokens_details: { cached_tokens: 10, cache_write_tokens: 4 }, synthetic_detail: 17 },
+    synthetic_metadata: { original: true },
+  };
+  const f = await fixture(t, (_body, _req, res) => {
+    res.setHeader("x-request-id", "req_synthetic_original");
+    res.setHeader("request-id", "req_synthetic_alternate");
+    sse(res, [{ type: "response.created", response: { ...reply, status: "in_progress", output: [] } },
+      { type: "response.completed", response: reply }]);
+  });
+  for (const stream of [false, true]) {
+    const response = await post(f.url, { model: "gpt", input: "Hello", stream });
+    assert.equal(response.headers.get("x-request-id"), "req_synthetic_original");
+    assert.equal(response.headers.get("request-id"), "req_synthetic_alternate");
+    const body = stream ? (await events(response)).find(event => event.type === "response.completed").response : await response.json();
+    assert.equal(body.id, reply.id);
+    assert.equal(body.created_at, reply.created_at);
+    assert.equal(body.model, "gpt");
+    assert.deepEqual(body.usage, reply.usage);
+    assert.deepEqual(body.synthetic_metadata, reply.synthetic_metadata);
+  }
 });
 
 test("HTTP model catalogs expose reviewed client metadata without connection or credential details", async (t) => {
@@ -499,7 +552,7 @@ test("a failed SSE response exposes no executable tool calls", async (t) => {
     const frames = await events(await post(f.url, { model, input: "Use lookup", tools: [{ type: "function", name: "lookup", parameters: { type: "object", properties: {} } }], stream: true }));
     assert.equal(frames.at(-1).type, "response.failed");
     assert.equal(frames.some((frame) => ["function_call", "custom_tool_call"].includes(frame.item?.type)), false);
-    assert.deepEqual(frames.at(-1).response.output, []);
+    assert.deepEqual(frames.at(-1).response.output, model === "gpt" ? undefined : []);
   }
 });
 
@@ -719,10 +772,14 @@ test("explicitly shared native state rejected upstream returns its original erro
 });
 
 test("a Responses model configured for summary compaction sends exactly one ordinary request", async (t) => {
-  const f = await fixture(t, (_body, _req, res) => nativeSuccess(res, [message("Portable summary only.")]), {}, (config) => {
+  const f = await fixture(t, (_body, _req, res) => {
+    res.setHeader("x-request-id", "req_summary_only");
+    nativeSuccess(res, [message("Portable summary only.")]);
+  }, {}, (config) => {
     config.models.gpt.compaction = { mode: "summary" };
   });
   const response = await post(f.url, { model: "gpt", input: [{ type: "message", role: "user", content: "Remember this." }, { type: "compaction_trigger" }] });
+  assert.equal(response.headers.get("x-request-id"), "req_summary_only");
   assert.equal(response.status, 200);
   const result = await responseJson(response);
   const checkpoint = decodeCompaction(result.output[0].encrypted_content);
@@ -736,7 +793,7 @@ test("a Responses model configured for summary compaction sends exactly one ordi
 
 test("HTTP summary opt-in controls visible reasoning while preserving replay carriers", async (t) => {
   const text = "Synthetic visible reasoning";
-  const f = await fixture(t, (_body, req, res) => {
+  const f = await fixture(t, (body, req, res) => {
     if (req.url!.endsWith("chat/completions")) {
       sse(res, [
         { choices: [{ index: 0, delta: { reasoning_content: text }, finish_reason: null }] },
@@ -754,7 +811,7 @@ test("HTTP summary opt-in controls visible reasoning while preserving replay car
         { type: "message_stop" },
       ]);
     } else nativeSuccess(res, [
-      { type: "reasoning", summary: [{ type: "summary_text", text }], encrypted_content: "synthetic-encrypted-reasoning" },
+      { type: "reasoning", summary: body.reasoning?.summary && body.reasoning.summary !== "none" ? [{ type: "summary_text", text }] : [], encrypted_content: "synthetic-encrypted-reasoning" },
       message("Answer"),
     ]);
   });
@@ -766,10 +823,12 @@ test("HTTP summary opt-in controls visible reasoning while preserving replay car
       let result;
       if (stream) {
         const received = await events(response);
-        assert.equal(received.some((event) => event.type === "response.reasoning_summary_text.delta"), visible);
+        // Native terminal-only responses keep their summary without invented deltas.
+        assert.equal(received.some((event) => event.type === "response.reasoning_summary_text.delta"), model === "gpt" ? false : visible);
         result = received.at(-1).response;
       } else result = await responseJson(response);
       const item = result.output.find((item: any) => item.type === "reasoning");
+      if (model === "gpt") assert.equal(f.seen.at(-1)!.body.reasoning.summary, summary);
       assert.deepEqual(item.summary, visible ? [{ type: "summary_text", text }] : []);
       const carrier = decodeReasoning(item.encrypted_content);
       assert(carrier, "Hidden reasoning still has a carrier for future turns");

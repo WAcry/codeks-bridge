@@ -8,11 +8,29 @@
 
 相邻同角色消息合并；reasoning、文本和工具调用成为 assistant 内容块，工具输出成为下一条 user 消息中的 `tool_result`。原历史不变。
 
-默认 effort 为 `medium`，普通映射支持 `none`、`low`、`medium`、`high`、`xhigh`、`max` 并保留同名值。codeks 的 `ultra` 注入多代理提示词，并将 Opus 5.5 的原生 effort 设为 `xhigh`、Sonnet 5.5 设为 `max`。映射后为 `none` 时设置 `thinking: {type: "disabled"}`；其他值使用 adaptive thinking 并写入 `output_config.effort`。
+默认 effort 为 `medium`，普通映射提供 `low`、`medium`、`high`、`xhigh`、`max` 并保留同名值，使用 adaptive thinking 并写入 `output_config.effort`。codeks 的 `ultra` 注入多代理提示词，并将 Opus 5.5 的原生 effort 设为 `xhigh`、Sonnet 5.5 设为 `max`。
+
+Opus 5.5 始终启用 thinking；Sonnet 5.5 的最低模式是 `between_tools`，关闭回复前的思考，但仍在工具之间返回带签名的进度说明。两者都拒绝 `thinking.type: "disabled"`，因此目录不把 `none` 作为可选档位，也不把关闭思考的请求静默改成 `low`。Sonnet 的 `between_tools` 只接受 `high` 或以下 effort，且 `thinking` 对象中不能附带 `display`、`budget_tokens` 等字段。[官方 thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)、[Sonnet 5.5 变更说明](https://platform.claude.com/docs/en/models/sonnet-5-5/whats-new-sonnet-5-5)
 
 `reasoning.summary` 缺省或为 `none` 时选择 `display: "omitted"`；`auto`、`concise`、`detailed` 选择 `summarized`，不保证上游区分摘要长度。目录默认值与 GPT-6.1 Sol 一样为 `none`；要显示摘要，在 codeks 配置中设置 `model_reasoning_summary = "auto"`。显示开关不关闭 thinking 或载荷回放。
 
-`reasoning.effort_map` 可以替换映射，`options.thinking` 和 `options.output_config` 可以覆盖完整原生对象，例如手动 budget。未映射的显式 effort 原样发送，端点自己判断是否支持。Opus / Sonnet 5.5 目录的默认及最大上下文窗口为 `1000000`，Messages API 要求提供 `max_tokens`，因此目录设置默认输出预算 `128000`，对应官方标准最大输出。输出预算依次取请求 `max_output_tokens`、模型配置、目录默认值，再接受上游和模型 options 的覆盖；这是允许的上限，不要求每次生成同样长度。[模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[配置优先级](config.md)
+`reasoning.effort_map` 可以替换映射，`options.thinking` 和 `options.output_config` 可以覆盖完整原生对象。例如以下 Sonnet 模型条目固定使用 `between_tools` 与 `low` effort；options 优先于客户端请求中推导的模式、effort 和 display，无需新增转换接口：
+
+```json
+{
+  "catalog": "claude-sonnet-5-5",
+  "upstream": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "options": {
+    "thinking": { "type": "between_tools" },
+    "output_config": { "effort": "low" }
+  }
+}
+```
+
+未映射的显式 effort 仍交给上游判断；客户端显式请求 `none` 时，adapter 仍发送 `thinking.type: "disabled"`，由上游返回错误。目录精调不构成运行时能力预检。
+
+Opus / Sonnet 5.5 目录的默认及最大上下文窗口为 `1000000`，Messages API 要求提供 `max_tokens`，因此目录设置默认输出预算 `128000`，对应官方标准最大输出。输出预算依次取请求 `max_output_tokens`、模型配置、目录默认值，再接受上游和模型 options 的覆盖；这是允许的上限，不要求每次生成同样长度。[模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[配置优先级](config.md)
 
 完整 `thinking`/`redacted_thinking` block，包括签名或隐藏数据，存入 `anthropic.thinking.v1` carrier。请求按 `replay.reasoning_from` 恢复允许来源，签名完整保留；其他来源只在当前请求过滤。允许配对不意味着上游一定接受其签名。[Reasoning 策略](reasoning.md)
 
@@ -26,7 +44,7 @@ namespace 和 custom tool 使用共享映射。自由文本工具转换成 `{inp
 
 用户与工具结果都可带图片。HTTP(S) URL 和 JPEG、PNG、GIF、WebP 的 base64 data URL 转为原生 image block，bridge 不下载图片。图片能力、尺寸和 schema 限制交给上游，不能转换的内容类型明确报错。空工具结果仍发送 `tool_result` 及原调用 ID，只省略空的 `content` 数组，不添加占位文字。
 
-工具参数分片先拼接、解析，完整 `message_stop` 后才交给 writer。`tool_use`、`pause_turn` 返回 `end_turn: false`；输出截断或 refusal 返回失败，不交付部分工具调用。`model_context_window_exceeded` 转为 `context_length_exceeded`，同样不交付工具调用；后续是否压缩或重试由 codeks 决定。
+工具参数分片先拼接、解析，在对应 `content_block_stop` 按原顺序交给 writer 缓存，完整 `message_stop` 后才交付客户端。工具之后的 thinking 和文字一起缓冲，保留签名所依赖的块顺序。`tool_use`、`pause_turn` 返回 `end_turn: false`；输出截断或 refusal 返回失败，不交付部分工具调用。`model_context_window_exceeded` 转为 `context_length_exceeded`，同样不交付工具调用；后续是否压缩或重试由 codeks 决定。
 
 ## 缓存与压缩
 

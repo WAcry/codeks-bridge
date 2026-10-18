@@ -5,6 +5,7 @@ import test from "node:test";
 import { responsesBody, runResponses } from "../src/backends/responses.ts";
 import { decodeReasoning, encodeReasoning } from "../src/carrier.ts";
 import { formatSse } from "../src/sse.ts";
+import { ResponsesIncompleteError } from "../src/errors.ts";
 import { resolveModel, validateConfig } from "../src/config.ts";
 import type { BackendContext } from "../src/types.ts";
 import { ResponseWriter } from "../src/writer.ts";
@@ -26,7 +27,6 @@ const context = (extra: Partial<BackendContext> = {}): BackendContext => ({
 function capture() {
   const events: any[] = [];
   const writer = new ResponseWriter({ write: (text) => events.push(JSON.parse(text.slice(6))) }, { model: "test" });
-  writer.start();
   return { writer, events };
 }
 
@@ -288,7 +288,7 @@ test("message phase provided only on item completion is retained", async () => {
     const { writer, events } = capture();
     const result = await runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer);
     writer.complete(result.usage, result.endTurn);
-    assert.equal(events.at(-1).response.output[0].phase, "partial_answer");
+    assert.equal(events.find((event) => event.type === "response.output_item.done").item.phase, "partial_answer");
   });
 });
 
@@ -313,9 +313,13 @@ test("GPT summary parts retain boundaries in streaming and complete JSON respons
       const result = await runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer);
       writer.complete(result.usage, result.endTurn);
       assert.deepEqual(events.at(-1).response.output[0].summary, summary);
-      assert.deepEqual(events.filter((event) => event.type === "response.reasoning_summary_part.added").map((event) => event.summary_index), [0, 1]);
-      assert.deepEqual(events.filter((event) => event.type === "response.reasoning_summary_part.done").map((event) => event.part), summary);
-      assert.deepEqual(events.filter((event) => event.type === "response.reasoning_summary_text.delta").map((event) => [event.summary_index, event.delta]), [[0, "First."], [1, "Second."]]);
+      if (Array.isArray(payload)) {
+        assert.deepEqual(events.filter((event) => event.type === "response.reasoning_summary_part.added").map((event) => event.summary_index), [0, 1]);
+        assert.deepEqual(events.filter((event) => event.type === "response.reasoning_summary_part.done").map((event) => event.part), summary);
+        assert.deepEqual(events.filter((event) => event.type === "response.reasoning_summary_text.delta").map((event) => [event.summary_index, event.delta]), [[0, "First."], [1, "Second."]]);
+      } else {
+        assert.deepEqual(events.find((event) => event.type === "response.output_item.done").item.summary, summary);
+      }
       assert.equal(decodeReasoning(events.at(-1).response.output[0].encrypted_content)?.data, "synthetic-cipher");
     });
   }
@@ -334,4 +338,114 @@ test("GPT stream and JSON failures retain unrecognized native codes and details"
       });
     }
   }
+});
+
+test("native events preserve ids, annotations, unknown metadata and complete usage", async () => {
+  const message = {
+    type: "message", id: "msg_native", role: "assistant", phase: "partial_answer", extra_item: { preserved: true },
+    content: [{ type: "output_text", text: "A cited answer.", annotations: [{ type: "url_citation", url: "https://example.com", title: "Example", start_index: 0, end_index: 1 }], extra_part: "kept" }],
+  };
+  const usage = {
+    input_tokens: 100, output_tokens: 10, total_tokens: 110,
+    input_tokens_details: { cached_tokens: 60, cache_write_tokens: 30, image_tokens: 4 },
+    output_tokens_details: { reasoning_tokens: 5, extra_output: 3 }, billed_extra: { value: 7 },
+  };
+  const unknown = { type: "future.output.status", future: { value: "preserved" }, sequence_number: 4 };
+  const done = { type: "response.completed", sequence_number: 8, extra_event: "kept", response: {
+    id: "resp_native", object: "response", created_at: 123, model: "deployment-a", status: "completed", end_turn: false,
+    output: [message], usage, service_tier: "synthetic", usage_metadata: { extra: "kept" }, extra_response: [1, 2],
+  } };
+  await fakeUpstream([
+    { type: "response.created", sequence_number: 0, response: { id: "resp_native", model: "deployment-a", status: "in_progress", extra: "start" } },
+    { type: "response.output_item.added", sequence_number: 1, output_index: 0, item: { ...message, content: [] } }, unknown,
+    { type: "response.output_item.done", sequence_number: 7, output_index: 0, item: message }, done,
+  ], async (base) => {
+    const { writer, events } = capture();
+    const result = await runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer);
+    assert.equal(result.usage.cache_write_tokens, 30);
+    writer.complete(result.usage, result.endTurn);
+    assert.deepEqual(events.at(-1), { ...done, response: { ...done.response, model: "test" } });
+    assert.deepEqual(events.find((event) => event.type === unknown.type), unknown);
+    assert.deepEqual(writer.outputItems, [message]);
+    assert.equal(events.filter((event) => event.type === "response.created").length, 1);
+    assert.equal(writer.responseId, "resp_native");
+    assert.deepEqual(writer.nativeResponse, events.at(-1).response);
+  });
+});
+
+test("native tools hold the ordered suffix including later reasoning and unknown events", async () => {
+  const items = [
+    { type: "reasoning", id: "rs_a", summary: [], encrypted_content: "cipher-a" },
+    { type: "function_call", id: "fc_a", name: "read", call_id: "call_a", arguments: "{}", extra_call: "kept" },
+    { type: "reasoning", id: "rs_b", summary: [], encrypted_content: "cipher-b" },
+    { type: "future_output_item", id: "future_a", payload: { kept: true } },
+    { type: "custom_tool_call", id: "ctc_b", name: "edit", call_id: "call_b", input: "raw" },
+  ];
+  const stream = items.flatMap((item, output_index) => [
+    { type: "response.output_item.added", output_index, item },
+    { type: "response.output_item.done", output_index, item },
+  ]);
+  await fakeUpstream([...stream, { type: "response.completed", response: { id: "resp_order", status: "completed", output: items, usage: { input_tokens: 2, output_tokens: 3 } } }], async (base) => {
+    const { writer, events } = capture();
+    const result = await runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer);
+    assert.deepEqual(events.filter((event) => event.type === "response.output_item.done").map((event) => event.item.id), ["rs_a"]);
+    writer.complete(result.usage, result.endTurn);
+    assert.deepEqual(events.filter((event) => event.type === "response.output_item.done").map((event) => event.item.id), items.map((item) => item.id));
+    assert.deepEqual(writer.outputItems.map((item) => item.id), items.map((item) => item.id));
+    assert.equal(writer.outputItems[1].extra_call, "kept");
+    assert.deepEqual(writer.outputItems[1].encrypted_function_args, []);
+    assert.equal(decodeReasoning(writer.outputItems[2].encrypted_content)?.data, "cipher-b");
+  });
+});
+
+test("native incomplete reasons retain usage, response id and their SSE envelope", async () => {
+  for (const reason of ["interrupted", "max_output_tokens", "content_filter"]) {
+    const response = { id: "resp_incomplete", status: "incomplete", model: "deployment-a", output: [],
+      incomplete_details: { reason, detail: "preserved" }, usage: { input_tokens: 12, output_tokens: 7 }, extra: { preserved: true } };
+    const event = { type: "response.incomplete", response, sequence_number: 7, future_event_field: "preserved" };
+    for (const payload of [[event], response]) await fakeUpstream(payload, async (base) => {
+      const { writer, events } = capture();
+      await assert.rejects(runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer), (error: any) => {
+        assert(error instanceof ResponsesIncompleteError);
+        assert.deepEqual(error.response, { ...response, model: "test" });
+        writer.nativeIncomplete(error.response, error.event);
+        return true;
+      });
+      assert.equal(events.at(-1).type, "response.incomplete");
+      assert.deepEqual(events.at(-1).response.usage, response.usage);
+      if (Array.isArray(payload)) assert.equal(events.at(-1).future_event_field, "preserved");
+    });
+  }
+});
+
+test("an interrupted whole JSON response publishes partial history but no tool suffix", async () => {
+  const output = [
+    { type: "message", id: "msg_partial", role: "assistant", content: [{ type: "output_text", text: "Partial answer." }] },
+    { type: "function_call", id: "fc_partial", name: "edit", call_id: "call_partial", arguments: '{"unfinished":' },
+    { type: "reasoning", id: "rs_after_tool", summary: [], encrypted_content: "cipher-after" },
+  ];
+  await fakeUpstream({ id: "resp_partial", status: "incomplete", output, incomplete_details: { reason: "interrupted" }, usage: { input_tokens: 10, output_tokens: 20 } }, async (base) => {
+    const { writer, events } = capture();
+    await assert.rejects(runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer), (error: any) => {
+      assert(error instanceof ResponsesIncompleteError);
+      writer.nativeIncomplete(error.response, error.event);
+      return true;
+    });
+    assert.deepEqual(events.filter((event) => event.type === "response.output_item.done").map((event) => event.item.id), ["msg_partial"]);
+    assert.deepEqual(writer.outputItems.map((item) => item.id), ["msg_partial"]);
+    assert.equal(events.at(-1).type, "response.incomplete");
+    assert.equal(events.at(-1).response.id, "resp_partial");
+  });
+});
+
+test("a bare SSE error stays an error object rather than a response envelope", async () => {
+  const error = { code: "future_code", message: "Synthetic failure", status: 503, extra: { preserved: true } };
+  await fakeUpstream([{ type: "error", error, sequence_number: 7 }], async (base) => {
+    const { writer } = capture();
+    await assert.rejects(runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer), (failure: any) => {
+      assert.deepEqual(failure.error, error);
+      assert.equal(failure.response, undefined);
+      return true;
+    });
+  });
 });

@@ -30,7 +30,7 @@ npm run check
 可选集成测试启动已经安装的 codeks，并让它通过桥接器访问本地假上游。指定要验证的二进制即可，测试不会下载或编译 codeks：
 
 ```sh
-CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/catalog-e2e.test.ts test/reasoning-e2e.test.ts test/errors-e2e.test.ts
+CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/catalog-e2e.test.ts test/reasoning-e2e.test.ts test/errors-e2e.test.ts test/protocol-e2e.test.ts
 ```
 
 未设置 `CODEKS_BIN` 时，这些测试自动跳过。它们为每个场景创建独立的 `CODEX_HOME` 和工作目录，监听随机的回环端口。临时目录路径会写入测试输出，保留会话和进程输出便于复查。退出时关闭本轮创建的服务器。
@@ -85,6 +85,18 @@ TypeScript 检查和普通测试通过，客户端场景各在两个现成二进
 - 未知 SSE 错误按客户端配置重试一次，bridge 收到和转发的请求均为两次，没有额外重试。
 
 普通 HTTP 测试另覆盖双压缩接受协调、失败取消、错误体解压后的 header 清理、凭据失败的终止语义，以及原生错误附加字段的完整保留。这里验证客户端协议，不代表真实服务产生过上述合成错误。
+
+### 协议细节与完整客户端回归
+
+2026-10-18（America/Los_Angeles），补充 `test/protocol-e2e.test.ts` 的三个真实客户端场景，上游均为本地测试服务器：
+
+- 原生 `response.incomplete` 的 `interrupted` 原因使客户端自动发起下一请求，即使配置关闭重试；已经交付的文字进入下一请求历史。
+- `max_output_tokens` 原因使客户端停止当前 turn，并将上游 input、output、cache 和 reasoning usage 记入会话的 token 统计。
+- Code Mode `exec` 执行两次 `notify()` 和一次最终输出，客户端实际生成三个同 call ID 的结果。Chat 出站只保留一个配对结果，另外两条作为通知，三段内容全部保留。
+
+本轮 `@openai/codex@0.163.0` 通过上述五个文件中的全部 19 个场景，包括 HTTP 目录、工具/图片、Code Mode 与明文多代理、压缩/resume、四种摘要配置及八种错误路径。`@wacry/codeks@0.162.1-codeks.10` 另外通过 `test/codeks-e2e.test.ts` 的三个场景，继续覆盖 fork 的工具、多代理及压缩行为。
+
+这些验证使用现成二进制，没有编译 Rust，也没有新增真实模型 API 请求。原生客户端在合成明文调用上的成功不代表它能跨模型解密真实上游生成的任务。
 
 ## 真实上游验证
 
