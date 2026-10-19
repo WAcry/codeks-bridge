@@ -30,7 +30,7 @@ codeks-bridge config-snippet --config /absolute/path/bridge.json
 
 - 上游错误保留原始详情交给客户端；bridge 不自动换端点、重试或更换压缩方式。
 - Reasoning 默认只回放给原目标。原生压缩与 reasoning 的跨目标复用分别配置，实际兼容性由上游决定。
-- GPT 默认使用 `compaction.mode: "native"`：先做原生加密压缩，需要文字表示时再向原来源复述并缓存。其他模型默认使用标准文字压缩，也可通过 [`compaction.model`](docs/config.md#压缩模式与执行模型) 委托 GPT 执行原生压缩。
+- GPT 默认使用 `compaction.mode: "native"`：先做原生加密压缩，需要文字表示时再向原来源复述并缓存。其他模型默认使用标准文字压缩，也可通过 [`compaction.model`](docs/config.md#压缩模式与执行模型) 委托常用 GPT 执行原生压缩，直接复用已有模型配置；见 [GPT＋Claude 双模型示例](examples/gpt-claude.json)。
 - 历史由 codeks 保存；按需复述的成功结果另存本地缓存。封装只是编码，文字 reasoning、摘要及复述配方可读。
 - Lark/regex 转为工具描述约束。图片理解由模型支持，客户端配置关闭网页搜索和图片生成。
 
