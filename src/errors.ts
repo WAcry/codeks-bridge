@@ -1,3 +1,5 @@
+import { forwardResponseHeaders, type HeaderRecord } from "./headers.ts";
+
 export interface UpstreamFailure {
   status?: number;
   body: unknown;
@@ -22,12 +24,14 @@ export class ResponsesStreamError extends Error {
   readonly error: Record<string, unknown>;
   readonly response?: Record<string, any>;
   readonly event?: Record<string, any>;
-  constructor(error: Record<string, unknown>, response?: Record<string, any>, event?: Record<string, any>) {
+  readonly headers?: Headers;
+  constructor(error: Record<string, unknown>, response?: Record<string, any>, event?: Record<string, any>, headers?: Headers) {
     super(typeof error.message === "string" ? error.message : "The upstream response failed");
     this.name = "ResponsesStreamError";
     this.error = error;
     this.response = response;
     this.event = event;
+    this.headers = headers;
   }
 }
 
@@ -47,9 +51,9 @@ export class ResponsesIncompleteError extends Error {
 export class BridgeError extends Error {
   readonly code: string;
   readonly status: number;
-  readonly headers?: Record<string, string>;
+  readonly headers?: HeaderRecord;
   readonly upstream?: UpstreamFailure;
-  constructor(message: string, code = "invalid_prompt", status = 400, headers?: Record<string, string>, options?: { upstream?: UpstreamFailure; cause?: unknown }) {
+  constructor(message: string, code = "invalid_prompt", status = 400, headers?: HeaderRecord, options?: { upstream?: UpstreamFailure; cause?: unknown }) {
     super(message, options);
     this.name = "BridgeError";
     this.code = code;
@@ -81,7 +85,7 @@ export function responsesStreamError(payload: unknown, headers?: Headers, event?
   if (delay !== undefined && retryAfter(error.headers) === undefined) {
     error = { ...error, headers: { ...record(error.headers), "retry-after": delay } };
   }
-  return new ResponsesStreamError(error, response ? { ...response, error } : undefined, event);
+  return new ResponsesStreamError(error, response ? { ...response, error } : undefined, event, headers);
 }
 
 /** Translate non-Responses protocols into errors understood by the client. */
@@ -105,7 +109,9 @@ export function upstreamError(status: number | undefined, payload: unknown, head
     : code === "server_is_overloaded" ? 503
     : code === "invalid_prompt" || code === "context_length_exceeded" ? 400 : 502;
   const delay = retryAfter(headers) ?? retryAfter(error?.headers) ?? retryAfter(envelope?.headers);
-  return new BridgeError(message, code, status ?? mappedStatus, delay !== undefined ? { "retry-after": delay } : undefined, {
+  const forwarded = headers ? forwardResponseHeaders(headers) : {};
+  if (delay !== undefined) forwarded["retry-after"] = delay;
+  return new BridgeError(message, code, status ?? mappedStatus, Object.keys(forwarded).length ? forwarded : undefined, {
     upstream: { ...(status !== undefined ? { status } : {}), body: payload },
   });
 }

@@ -2,6 +2,16 @@
 
 客户端使用 `POST /v1/responses`，也接受不带 `/v1` 的同一路径。`stream: true` 返回 SSE，其他请求返回完整 JSON response。上游统一使用流式请求，以便及时显示文字、处理取消与错误。
 
+## Header 与转发边界
+
+请求及成功、失败响应的 header 默认转发，包括 `session-id`、`thread-id`、`x-codex-turn-state`、请求 ID 和未知扩展字段。`prompt_cache_key` 属于 body，不能替代会话及路由 header。GPT body、事件及错误同样保留未知字段；必要转换不等于按已知字段重建整个协议。
+
+每段 HTTP 连接独立负责传输：去掉 hop-by-hop header、`Connection` 指定的字段，以及重写或解压后失效的 `Content-Length`、`Content-Encoding`。出站请求重新生成 Host 与压缩协商，不转发客户端的 `Authorization`、API key、Cookie 或所选连接的自定义鉴权 header；上游静态 headers 覆盖同名客户端值，再由该连接的凭据配置设置鉴权。返回 body 被转换时由 bridge 设置 Content-Type，`x-models-etag` 始终属于 bridge 自己的模型目录。其余字段不按厂商或名称白名单筛选。
+
+按需复述使用本次客户端的请求 metadata 和原来源的当前鉴权，header 不写进检查点或摘要缓存。若复述来源与当前目标是不同连接，仅去掉 `x-codex-turn-state`：该 token 绑定 turn 的路由及鉴权归属，不能交给另一连接；相同连接仍保留。`session-id`、`thread-id` 和未知 header 继续转发。普通回答、原生压缩和标准文字压缩不改变 sticky token。这个边界来自 Codex `0.163.0` 的 `core/src/client.rs`，不是上游拒绝后的回退。
+
+成功的辅助复述不把响应 header 混入目标响应；最终返回目标请求的 header。辅助请求发生 HTTP 或流内失败时保留其请求 ID 等诊断及未知 header；跨连接时同样去掉来源返回的 `x-codex-turn-state`，避免客户端重试目标时携带来源的 sticky token，相同连接则保留。
+
 ## 事件与交付
 
 每项输出先发 `response.output_item.added`，随后发 delta，最后发包含完整内容的 `response.output_item.done`。客户端从 done 项持久化历史，因此 reasoning carrier 必须出现在完整项中。
@@ -24,7 +34,7 @@ GPT 的 `response.incomplete` 保留原类型、原因和 usage，不改成通�
 
 流式入口等上游成功响应头到达后，才发送下游 HTTP 200 并开始 SSE。上游 HTTP 失败保留 status、body 内容和诊断 header，包括 `Retry-After`；不解析后重新包装错误体。fetch 已解压响应体，因此去掉原 `Content-Encoding`、`Content-Length`，以及只适用于当前连接的传输 header。
 
-上游流内错误保留完整 error 对象，放入 `response.failed.response.error`；上游提供完整 response envelope 时也一并保留。`code`、`type`、`misalignment`、`plan_type`、`resets_at` 等字段不改写，也不按 GPT 错误码白名单分类。只有 error 中缺少 `retry-after` 而上游 HTTP header 提供了它时，才补入 `error.headers`。非流式客户端收到相同原生错误，HTTP 状态为 502；它不能恢复已经成功建立的上游流的 HTTP 错误状态。成功响应另保留上游的 `x-request-id`、`request-id`，便于关联诊断。按需复述后的恢复返回目标请求的 ID，辅助导出不占用该 header，不制造复合请求 ID。
+上游流内错误保留完整 error 对象，放入 `response.failed.response.error`；上游提供完整 response envelope 时也一并保留。`code`、`type`、`misalignment`、`plan_type`、`resets_at` 等字段不改写，也不按 GPT 错误码白名单分类。只有 error 中缺少 `retry-after` 而上游 HTTP header 提供了它时，才补入 `error.headers`。非流式客户端收到相同原生错误，HTTP 状态为 502；它不能恢复已经成功建立的上游流的 HTTP 错误状态。响应 header 按上述边界保留，不制造复合请求 ID。
 
 这是保留客户端行为的协议边界。已核对 Codex `0.163.0` 的 `codex-rs/codex-api/src/api_bridge.rs` 与 `sse/responses_error.rs`：HTTP 和 SSE 使用不同的错误处理路径，部分专用提示依赖原错误字段，未知 SSE code 则会进入可重试分支。把 HTTP 400 改成 200 + SSE，或把原生策略错误改名为 `upstream_error`，都可能把原本会停止的请求变成重试。bridge 因此接受等待响应头期间没有心跳的代价，不自行维护另一套 GPT 重试分类。
 

@@ -64,7 +64,7 @@ assistant/system/developer 图片、文件 ID、音频和视频没有本轮转�
 | `prompt_cache_hit_tokens`，或 `prompt_tokens_details.cached_tokens` | `input_tokens_details.cached_tokens` |
 | `completion_tokens_details.reasoning_tokens` | `output_tokens_details.reasoning_tokens` |
 
-reasoning 不重复加到总量中。压缩只生成文字摘要，仍由客户端远程 V2 通道接收；保留工具定义并固定 `tool_choice: none`，不能保证上游继续缓存所有工具上下文。
+reasoning 不重复加到总量中。压缩只生成文字摘要，仍由客户端远程 V2 通道接收；保留工具定义及普通请求的工具选择。参数保持与意外工具调用的处理见 [压缩](compaction.md#工具选择与缓存)。
 
 ## 扩展方言
 

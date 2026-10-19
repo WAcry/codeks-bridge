@@ -76,6 +76,8 @@ export interface BackendContext {
   request: ResponsesRequest;
   route: ResolvedModel;
   signal: AbortSignal;
+  /** Client metadata; transport framing and credentials are replaced upstream. */
+  requestHeaders?: Headers;
   compacting?: boolean;
   /** Transport mode received from the client, including tool-free Lite requests. */
   responsesLite?: boolean;

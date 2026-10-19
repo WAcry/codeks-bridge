@@ -50,7 +50,7 @@ namespace 和 custom tool 使用共享映射。自由文本工具转换成 `{inp
 
 最多四个显式缓存断点：最后一个工具、最后一段顶层 system、最近两条 user 消息的末块。普通请求 TTL 为 `1h`。压缩保留公共前缀的 `1h`，只将最后的摘要请求末块设为 `5m`，使长 TTL 位于短 TTL 之前。thinking 块不直接设置缓存断点。
 
-压缩只生成文字摘要，保留工具定义，固定 `tool_choice: none` 并移除 `output_config.format`，其他参数保留。摘要封装为客户端 V2 compaction item，可供其他模型恢复。缓存是否命中由上游决定，不影响正确性。
+压缩只生成文字摘要，保留工具定义及普通请求的工具选择，移除 `output_config.format`，其他参数保留。摘要封装为客户端 V2 compaction item，可供其他模型恢复。保留工具选择的缓存依据及意外工具调用的处理见 [压缩](compaction.md#工具选择与缓存)。
 
 ## Usage 与错误
 

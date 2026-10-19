@@ -45,7 +45,7 @@ Codex 目录中的 `comp_hash` 是压缩兼容组的标识，不是提示词内�
 
 ### `summary`：标准文字压缩
 
-将 trigger 换成现有的 `CRITICAL: Respond with TEXT ONLY. Do NOT call any tools...` 标准 prompt，保留原 instructions、历史和工具定义，设置 `tool_choice: "none"`，移除结构化输出格式。
+将 trigger 换成现有的 `CRITICAL: Respond with TEXT ONLY. Do NOT call any tools...` 标准 prompt，保留原 instructions、历史、工具定义及工具选择，移除结构化输出格式。
 
 这份提示词要求按对话顺序梳理用户意图、技术决策、相关文件与代码、错误修复、待办和当前工作，并原样保留用户提出的安全约束。它区分真实 user 消息与 assistant 引用的“用户话语”，输出 `<analysis>` 和 `<summary>` 两个文本块，完整文本一并保存。它没有要求逐条复述全部用户消息，因为客户端会自行保留符合预算的用户历史。
 
@@ -60,19 +60,27 @@ Claude 摘要保留工具及公共前缀的 `1h` 缓存，只将最后的摘要�
 目标续聊：U + 文字摘要 + BBBB
 ```
 
-复述由生成 `K` 的原模型和原连接执行。原生请求移除普通回答的输出预算，交由上游管理；复述使用普通回答预算。源请求前缀包括开头的 system/developer 消息和工具声明；中途新增的 Lite 工具声明也按原顺序收集，确保原工具仍可解释。 工具声明集中放在源前缀，不保留它们与旧对话的交错位置；因此精确保留 `U` 不代表完整工具布局也逐字一致。复述保留源 instructions、reasoning、缓存 key 等相关请求参数，固定禁止工具调用并移除结构化输出约束。
+复述由生成 `K` 的原模型和原连接执行。原生请求移除普通回答的输出预算，交由上游管理；复述使用普通回答预算。源请求前缀包括开头的 system/developer 消息和工具声明；中途新增的 Lite 工具声明也按原顺序收集，确保原工具仍可解释。工具声明集中放在源前缀，不保留它们与旧对话的交错位置；因此精确保留 `U` 不代表完整工具布局也逐字一致。复述保留源 instructions、reasoning、缓存 key、工具选择和未知请求参数，重新构造 input、stream，并移除文字输出约束。
 
-这是用户选择的质量策略：优先让原生压缩整理任务状态，再把该状态交接给其他模型。复述 prompt 是 Codex 压缩 prompt 的微调英文版本，明确说明此前已压缩，要求全面完整地复述现有任务状态，覆盖进度、决策、约束、待办和关键引用；不再要求再次精简，也不强制标准文字压缩的 `<analysis>/<summary>` 格式。原文集中在 [`src/prompts.ts`](../src/prompts.ts) 的 `HANDOFF_PROMPT`。
+这是用户选择的质量策略：优先让原生压缩整理任务状态，再把该状态交接给其他模型。复述 prompt 是 Codex 压缩 prompt 的微调英文版本，明确说明此前已压缩，要求全面完整地复述现有任务状态，覆盖进度、决策、约束、待办和关键引用；不再要求再次精简，也不强制标准文字压缩的 `<analysis>/<summary>` 格式。保留用户给定的正文，末尾补充只输出文字、不调用工具的要求。原文集中在 [`src/prompts.ts`](../src/prompts.ts) 的 `HANDOFF_PROMPT`。
 
 复述仍是模型生成，并不是密文的可逆解码，可能遗漏或误述细节。实测的长度和事实覆盖用于选择提示词，不能保证任意历史都无损；输出 token 数也不是独立的质量证明。
 
 按需复述保留了正常续聊的 `U + K` 前缀，有机会复用 prompt cache；真实命中还受请求布局、服务路由和缓存有效期影响，不保证命中。确定的收益是始终使用兼容目标时，完全没有额外的文字复述请求。
 
-原来源在配置中继续可用。bridge 优先选择配方记录的原别名，也接受连接、adapter 和实际部署相同的其他别名；实际鉴权与 options 读取当前配置。配方保存选定的源请求参数和前缀，不保存连接凭据或完整 `AAAA`。
+原来源在配置中继续可用。bridge 优先选择配方记录的原别名，也接受连接、adapter 和实际部署相同的其他别名；实际鉴权与 options 读取当前配置。配方保存源请求前缀，以及除 `input`、`stream`、`text` 外的请求 body，避免参数白名单遗漏未来字段；不保存 HTTP header、连接凭据或完整 `AAAA`。复述时如何处理会话 header 与跨连接 sticky，见 [header 边界](responses-stream.md#header-与转发边界)。
 
 成功的复述及其独立 usage 写入 `compaction_cache_dir`。缓存键包含原来源、实际复述请求及 prompt，不包含 `BBBB`；同一输入的后续请求与服务重启可以复用结果。文件以 `0600` 权限原子写入，新目录使用 `0700`。同一服务实例内，相同键的请求排队后读取已有结果，各自取消互不牵连；不同进程之间没有去重协调。
 
 缓存保存的是可读任务摘要，应按会话数据管理。删除缓存后，下次需要时重新生成。缓存写入失败会返回错误，不继续发送目标请求；没有失效条目或失败响应的缓存。若目标请求随后失败，已经成功保存的复述仍可供客户端重试复用。
+
+### 工具选择与缓存
+
+文字摘要和按需复述沿用普通请求的工具定义及 `tool_choice`，包括原生 options 的覆盖；缺省保持缺省，`auto` 保持 `auto`，显式 `required` 或指定工具也不静默改写。各 adapter 继续执行正常的协议转换，不因为是摘要而强制设置 `none`。只输出文字、不调用工具的要求写在 prompt 中。
+
+用户选择这项策略，是为了保留正常会话的缓存条件，并信任模型遵守摘要指令。Claude 官方说明，改变 `tool_choice` 会使消息缓存失效，工具和 system 缓存仍可复用。[缓存失效规则](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#what-invalidates-the-cache) GPT 尚未做隔离该参数的 A/B 实测，因此不宣称同样修改必然导致 GPT 缓存失效。保持参数一致只减少桥接器主动引入的差异，不保证远端命中。
+
+模型若仍返回工具调用，摘要直接以 `invalid_prompt` 失败，不执行工具、不伪造工具结果，也不再发一轮“禁止工具”的请求。显式强制工具选择与摘要任务冲突时，也按同样的上游或摘要校验错误暴露。codeks 决定后续处理；bridge 不增加重试或改成 `none` 兜底。
 
 ## 交付、错误与用量
 
@@ -119,7 +127,7 @@ cxbc1:<base64url(JSON)>
 }
 ```
 
-`summary` 检查点只保存 `summary` 文字字段。原生检查点的 `handoff` 包含 `prefix`、选定的请求 `parameters` 和 `responsesLite` 标记，足以在后续请求提供的 `U` 上生成文字。原生 data 保留完整上游 item；来源指纹计算见 [reasoning](reasoning.md)。
+`summary` 检查点只保存 `summary` 文字字段。原生检查点的 `handoff` 包含 `prefix`、上述请求 `parameters` 和 `responsesLite` 标记，足以在后续请求提供的 `U` 上生成文字。原生 data 保留完整上游 item；来源指纹计算见 [reasoning](reasoning.md)。
 
 每次普通请求或再次压缩前，bridge 按当前目标选表示：
 

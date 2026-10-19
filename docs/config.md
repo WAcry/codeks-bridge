@@ -62,10 +62,10 @@
 | `api_key_command` | 与 `api_key_env` 二选一；argv 数组，程序 stdout 返回当前凭据 |
 | `auth_header` | 覆盖鉴权 header 名；默认 GPT/DeepSeek 用 `authorization: Bearer …`，Claude 用 `x-api-key` |
 | `stream_idle_timeout_ms` | 等待上游 headers 或后续字节的最长空闲时间，默认 300000 ms |
-| `headers` | 静态额外 header，例如 API 版本 |
+| `headers` | 静态 header，覆盖同名客户端 header，例如 API 版本 |
 | `options` | 原生请求参数，覆盖 adapter 推导出的参数 |
 
-`api_key_command` 不经过 shell，每条上游请求执行一次，最多 30 秒，适合短期凭据。命令错误不会把 stdout/stderr 回传客户端。连接无需 key 的服务时可省略凭据设置。Claude 默认版本 header 为 `anthropic-version: 2023-06-01`。
+`api_key_command` 不经过 shell，每条上游请求执行一次，最多 30 秒，适合短期凭据。命令错误不会把 stdout/stderr 回传客户端。连接无需 key 的服务时可省略凭据设置。Claude 默认版本 header 为 `anthropic-version: 2023-06-01`。客户端 metadata 默认透传，鉴权使用上游配置；覆盖顺序及必要过滤见 [header 边界](responses-stream.md#header-与转发边界)。
 
 ## 模型
 
@@ -86,7 +86,7 @@
 
 请求先由 adapter 转换，再浅层合并 `upstream.options`、`model.options`；后者优先，嵌套对象整体替换。例如模型 `options.output_config` 会替换推导值和上游同名对象。由此可以显式调整 thinking budget、原生 effort 或端点专有字段。
 
-最终由 bridge 固定模型路由、转换后的历史、工具定义、流模式和必要协议字段。摘要请求固定禁止调用工具并移除结构化输出约束；原生压缩移除普通回答的输出上限。这些字段承载桥接契约，不由 options 改写。详见上表链接的后端文档。
+最终由 bridge 固定模型路由、转换后的历史、工具定义、流模式和必要协议字段。摘要请求保留普通工具选择并移除结构化输出约束；原生压缩移除普通回答的输出上限。必须重建的字段承载桥接契约，不由 options 改写。详见上表链接的后端文档，以及[摘要的工具选择](compaction.md#工具选择与缓存)。
 
 ## Reasoning 与模型目录
 

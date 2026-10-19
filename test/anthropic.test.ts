@@ -233,12 +233,12 @@ test("Messages applies endpoint options after generated output limits", () => {
   assert.equal(buildAnthropicRequest(ctx).body.max_tokens, 128000);
 });
 
-test("Messages compaction forces no tools and removes only the structured format", () => {
+test("Messages compaction preserves tool choice options and removes only the structured format", () => {
   const output_config = { effort: "high", format: { type: "json_schema", schema: { type: "object" } } };
   const ctx = { ...context({ tools: [tool], parallel_tool_calls: false, tool_choice: { type: "function", name: "lookup" }, text: { format: { type: "json_schema", schema: { type: "string" } } } }), compacting: true,
     route: { ...route, config: { ...route.config, options: { output_config, tool_choice: { type: "any" } } } } };
   const body = buildAnthropicRequest(ctx).body;
-  assert.deepEqual(body.tool_choice, { type: "none" });
+  assert.deepEqual(body.tool_choice, { type: "any" });
   assert.deepEqual(body.output_config, { effort: "high" });
   assert.ok(output_config.format);
   assert.equal(body.tools.length, 1);
@@ -438,7 +438,7 @@ test("Messages stream errors preserve the original upstream event", async () => 
     await assert.rejects(runAnthropic({ ...context(), route: { ...route, upstream: { ...route.upstream, base_url: base } } }, writer), (error: any) => {
       assert.equal(error.message, "Capacity unavailable.");
       assert.equal(error.code, "server_is_overloaded");
-      assert.deepEqual(error.headers, { "retry-after": "12" });
+      assert.equal(error.headers["retry-after"], "12");
       assert.deepEqual(error.upstream.body, failure);
       return true;
     });

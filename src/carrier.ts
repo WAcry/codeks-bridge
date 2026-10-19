@@ -8,8 +8,7 @@ const COMPACTION_PREFIX = "cxbc1:";
 
 export interface HandoffRecipe {
   prefix: Record<string, any>[];
-  parameters: Pick<ResponsesRequest, "model"> & Partial<Pick<ResponsesRequest,
-    "instructions" | "tools" | "reasoning" | "prompt_cache_key" | "max_output_tokens" | "service_tier" | "parallel_tool_calls">>;
+  parameters: ResponsesRequest;
   responsesLite: boolean;
 }
 

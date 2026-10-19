@@ -159,7 +159,6 @@ export function buildChatRequest(context: BackendContext, dialect: ChatDialect):
   }));
   else delete body.tools;
   if (context.compacting) {
-    body.tool_choice = "none";
     delete body.response_format;
   }
   return { body, tools };
@@ -177,7 +176,7 @@ async function* chatEvents(body: AsyncIterable<Uint8Array>, signal: AbortSignal)
 export async function runChat(context: BackendContext, writer: ResponseWriter, dialect: ChatDialect): Promise<BackendResult> {
   const { body, tools } = buildChatRequest(context, dialect);
   const { reasoningField } = dialect;
-  const response = await upstreamFetch(context.route, "chat/completions", body, context.signal);
+  const response = await upstreamFetch(context.route, "chat/completions", body, context.signal, context.requestHeaders);
   context.onAccepted?.(response.headers);
   if (!response.body) throw new BridgeError("Chat upstream returned no stream.", "upstream_error", 502);
   let reasoning = "";
