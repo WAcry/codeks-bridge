@@ -131,27 +131,33 @@ GPT 的默认配置等价于：
 
 `native` 初始只生成原生检查点；目标无法按来源策略回放它时，先向生成检查点的模型和连接复述为文字。原来源须继续在配置中可用。成功摘要及辅助 usage 存入顶层 `compaction_cache_dir`，重启后可复用；它不是上游 prompt cache。`summary` 继续使用标准 prompt 直接压缩原历史。
 
-例如让 Claude 的历史由 GPT 原生压缩，再按需复述给 Claude：
+经常在 GPT 与 Claude 之间切换时，建议直接复用日常使用的 GPT 别名执行压缩。只需两个模型，Claude 的历史由同一个 GPT 原生压缩，再按需复述给 Claude。以下为模型部分，含连接的完整配置见 [examples/gpt-claude.json](../examples/gpt-claude.json)：
 
 ```json
 {
   "models": {
+    "gpt": {
+      "catalog": "gpt-6.1-sol", "upstream": "openai", "model": "gpt-6.1-sol"
+    },
     "claude": {
       "catalog": "claude-opus-5-5", "upstream": "anthropic", "model": "claude-opus-5-5",
-      "compaction": { "mode": "native", "model": "gpt-compactor" }
-    },
-    "gpt-compactor": {
-      "catalog": "gpt-6.1-sol", "upstream": "openai", "model": "gpt-6.1-sol",
-      "expose": false,
-      "reasoning": { "default_effort": "xhigh" }
+      "compaction": { "mode": "native", "model": "gpt" }
     }
   }
 }
 ```
 
-这里的 `anthropic` 和 `openai` 使用已有 `upstreams` 连接。`gpt-compactor` 通过 `expose: false` 隐藏于客户端目录，仍复用普通模型配置，不需要另一套压缩器注册表。压缩只跟随一次 `compaction.model`，不继续读取执行模型自己的委托配置或生成模式。工作模型的窗口与压缩阈值仍决定何时压缩，执行模型须能接收实际历史；超限由上游报错。
+这里的 `anthropic` 和 `openai` 使用已有 `upstreams` 连接，客户端目录只展示 `gpt` 和 `claude`。Claude 必须同时设置 `mode: "native"`；只设置 `model: "gpt"` 会让 GPT 执行 Claude 默认的标准文字压缩。
+
+两条压缩路径都由 `gpt` 执行，因此生成的原生检查点与日常 GPT 的来源身份相同。GPT 默认就能恢复它们及历史中仍保存的自身 reasoning，无需添加 `replay.reasoning_from` 或 `replay.native_compaction_from`。Claude 使用文字 handoff；切换到 Claude 不会改写客户端保存的 GPT 原生状态。具体切换时序见[委托压缩与切换模型](compaction.md#委托压缩与切换模型)。
+
+只有需要独立的压缩参数或不同部署时，才有必要增加专用模型别名；可用 `expose: false` 隐藏于客户端目录。同一 upstream ID、URL、adapter 和实际部署的别名本就共享来源身份，即使别名不同也不需要额外的 replay 配置。
+
+压缩只跟随一次 `compaction.model`，不继续读取执行模型自己的委托配置或生成模式。工作模型的窗口与压缩阈值仍决定何时压缩，执行模型须能接收实际历史；超限由上游报错。
 
 未设置 `compaction.model` 或显式引用自身别名时，沿用请求的 reasoning effort；引用其他别名时使用执行别名的 `reasoning.default_effort`，未设置则使用它的目录默认值，再按该模型的映射转换。即使两个别名指向同一部署，也可用专用压缩别名选择不同默认 effort。复述配方保留选定的请求 effort，后续切换工作模型不改变它。显式原生 options 仍按普通请求的规则覆盖推导参数；后续修改原来源的 options 也会作用于复述，它们不作为快照固化。
+
+因此，Claude 委托 `gpt` 压缩不会记住之前 GPT 轮次在客户端临时选择的 effort。若希望受托压缩固定使用某档位，直接在现有 `gpt` 条目设置 `reasoning.default_effort`；它也会成为该别名的普通请求默认值，普通请求仍可显式覆盖。
 
 Claude 的 `native_replay` 仍默认为 `false`：委托生成不会让 Claude 获得读取 GPT 密文的能力。`native` 要求执行模型的 adapter 支持原生压缩格式；`native_replay` 则要求工作模型能恢复该格式。它们与[状态复用](#状态复用)的来源策略独立。完整时序、失败及用量规则见[压缩](compaction.md)。
 

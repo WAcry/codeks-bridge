@@ -222,6 +222,58 @@ test("model switches retain native checkpoints for delegated recompression and a
   assert.equal(decodeCompaction(k2.encrypted_content)!.summary, undefined, "Materialization never rewrites the client's saved K");
 });
 
+test("two working aliases reuse GPT checkpoints and reasoning when Claude delegates compaction", async t => {
+  let checkpoints = 0;
+  const f = await fixture(t, ({ path, body }, res) => {
+    if (path === "/claude/messages") { claude(res); return; }
+    assert.equal(path, "/gpt/responses");
+    assert.equal(body.model, "synthetic-gpt-worker");
+    if (isNative(body)) {
+      gpt(res, [{ type: "compaction", encrypted_content: `synthetic-shared-${++checkpoints}` }], nativeUsage);
+    } else if (isHandoff(body)) {
+      gpt(res, [answer("SHARED_CHECKPOINT_HANDOFF")], handoffUsage);
+    } else gpt(res, [{ type: "reasoning", summary: [], encrypted_content: "synthetic-shared-reasoning" }, answer("GPT_WORK")]);
+  }, config => {
+    delete config.models.gpt.replay;
+    config.models.claude.compaction = { mode: "native", model: "gpt" };
+    delete config.models.compressor;
+    delete config.models.unused;
+  });
+  const catalog: any = await (await fetch(`${f.url}/v1/models`)).json();
+  assert.deepEqual(catalog.models.map((model: any) => model.slug), ["gpt", "claude"]);
+  const retained = user("RETAINED_TASK");
+  const compacted = await result(await post(f.url, { model: "gpt", input: [retained, trigger] }));
+  const history = [retained, ...compacted.output, user("GPT_CONTINUATION")];
+  const gptWork = await result(await post(f.url, { model: "gpt", input: history }));
+  assert.equal(f.seen.length, 2, "GPT continues directly from its native checkpoint");
+  const switching = [...history, ...gptWork.output, user("CLAUDE_CONTINUATION")];
+  const claudeWork = await result(await post(f.url, { model: "claude", input: switching }));
+  assert.ok(claudeWork.output.some((item: any) => item.type === "reasoning"));
+  assert.equal(f.seen.length, 4);
+  assert.ok(isHandoff(f.seen[2].body));
+  assert.match(JSON.stringify(f.seen[3].body.messages), /SHARED_CHECKPOINT_HANDOFF/);
+  assert.doesNotMatch(JSON.stringify(f.seen[3].body.messages), /synthetic-shared-reasoning/);
+
+  const recompressed = await result(await post(f.url, {
+    model: "claude", input: [...switching, ...claudeWork.output, trigger],
+  }));
+  assert.equal(f.seen.length, 5, "Delegation restores the old native checkpoint without another handoff");
+  const native = f.seen[4].body;
+  assert.ok(isNative(native));
+  assert.ok(native.input.some((item: any) => item.encrypted_content === "synthetic-shared-1"));
+  assert.deepEqual(native.input.filter((item: any) => item.type === "reasoning"), [
+    { type: "reasoning", summary: [], encrypted_content: "synthetic-shared-reasoning" },
+  ]);
+  assert.match(JSON.stringify(native.input), /CLAUDE_WORK_COMPLETE/);
+  assert.doesNotMatch(JSON.stringify(native.input), /SHARED_CHECKPOINT_HANDOFF|synthetic-claude-signature/);
+  assert.equal(decodeCompaction(recompressed.output[0].encrypted_content)!.native!.source.id, resolveModel(f.config, "gpt").origin.id);
+
+  await result(await post(f.url, { model: "gpt", input: [retained, ...recompressed.output, user("RESUME_GPT")] }));
+  assert.equal(f.seen.length, 6, "GPT uses the delegated checkpoint directly");
+  assert.ok(f.seen[5].body.input.some((item: any) => item.encrypted_content === "synthetic-shared-2"));
+  assert.equal(f.seen.filter(call => isHandoff(call.body)).length, 1);
+});
+
 test("delegating without a mode retains the worker's summary default and uses the executor's effort default", async t => {
   const f = await fixture(t, (_call, res) => gpt(res, [answer("PORTABLE_SUMMARY")], handoffUsage), config => {
     config.models.claude.compaction = { model: "compressor" };
