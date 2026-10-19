@@ -12,7 +12,7 @@
 ## 打开
 
 ```sh
-node dist/cli.js serve --config /absolute/path/bridge.json --capture
+codeks-bridge serve --config /absolute/path/bridge.json --capture
 ```
 
 启动日志会打印页面地址，例如 `Inspector: http://127.0.0.1:8787/inspect/ (capture on)`。不加 `--capture` 时页面同样可用，捕获默认关闭，可以在页面上随时打开或关闭。也可以写进配置：
