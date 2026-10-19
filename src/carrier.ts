@@ -4,7 +4,7 @@ import type { ResponsesRequest, StateOrigin } from "./types.ts";
 // Versioned, self-contained state stored in the client's encrypted_content field.
 // These envelopes encode source facts and payloads, never replay policy.
 const REASONING_PREFIX = "cxbr2:";
-const COMPACTION_PREFIX = "cxbc3:";
+const COMPACTION_PREFIX = "cxbc1:";
 
 export interface HandoffRecipe {
   prefix: Record<string, any>[];
@@ -79,7 +79,6 @@ export function encodeCompaction(carrier: CompactionCarrier): string {
 }
 
 export function decodeCompaction(value: unknown): CompactionCarrier | undefined {
-  // Existing eager checkpoints remain readable after deferred summaries are added.
-  const decoded = decode(value, COMPACTION_PREFIX) ?? decode(value, "cxbc2:");
+  const decoded = decode(value, COMPACTION_PREFIX);
   return compactionCarrier(decoded) ? decoded : undefined;
 }

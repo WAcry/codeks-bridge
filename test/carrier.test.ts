@@ -22,9 +22,8 @@ test("versioned envelopes preserve source facts and raw structured payloads thro
     native: { source, format: "responses.compaction.v1", data: { type: "compaction", encrypted_content: "synthetic-ciphertext" } },
   };
   const stored = JSON.parse(JSON.stringify(encodeCompaction(checkpoint)));
-  assert.match(stored, /^cxbc3:/);
+  assert.match(stored, /^cxbc1:/);
   assert.deepEqual(decodeCompaction(stored), checkpoint);
-  assert.deepEqual(decodeCompaction(encoded("cxbc2:", checkpoint)), checkpoint);
 });
 
 test("damaged current reasoning envelopes fail; unrelated and obsolete formats are not decoded", () => {
@@ -51,7 +50,7 @@ test("compaction requires a summary or a complete deferred handoff", () => {
     { summary: "valid", native: { source, data: "cipher" } },
     { summary: "valid", native: { source, format: "responses.compaction.v1" } },
   ]) {
-    assert.equal(decodeCompaction(encoded("cxbc3:", value)), undefined);
+    assert.equal(decodeCompaction(encoded("cxbc1:", value)), undefined);
     assert.throws(() => encodeCompaction(value as any), /Invalid compaction/);
   }
 });

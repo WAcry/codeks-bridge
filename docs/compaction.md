@@ -97,11 +97,13 @@ bridge 不重试、不自动换端点或换压缩方式。原生压缩失败后�
 
 ## 保存格式与恢复
 
-新的 `compaction` item 使用：
+`compaction` item 使用：
 
 ```text
-cxbc3:<base64url(JSON)>
+cxbc1:<base64url(JSON)>
 ```
+
+`cxbc` 标识 bridge 的压缩封装，`1` 标识持久化数据格式，不代表 bridge 版本、模型或密文兼容组。格式标记供恢复会话时解释载荷；模型之间能否复用仍由来源、格式和配置决定。
 
 已完成的双表示检查点结构如下；`summary` 模式省略 `native`：
 
@@ -124,7 +126,7 @@ cxbc3:<base64url(JSON)>
 }
 ```
 
-初始 `lazy` 检查点省略 `summary`，保存 `native` 和 `handoff`。后者包含 `prefix`、选定的请求 `parameters` 和 `responsesLite` 标记，足以在后续请求提供的 `U` 上生成文字。旧 `cxbc2:` 检查点继续可读。原生 data 保留完整上游 item；来源指纹计算见 [reasoning](reasoning.md)。
+初始 `lazy` 检查点省略 `summary`，保存 `native` 和 `handoff`。后者包含 `prefix`、选定的请求 `parameters` 和 `responsesLite` 标记，足以在后续请求提供的 `U` 上生成文字。原生 data 保留完整上游 item；来源指纹计算见 [reasoning](reasoning.md)。
 
 每次普通请求或再次压缩前，bridge 按当前目标选表示：
 
