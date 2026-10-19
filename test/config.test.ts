@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateConfig, resolveModel } from "../src/config.ts";
+import { validateConfig, resolveModel, resolveCompactionModel } from "../src/config.ts";
 import { buildCatalog, configSnippet } from "../src/catalog.ts";
 import { upstreamHeaders } from "../src/auth.ts";
 import { reasoningEffort } from "../src/profiles.ts";
@@ -86,6 +86,50 @@ test("native compaction generation and replay are independently configured", () 
   assert.deepEqual(resolveModel(validateConfig(c), "first").compaction, { mode: "native", native_replay: false });
   c.models.first.catalog = "deepseek-flash";
   assert.throws(() => validateConfig(c), /native compaction representation/);
+});
+
+test("delegated generation keeps the caller's mode and the executor's replay policy", () => {
+  const c = config();
+  c.models.executor = { upstream: "a", catalog: "gpt-6.1-sol", model: "deployment-b",
+    compaction: { mode: "summary", model: "first" } };
+  c.models.first.compaction = { model: "executor" };
+  validateConfig(c);
+  const caller = resolveModel(c, "first");
+  assert.equal(resolveCompactionModel(c, caller).compaction.mode, "summary");
+  c.models.first.compaction.mode = "native";
+  validateConfig(c);
+  const nativeCaller = resolveModel(c, "first");
+  const executor = resolveCompactionModel(c, nativeCaller);
+  assert.equal(executor.slug, "executor");
+  assert.equal(executor.compaction.mode, "native");
+  assert.equal(executor.compaction.native_replay, true);
+  assert.equal(nativeCaller.compaction.native_replay, false);
+  assert(executor.replay.native_compaction.has(executor.origin.id));
+  assert(!executor.replay.native_compaction.has(nativeCaller.origin.id));
+  assert.equal(resolveModel(c, "executor").compaction.mode, "summary");
+  assert.deepEqual(resolveModel(c, "first").origin, caller.origin);
+  // Generation is single-hop, including when the configured references form a cycle.
+  assert.equal(resolveCompactionModel(c, resolveModel(c, "executor")).slug, "first");
+  c.models.first.compaction.native_replay = true;
+  assert.throws(() => validateConfig(c), /native compaction representation for replay/);
+});
+
+test("delegation validates aliases and the selected generator's representation", () => {
+  const c = config();
+  for (const model of ["", "missing", "toString", null, 42]) {
+    c.models.first.compaction = { model: model as string };
+    assert.throws(() => validateConfig(c), /compaction.model must name an existing model alias/);
+  }
+  c.models.first.compaction = { model: "first" };
+  const caller = resolveModel(validateConfig(c), "first");
+  assert.equal(resolveCompactionModel(c, caller), caller);
+  c.models.gpt = { upstream: "a", catalog: "gpt-6.1-sol", model: "deployment-b",
+    compaction: { model: "first" } };
+  assert.throws(() => validateConfig(c), /compaction model first has no native compaction representation/);
+  c.models.gpt.compaction!.mode = "summary";
+  validateConfig(c);
+  c.models.gpt.replay = { reasoning_from: ["missing"] };
+  assert.throws(() => validateConfig(c), /unknown replay source missing/);
 });
 
 test("compaction cache directory is optional and validates explicit paths", () => {

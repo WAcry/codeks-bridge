@@ -79,7 +79,7 @@
 | `input_modalities` | 可选，覆盖条目中的 `text`/`image` 能力声明 |
 | `reasoning` | 默认 effort 及其到原生值的映射 |
 | `replay` | 分别允许哪些来源的 reasoning、原生压缩 |
-| `compaction` | 本目标如何生成压缩，以及是否接收原生压缩 |
+| `compaction` | 压缩方式、执行模型，以及本目标是否接收原生压缩 |
 | `options` | 原生请求参数，覆盖上游级 options |
 
 不设置窗口时，原条目的两个窗口字段各自保留。当前 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；Opus 5.5、Sonnet 5.5 和 DeepSeek Flash 的两个字段均为 `1000000`。压缩阈值沿用模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 必须提供 `max_tokens`，对应目录外层默认预算为 `128000`；GPT 和 DeepSeek 使用请求、模型配置或上游提供的默认值。原生 options 也可调整预算，实际限制由部署端点裁决。
@@ -116,9 +116,9 @@ model_reasoning_summary = "auto"
 
 `input_modalities` 用于客户端能力声明，不是 bridge 的模型能力预检。bridge 负责转换能表达的输入，具体模型能否处理由上游裁决。
 
-## 压缩模式
+## 压缩模式与执行模型
 
-`models.<别名>.compaction.mode` 可选择 `summary` 或 `native`。GPT 默认 `native`：先生成原生检查点，只在目标需要文字表示时用 handoff prompt 复述。Claude/DeepSeek 默认且只支持 `summary`，继续用标准 prompt 压缩原历史。
+`models.<别名>.compaction.mode` 可选择 `summary` 或 `native`。默认值取自工作模型：GPT 默认 `native`，Claude/DeepSeek 默认 `summary`。`compaction.model` 可引用另一个已配置的模型别名，让它执行压缩；省略时由工作模型自己执行。两项独立，仅设置执行模型不会改变模式。
 
 GPT 的默认配置等价于：
 
@@ -126,7 +126,30 @@ GPT 的默认配置等价于：
 { "compaction": { "mode": "native", "native_replay": true } }
 ```
 
-`native` 初始只生成原生检查点；目标无法按来源策略回放它时，先向原模型和原连接生成文字。原来源须继续在配置中可用。成功摘要及辅助 usage 存入顶层 `compaction_cache_dir`，重启后可复用；它不是上游 prompt cache。生成模式不改变下面的原生状态复用策略。详见[压缩](compaction.md)。
+`native` 初始只生成原生检查点；目标无法按来源策略回放它时，先向生成检查点的模型和连接复述为文字。原来源须继续在配置中可用。成功摘要及辅助 usage 存入顶层 `compaction_cache_dir`，重启后可复用；它不是上游 prompt cache。`summary` 继续使用标准 prompt 直接压缩原历史。
+
+例如让 Claude 的历史由 GPT 原生压缩，再按需复述给 Claude：
+
+```json
+{
+  "models": {
+    "claude": {
+      "catalog": "claude-opus-5-5", "upstream": "anthropic", "model": "claude-opus-5-5",
+      "compaction": { "mode": "native", "model": "gpt-compactor" }
+    },
+    "gpt-compactor": {
+      "catalog": "gpt-6.1-sol", "upstream": "openai", "model": "gpt-6.1-sol",
+      "reasoning": { "default_effort": "xhigh" }
+    }
+  }
+}
+```
+
+这里的 `anthropic` 和 `openai` 使用已有 `upstreams` 连接。执行模型与普通别名一样出现在客户端目录中，不需要另一套压缩器注册表。压缩只跟随一次 `compaction.model`，不继续读取执行模型自己的委托配置或生成模式。工作模型的窗口与压缩阈值仍决定何时压缩，执行模型须能接收实际历史；超限由上游报错。
+
+未设置 `compaction.model` 或显式引用自身别名时，沿用请求的 reasoning effort；引用其他别名时使用执行别名的 `reasoning.default_effort`，未设置则使用它的目录默认值，再按该模型的映射转换。即使两个别名指向同一部署，也可用专用压缩别名选择不同默认 effort。复述配方保留选定的请求 effort，后续切换工作模型不改变它。显式原生 options 仍按普通请求的规则覆盖推导参数；后续修改原来源的 options 也会作用于复述，它们不作为快照固化。
+
+Claude 的 `native_replay` 仍默认为 `false`：委托生成不会让 Claude 获得读取 GPT 密文的能力。`native` 要求执行模型的 adapter 支持原生压缩格式；`native_replay` 则要求工作模型能恢复该格式。它们与[状态复用](#状态复用)的来源策略独立。完整时序、失败及用量规则见[压缩](compaction.md)。
 
 ## 状态复用
 

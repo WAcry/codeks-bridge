@@ -65,7 +65,8 @@ test("native compaction stores a deferred handoff recipe and accounts only for t
     native: { source: ctx.route.origin, format: "responses.compaction.v1", data: checkpoint },
     handoff: {
       prefix: [],
-      parameters: { model: ctx.request.model, instructions: ctx.request.instructions, tools: ctx.request.tools },
+      parameters: { model: ctx.request.model, instructions: ctx.request.instructions, tools: ctx.request.tools,
+        reasoning: { effort: ctx.route.profile.default_effort } },
       responsesLite: false,
     },
   });

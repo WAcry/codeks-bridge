@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { validateConfig, resolveModel } from "./config.ts";
+import { validateConfig, resolveModel, resolveCompactionModel } from "./config.ts";
 import { buildCatalog, MAX_HTTP_CATALOG_BYTES } from "./catalog.ts";
 import { reasoningSummaryRequested } from "./profiles.ts";
 import { BridgeError, ResponsesIncompleteError, ResponsesStreamError, transportError, UpstreamHttpError } from "./errors.ts";
@@ -101,7 +101,15 @@ export function createBridgeServer(value: BridgeConfig): Server {
       res.setHeader("x-models-etag", catalogEtag);
       const exchange = inspector.begin(req, res);
       const request = await readRequest(req, exchange);
-      const route = resolveModel(config, request.model);
+      const caller = resolveModel(config, request.model);
+      const compacting = isCompactionRequest(request);
+      // Restore history for the actual consumer before materializing any handoffs.
+      const route = compacting ? resolveCompactionModel(config, caller) : caller;
+      // A distinct alias selects its own effort preset, even for the same deployment.
+      const executionRequest = route.slug === caller.slug ? request : {
+        ...request, model: route.slug,
+        reasoning: { ...request.reasoning, effort: route.profile.default_effort },
+      };
       const responsesLite = req.headers["x-openai-internal-codex-responses-lite"] === "true" ||
         (Array.isArray(request.input) && request.input.some((item) => item.type === "additional_tools"));
       exchange?.routed(route, responsesLite);
@@ -118,13 +126,13 @@ export function createBridgeServer(value: BridgeConfig): Server {
         keepalive = setInterval(() => writer?.keepalive(), 15_000).unref();
       };
       else writer.start();
-      const context = { request, route, signal: controller.signal, requestHeaders: incomingHeaders(req.headers), responsesLite, onAccepted: (headers?: Headers) => {
+      const context = { request: executionRequest, route, signal: controller.signal, requestHeaders: incomingHeaders(req.headers), responsesLite, onAccepted: (headers?: Headers) => {
         for (const [name, value] of Object.entries(headers ? forwardResponseHeaders(headers) : {})) res.setHeader(name, value);
         startStream?.();
       } };
       context.request = await compactions.materialize(context);
       let result;
-      if (isCompactionRequest(request)) {
+      if (compacting) {
         const compacted = await compact(context, backend);
         writer.addItem(compacted.item);
         result = { usage: compacted.usage, endTurn: true };

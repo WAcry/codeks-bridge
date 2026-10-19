@@ -74,8 +74,9 @@ export function validateConfig(value: unknown): BridgeConfig {
       const c = model.compaction;
       if (!object(c)) fail(`model ${slug}: compaction must be an object`);
       if (c.mode !== undefined && !["summary", "native"].includes(c.mode)) fail(`model ${slug}: compaction.mode must be summary or native`);
+      if (c.model !== undefined && (typeof c.model !== "string" || !Object.hasOwn(value.models, c.model))) fail(`model ${slug}: compaction.model must name an existing model alias`);
       if (c.native_replay !== undefined && typeof c.native_replay !== "boolean") fail(`model ${slug}: compaction.native_replay must be boolean`);
-      if (!profile.native_compaction_format && (c.mode === "native" || c.native_replay === true)) fail(`model ${slug}: adapter has no native compaction representation`);
+      if (!profile.native_compaction_format && c.native_replay === true) fail(`model ${slug}: adapter has no native compaction representation for replay`);
     }
   }
   // References are directional. Validate decodability, not provider compatibility.
@@ -89,6 +90,10 @@ export function validateConfig(value: unknown): BridgeConfig {
         if (!target[format] || source[format] !== target[format]) fail(`model ${slug}: cannot decode ${field} source ${name}`);
       }
     }
+  }
+  for (const slug of Object.keys(config.models)) {
+    const executor = resolveCompactionModel(config, resolveModel(config, slug));
+    if (executor.compaction.mode === "native" && !executor.profile.native_compaction_format) fail(`model ${slug}: compaction model ${executor.slug} has no native compaction representation`);
   }
   return config;
 }
@@ -109,4 +114,12 @@ export function resolveModel(config: BridgeConfig, slug: string): ResolvedModel 
       native_replay: model.compaction?.native_replay ?? !!profile.native_compaction_format,
     },
   };
+}
+
+/** Select one executor; the caller owns the generation mode, the executor owns replay. */
+export function resolveCompactionModel(config: BridgeConfig, caller: ResolvedModel): ResolvedModel {
+  const slug = caller.config.compaction?.model;
+  if (slug === undefined || slug === caller.slug) return caller;
+  const executor = resolveModel(config, slug);
+  return { ...executor, compaction: { ...executor.compaction, mode: caller.compaction.mode } };
 }
