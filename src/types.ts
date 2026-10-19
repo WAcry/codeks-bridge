@@ -16,12 +16,14 @@ export interface ModelConfig {
   upstream: string;
   model: string;
   catalog: string;
+  /** Include this alias in the client catalog. Defaults to true. */
+  expose?: boolean;
   context_window?: number;
   max_output_tokens?: number;
   input_modalities?: ("text" | "image")[];
   reasoning?: { default_effort?: string; effort_map?: Record<string, string> };
   replay?: { reasoning_from?: string[]; native_compaction_from?: string[] };
-  compaction?: { mode?: "summary" | "native"; native_replay?: boolean };
+  compaction?: { mode?: "summary" | "native"; model?: string; native_replay?: boolean };
   options?: Record<string, unknown>;
 }
 export interface BridgeConfig {

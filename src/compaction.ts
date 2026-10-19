@@ -51,6 +51,7 @@ export function summaryRequest(request: ResponsesRequest): ResponsesRequest {
 function handoffRecipe(context: BackendContext, prefix: Item[]): HandoffRecipe {
   // The handoff rebuilds input and transport mode; a summary is not a structured answer.
   const { input: _input, stream: _stream, text: _text, ...parameters } = context.request;
+  parameters.reasoning = { ...parameters.reasoning, effort: parameters.reasoning?.effort ?? context.route.profile.default_effort };
   return structuredClone({ prefix, parameters, responsesLite: context.responsesLite === true }) as HandoffRecipe;
 }
 

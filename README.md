@@ -25,13 +25,13 @@ node dist/cli.js serve --config /absolute/path/bridge.json
 node dist/cli.js config-snippet --config /absolute/path/bridge.json
 ```
 
-将输出合并到 codeks 的 `config.toml`，顶层配置放在表定义前，替换已有同名项。codeks 会从 bridge 的 `/v1/models` 读取完整模型目录，然后可按配置中的别名选择模型。已有 `model_catalog_json` 会优先使用本地文件；迁移到 HTTP 目录时应移除它。修改 bridge 配置后重启服务。
+将输出合并到 codeks 的 `config.toml`，顶层配置放在表定义前，替换已有同名项。codeks 会从 bridge 的 `/v1/models` 读取公开模型的完整目录，然后可按配置中的别名选择模型。专用预设可设 `expose: false`，保留内部调用而不占模型列表。已有 `model_catalog_json` 会优先使用本地文件；迁移到 HTTP 目录时应移除它。修改 bridge 配置后重启服务。
 
 ## 使用边界
 
 - 上游错误保留原始详情交给客户端；bridge 不自动换端点、重试或更换压缩方式。
 - Reasoning 默认只回放给原目标。原生压缩与 reasoning 的跨目标复用分别配置，实际兼容性由上游决定。
-- GPT 默认使用 `compaction.mode: "native"`：先做原生加密压缩，需要文字表示时再向原来源复述并缓存。其他模型使用标准文字压缩。
+- GPT 默认使用 `compaction.mode: "native"`：先做原生加密压缩，需要文字表示时再向原来源复述并缓存。其他模型默认使用标准文字压缩，也可通过 [`compaction.model`](docs/config.md#压缩模式与执行模型) 委托 GPT 执行原生压缩。
 - 历史由 codeks 保存；按需复述的成功结果另存本地缓存。封装只是编码，文字 reasoning、摘要及复述配方可读。
 - Lark/regex 转为工具描述约束。图片理解由模型支持，客户端配置关闭网页搜索和图片生成。
 

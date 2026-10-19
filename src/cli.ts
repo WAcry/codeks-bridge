@@ -10,7 +10,7 @@ const HELP = `Usage: codeks-bridge <command> --config <file> [options]
 
 Commands:
   serve           Start the local Responses API server
-  catalog         Export the configured model catalog for codeks
+  catalog         Export the client-visible model catalog for codeks
   config-snippet  Print the codeks provider configuration
 
 Options:

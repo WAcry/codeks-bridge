@@ -1,23 +1,30 @@
 import { modelProfile } from "./profiles.ts";
+import { BridgeError } from "./errors.ts";
 import type { BridgeConfig } from "./types.ts";
 
 /** Codex bounds downloads from an explicit model_catalog_url to 1 MiB. */
 export const MAX_HTTP_CATALOG_BYTES = 1024 * 1024;
 
-/** Serve only configured aliases, using their own reviewed client behavior. */
+function exposedModels(config: BridgeConfig) {
+  return Object.entries(config.models).filter(([, model]) => model.expose !== false);
+}
+
+/** Serve client-exposed aliases, using their own reviewed client behavior. */
 export function buildCatalog(config: BridgeConfig): { models: Record<string, any>[] } {
-  return { models: Object.entries(config.models).map(([slug, model], priority) => ({
+  return { models: exposedModels(config).map(([slug, model], priority) => ({
     ...modelProfile(model).model_info,
     slug, display_name: slug, priority, visibility: "list", supported_in_api: true,
   })) };
 }
 
 export function configSnippet(config: BridgeConfig, catalogPath?: string): string {
+  const first = exposedModels(config)[0]?.[0];
+  if (first === undefined) throw new BridgeError("config-snippet requires at least one model with expose enabled");
   const host = ["0.0.0.0", "::"].includes(config.host ?? "") ? "127.0.0.1" : config.host ?? "127.0.0.1";
   const authority = host.includes(":") ? `[${host}]` : host;
   const baseUrl = `http://${authority}:${config.port ?? 8787}/v1`;
   const lines = [
-    `model = ${JSON.stringify(Object.keys(config.models)[0])}`, 'model_provider = "bridge"',
+    `model = ${JSON.stringify(first)}`, 'model_provider = "bridge"',
     ...(catalogPath ? [`model_catalog_json = ${JSON.stringify(catalogPath)}`] : []),
     'web_search = "disabled"', "", "[features]", "image_generation = false", "",
     // Outside the reserved "collaboration" namespace, codeks sends multi-agent task messages as plaintext.
