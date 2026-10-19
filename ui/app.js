@@ -29,10 +29,11 @@ const store = {
   cache: new Map(),      // id -> {rev, detail, at}
   selected: null,
   selectToken: 0,
+  generation: 0,        // Invalidates async work when the data source is replaced or reset.
   conn: 'connecting',    // 'ok' | 'down' | 'auth' | 'forbidden' | 'connecting'
   connError: '',
   timer: null,
-  busy: false,
+  busy: null,           // Generation of the active poll, if any.
   authOpen: false,
 };
 
@@ -52,6 +53,7 @@ const detail = new DetailView($('detail'), {
 // ---------- data access ----------
 
 async function getDetail(id, fresh = false) {
+  const generation = store.generation;
   if (store.mode === 'offline') {
     const d = store.map.get(id);
     if (!d) throw new Error(`导入文件中没有记录 ${id}`);
@@ -66,6 +68,7 @@ async function getDetail(id, fresh = false) {
   }
   if (hit && !sum && !fresh) return hit.detail;
   const d = await api(`exchanges/${encodeURIComponent(id)}`);
+  if (generation !== store.generation) throw new Error('数据来源已切换');
   store.cache.delete(id);
   store.cache.set(id, { rev: d.rev, detail: d, at: Date.now() });
   while (store.cache.size > DETAIL_CACHE) {
@@ -82,15 +85,16 @@ async function select(id, { scroll = false } = {}) {
   if (scroll) list.scrollToSelected();
   history.replaceState(null, '', `#${encodeURIComponent(id)}`);
   const token = ++store.selectToken;
+  const generation = store.generation;
   const cached = store.mode === 'offline' ? store.map.get(id) : store.cache.get(id)?.detail;
   if (cached && cached.id === id) detail.show(cached, { gone: store.mode === 'live' && !store.map.has(id) });
   else detail.clear('加载中…');
   try {
     const d = await getDetail(id);
-    if (token !== store.selectToken) return;
+    if (generation !== store.generation || token !== store.selectToken) return;
     detail.show(d, { gone: store.mode === 'live' && !store.map.has(id) });
   } catch (e) {
-    if (token !== store.selectToken) return;
+    if (generation !== store.generation || token !== store.selectToken) return;
     if (e instanceof ApiError && e.status === 404) detail.clear('这条记录已被清空或淘汰（bridge 上已不存在）。');
     else if (e instanceof ApiError && e.status === 401) { detail.clear('需要令牌'); askToken(); }
     else detail.clear(`加载失败：${e.message}`);
@@ -101,6 +105,8 @@ async function select(id, { scroll = false } = {}) {
 async function refreshSelected(force = false) {
   const id = store.selected;
   if (!id || store.mode !== 'live') return;
+  const generation = store.generation;
+  const token = store.selectToken;
   const sum = store.map.get(id);
   const hit = store.cache.get(id);
   if (!sum) { if (detail.detail?.id === id && !detail.gone) detail.show(detail.detail, { gone: true }); return; }
@@ -108,9 +114,11 @@ async function refreshSelected(force = false) {
   if (!force && !stale) return;
   try {
     const d = await getDetail(id, true);
-    if (store.selected === id) detail.show(d);
+    if (generation !== store.generation || token !== store.selectToken) return;
+    detail.show(d);
     if (force) toast('已刷新');
   } catch (e) {
+    if (generation !== store.generation || token !== store.selectToken) return;
     if (force) toast(`刷新失败：${e.message}`, true);
   }
 }
@@ -125,28 +133,37 @@ function schedule(ms = POLL_MS) {
 }
 
 async function tick() {
-  if (store.busy) return;
-  store.busy = true;
+  if (store.mode !== 'live' || store.busy === store.generation) return;
+  let generation = store.generation;
+  store.busy = generation;
   let next = POLL_MS;
   try {
     const st = await api('state');
-    if (store.mode !== 'live') return;
-    if (store.startedAt != null && st.started_at !== store.startedAt) resetLive('bridge 已重启，记录已重置');
+    if (generation !== store.generation) return;
+    if (store.startedAt != null && st.started_at !== store.startedAt) {
+      resetLive('bridge 已重启，记录已重置');
+      generation = store.generation;
+      store.busy = generation;
+    }
     store.startedAt = st.started_at;
     store.state = st;
     if (st.rev !== store.rev || store.rev === 0) {
       const r = await api(`exchanges?since=${store.rev}`);
-      if (store.mode !== 'live') return;
+      if (generation !== store.generation) return;
       applyList(r);
+      generation = store.generation;
+      store.busy = generation;
     }
     setConn('ok');
     renderTop();
     await refreshSelected();
   } catch (e) {
-    next = handleError(e);
+    if (generation === store.generation) next = handleError(e);
   } finally {
-    store.busy = false;
-    schedule(next);
+    if (generation === store.generation) {
+      store.busy = null;
+      schedule(next);
+    }
   }
 }
 
@@ -167,10 +184,19 @@ function applyList(r) {
 }
 
 function resetLive(message) {
+  invalidateSource();
   store.map.clear();
-  store.cache.clear();
   store.rev = 0;
+  store.selected = null;
   if (message) toast(message);
+}
+
+function invalidateSource() {
+  store.generation++;
+  store.selectToken++;
+  store.busy = null;
+  store.cache.clear();
+  detail.clear('加载中…');
 }
 
 function handleError(e) {
@@ -270,24 +296,29 @@ function renderModels() {
 $('models').addEventListener('toggle', () => { if ($('models').open) renderModels(); });
 
 $('capture').addEventListener('click', async () => {
+  const generation = store.generation;
   try {
-    store.state = await api('capture', { method: 'POST', json: { enabled: !store.state?.capturing } });
+    const state = await api('capture', { method: 'POST', json: { enabled: !store.state?.capturing } });
+    if (generation !== store.generation) return;
+    store.state = state;
     renderTop();
     toast(store.state.capturing ? '已开始捕获' : '已停止捕获（已存储的记录保留）');
-  } catch (e) { handleError(e); toast(`操作失败：${e.message}`, true); }
+  } catch (e) { if (generation === store.generation) { handleError(e); toast(`操作失败：${e.message}`, true); } }
 });
 
 $('clear').addEventListener('click', async () => {
   if (!confirm('删除 bridge 上所有已捕获的记录？')) return;
+  const generation = store.generation;
   try {
-    store.state = await api('exchanges', { method: 'DELETE' });
+    const state = await api('exchanges', { method: 'DELETE' });
+    if (generation !== store.generation) return;
     resetLive();
-    store.selected = null;
+    store.state = state;
     detail.clear('已清空。');
     renderList();
     renderTop();
     tick();
-  } catch (e) { handleError(e); toast(`清空失败：${e.message}`, true); }
+  } catch (e) { if (generation === store.generation) { handleError(e); toast(`清空失败：${e.message}`, true); } }
 });
 
 $('export-all').addEventListener('click', async () => {
@@ -323,11 +354,11 @@ async function importFile(file) {
 }
 
 function enterOffline(doc, name) {
+  invalidateSource();
   store.mode = 'offline';
   clearTimeout(store.timer);
   store.offline = { name, exported_at: doc.exported_at };
   store.map = new Map(doc.exchanges.filter((d) => d && d.id != null).map((d) => [String(d.id), d]));
-  store.cache.clear();
   store.selected = null;
   $('banner').hidden = true;
   renderTop();
@@ -338,11 +369,11 @@ function enterOffline(doc, name) {
 }
 
 $('live').addEventListener('click', () => {
+  resetLive();
   store.mode = 'live';
   store.offline = null;
-  store.map = new Map();
-  store.rev = 0;
-  store.selected = null;
+  store.state = null;
+  store.startedAt = null;
   detail.clear('正在连接 bridge…');
   renderTop();
   renderList();

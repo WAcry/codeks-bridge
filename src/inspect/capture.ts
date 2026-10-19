@@ -66,6 +66,7 @@ export class Message {
   constructor(exchange: Exchange) { this.exchange = exchange; }
 
   head(status: number, statusText: string | undefined, headers: HeaderMap): void {
+    if (this.exchange.closed) return;
     if (this.headersMs === undefined) this.exchange.touch();
     this.status = status;
     this.statusText = statusText;
@@ -74,7 +75,7 @@ export class Message {
   }
 
   push(chunk: Uint8Array | string): void {
-    if (this.end !== "active") return;
+    if (this.exchange.closed || this.end !== "active") return;
     const text = typeof chunk === "string" ? chunk : this.decoder.decode(chunk, { stream: true });
     if (text) this.parts.push({ t: this.exchange.now(), text });
     const size = byteLength(chunk);
@@ -83,7 +84,7 @@ export class Message {
   }
 
   finish(end: Exclude<EndKind, "active">, error?: unknown): void {
-    if (this.end !== "active") return;
+    if (this.exchange.closed || this.end !== "active") return;
     const rest = this.decoder.decode();
     if (rest) this.parts.push({ t: this.exchange.now(), text: rest });
     this.end = end;
@@ -95,6 +96,14 @@ export class Message {
   text(): string {
     return this.parts.map(part => part.text).join("");
   }
+
+  discard(): void {
+    this.parts.length = 0;
+    this.bytes = 0;
+    this.headers = undefined;
+    this.error = undefined;
+    this.decoder.decode();
+  }
 }
 
 /** One request from the bridge to an upstream. */
@@ -105,8 +114,8 @@ export class Call {
   readonly method = "POST";
   readonly url: string;
   readonly headers: HeaderMap;
-  readonly text: string;
-  readonly bytes: number;
+  text: string;
+  bytes: number;
   error?: string;
   response?: Message;
   private readonly exchange: Exchange;
@@ -139,9 +148,17 @@ export class Call {
   }
 
   failed(error: unknown): void {
-    if (this.response || this.error !== undefined) return;
+    if (this.exchange.closed || this.response || this.error !== undefined) return;
     this.error = message(error);
     this.exchange.touch();
+  }
+
+  discard(): void {
+    this.text = "";
+    this.bytes = 0;
+    for (const name of Object.keys(this.headers)) delete this.headers[name];
+    this.error = undefined;
+    this.response?.discard();
   }
 }
 
@@ -206,12 +223,14 @@ export class Exchange {
   account(bytes: number): void { this.inspector.account(this, bytes); }
 
   received(text: string): void {
+    if (this.closed) return;
     this.requestText = text;
     this.requestBytes = Buffer.byteLength(text);
     this.account(this.requestBytes);
   }
 
   parsed(request: ResponsesRequest): void {
+    if (this.closed) return;
     const input = request.input;
     this.meta = {
       model: typeof request.model === "string" ? request.model : null,
@@ -224,6 +243,7 @@ export class Exchange {
   }
 
   routed(route: ResolvedModel, responsesLite: boolean): void {
+    if (this.closed) return;
     this.route = route;
     this.responsesLite = responsesLite;
     this.touch();
@@ -270,6 +290,21 @@ export class Exchange {
     this.durationMs = this.now();
     this.closed = true;
     this.touch();
+    this.inspector.evict();
+  }
+
+  /** Releases captured data without stopping the underlying HTTP exchange. */
+  discard(): void {
+    this.closed = true;
+    this.requestText = undefined;
+    this.requestBytes = 0;
+    this.meta = { model: null, kind: "invalid", stream: null, input_items: null, preview: null };
+    this.route = undefined;
+    for (const name of Object.keys(this.headers)) delete this.headers[name];
+    for (const call of this.calls) call.discard();
+    this.calls.length = 0;
+    this.response.discard();
+    this.bytes = 0;
   }
 }
 
@@ -320,6 +355,11 @@ export class Inspector {
     if (this.exchanges.get(exchange.id) !== exchange) return;
     exchange.bytes += bytes;
     this.bytes += bytes;
+    this.evict();
+  }
+
+  /** Rechecks the soft cap when bytes arrive or an active exchange closes. */
+  evict(): void {
     if (this.bytes <= this.maxBytes) return;
     // The cap is soft: exchanges still streaming are never evicted.
     for (const [id, candidate] of this.exchanges) {
@@ -333,6 +373,7 @@ export class Inspector {
   }
 
   clear(): void {
+    for (const exchange of this.exchanges.values()) exchange.discard();
     this.exchanges.clear();
     this.bytes = 0;
     this.rev++;

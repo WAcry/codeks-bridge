@@ -270,12 +270,19 @@ export function finalObject(resp) {
 }
 
 function fromResponses(data) {
+  const output = [];
+  for (const { json: j } of data) {
+    if (j.type === 'response.output_item.done') output[j.output_index ?? output.length] = j.item;
+  }
   for (let k = data.length - 1; k >= 0; k--) {
     const j = data[k].json;
-    if (TERMINAL.has(j.type) && j.response) return { value: j.response, note: `取自终止事件 ${j.type}（#${data[k].i}）的 response 对象` };
+    if (TERMINAL.has(j.type) && j.response) {
+      const note = `取自终止事件 ${j.type}（#${data[k].i}）的 response 对象`;
+      if (j.response.output?.length || !output.length) return { value: j.response, note };
+      return { value: { ...j.response, output }, note: `${note}；output 由 output_item.done 按 output_index 合成` };
+    }
   }
   const created = data.find((e) => e.json.type === 'response.created')?.json.response ?? {};
-  const output = data.filter((e) => e.json.type === 'response.output_item.done').map((e) => e.json.item);
   const errors = data.filter((e) => e.json.type === 'error').map((e) => e.json);
   return { value: { ...created, output, ...(errors.length ? { errors } : {}) }, note: '流没有终止事件：由 response.created 与 output_item.done 合成' };
 }

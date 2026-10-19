@@ -5,6 +5,7 @@ import type { AddressInfo } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import test, { type TestContext } from "node:test";
 import { createBridgeServer } from "../src/server.ts";
+import { Inspector, type Exchange } from "../src/inspect/capture.ts";
 import { sseEvents } from "../src/inspect/view.ts";
 import type { BridgeConfig } from "../src/types.ts";
 
@@ -205,6 +206,114 @@ test("capture is off by default, follows the toggle, and evicts only finished ex
   await (await post(f.url, { model: "gpt", input: "off again" })).text();
   assert.equal((await api(f.url, "state")).exchanges, 2);
   assert.equal((await api(f.url, "exchanges", { method: "DELETE" })).exchanges, 0);
+});
+
+test("the last oversized exchange is evicted on close without another request", async (t) => {
+  const f = await fixture(t, (_body, _req, res) => nativeSuccess(res, [message("Done")]), config => {
+    config.inspect!.max_mib = 1;
+  });
+  const response = await post(f.url, { model: "gpt", input: "x".repeat(600 * 1024) });
+  assert.equal((await response.json() as any).output[0].content[0].text, "Done");
+  const state = await settled(f.url);
+  assert.equal(state.evicted, 1);
+  assert.equal(state.exchanges, 0);
+  assert.equal(state.bytes, 0);
+});
+
+test("closing an over-cap exchange evicts it while another exchange remains active", async (t) => {
+  const held: ServerResponse[] = [];
+  let ready!: () => void;
+  const arrived = new Promise<void>(resolve => { ready = resolve; });
+  const f = await fixture(t, (_body, _req, res) => {
+    held.push(res);
+    if (held.length === 2) ready();
+  }, config => { config.inspect!.max_mib = 1; });
+  const first = post(f.url, { model: "gpt", input: "a".repeat(400 * 1024) });
+  const second = post(f.url, { model: "gpt", input: "b".repeat(400 * 1024) });
+  await arrived;
+  const active = await api(f.url, "state");
+  assert.equal(active.active, 2);
+  assert.equal(active.evicted, 0);
+  assert.ok(active.bytes > active.max_bytes);
+
+  // Complete both fetches independently of which request arrived first.
+  nativeSuccess(held[0], [message("First")]);
+  await Promise.race([first, second]).then(response => response.text());
+  const state = await api(f.url, "state");
+  assert.equal(state.active, 1);
+  assert.equal(state.exchanges, 1);
+  assert.equal(state.evicted, 1);
+  assert.ok(state.bytes <= state.max_bytes);
+  nativeSuccess(held[1], [message("Second")]);
+  await Promise.all([first, second]).then(responses => Promise.all(responses.filter(response => !response.bodyUsed).map(response => response.text())));
+  assert.equal((await settled(f.url)).exchanges, 1);
+});
+
+test("clear releases active capture buffers without interrupting the response", async (t) => {
+  const records: Exchange[] = [];
+  const begin = Inspector.prototype.begin;
+  t.mock.method(Inspector.prototype, "begin", function (this: Inspector, req: IncomingMessage, res: ServerResponse) {
+    const exchange = begin.call(this, req, res);
+    if (exchange) records.push(exchange);
+    return exchange;
+  });
+  let held!: ServerResponse;
+  const f = await fixture(t, (_body, _req, res) => {
+    held = res;
+    res.writeHead(200, { "content-type": "text/event-stream" });
+    res.write(`data: ${JSON.stringify({ type: "response.created", response: { id: "resp_synthetic" } })}\n\n`);
+  });
+  const response = await post(f.url, { model: "gpt", input: "x".repeat(64 * 1024), stream: true });
+  const exchange = records[0];
+  const call = exchange.calls[0];
+  assert.ok(exchange.requestText!.length > 64 * 1024);
+  assert.ok(call.text.length > 64 * 1024);
+  assert.ok(exchange.response.parts.length > 0);
+  assert.ok(call.response!.parts.length > 0);
+
+  const cleared = await api(f.url, "exchanges", { method: "DELETE" });
+  assert.equal(cleared.exchanges, 0);
+  assert.equal(cleared.bytes, 0);
+  const assertReleased = () => {
+    assert.equal(exchange.requestText, undefined);
+    assert.equal(exchange.requestBytes, 0);
+    assert.equal(exchange.bytes, 0);
+    assert.equal(exchange.calls.length, 0);
+    assert.equal(exchange.response.bytes, 0);
+    assert.deepEqual(exchange.response.parts, []);
+    assert.equal(call.text, "");
+    assert.equal(call.bytes, 0);
+    assert.equal(call.response!.bytes, 0);
+    assert.deepEqual(call.response!.parts, []);
+  };
+  assertReleased();
+  held.end(`data: ${JSON.stringify({ type: "response.completed", response: { id: "resp_synthetic", status: "completed", output: [message("Still completes")], usage } })}\n\n`);
+  const text = await response.text();
+  assert.match(text, /Still completes/);
+  assert.match(text, /response\.completed/);
+  assertReleased();
+  const state = await api(f.url, "state");
+  assert.equal(state.exchanges, 0);
+  assert.equal(state.bytes, 0);
+  assert.equal(state.rev, cleared.rev);
+  assert.equal(state.capturing, true);
+});
+
+test("stopping capture lets active exchanges finish recording", async (t) => {
+  let held!: ServerResponse;
+  const f = await fixture(t, (_body, _req, res) => {
+    held = res;
+    res.writeHead(200, { "content-type": "text/event-stream" });
+    res.write(`data: ${JSON.stringify({ type: "response.created", response: { id: "resp_synthetic" } })}\n\n`);
+  });
+  const response = await post(f.url, { model: "gpt", input: "Continue recording", stream: true });
+  await api(f.url, "capture", { method: "POST", body: JSON.stringify({ enabled: false }) });
+  held.end(`data: ${JSON.stringify({ type: "response.completed", response: { id: "resp_synthetic", status: "completed", output: [message("After capture stopped")], usage } })}\n\n`);
+  const text = await response.text();
+  const detail = await latest(f.url);
+  assert.equal(detail.client.response.body.text, text);
+  assert.match(detail.upstream[0].response.body.text, /After capture stopped/);
+  assert.equal(detail.outcome, "completed");
 });
 
 test("a client disconnect is recorded as aborted with a cancelled upstream call", async (t) => {
