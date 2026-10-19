@@ -27,6 +27,12 @@ export function validateConfig(value: unknown): BridgeConfig {
   if (value.host !== undefined && (typeof value.host !== "string" || !value.host)) fail("host must be a string");
   if (value.port !== undefined && (!Number.isInteger(value.port) || value.port < 0 || value.port > 65535)) fail("port must be 0..65535");
   if (value.token_env !== undefined && (typeof value.token_env !== "string" || !value.token_env)) fail("token_env must name an environment variable");
+  if (value.inspect !== undefined) {
+    const inspect = value.inspect;
+    if (!object(inspect)) fail("inspect must be an object");
+    if (inspect.capture !== undefined && typeof inspect.capture !== "boolean") fail("inspect.capture must be boolean");
+    if (inspect.max_mib !== undefined && (!Number.isSafeInteger(inspect.max_mib) || inspect.max_mib <= 0)) fail("inspect.max_mib must be a positive integer");
+  }
   for (const [name, up] of Object.entries(value.upstreams)) {
     if (!object(up)) fail(`upstream ${name}: expected a connection object`);
     let url: URL;

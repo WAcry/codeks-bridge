@@ -9,6 +9,8 @@ import { runResponses } from "./backends/responses.ts";
 import { runAnthropic } from "./backends/anthropic.ts";
 import { runDeepSeek } from "./backends/deepseek.ts";
 import { compact, isCompactionRequest } from "./compaction.ts";
+import { Inspector, type Exchange } from "./inspect/capture.ts";
+import { isInspectorPath, serveInspector } from "./inspect/http.ts";
 import type { AdapterId, Backend, BridgeConfig, ResponsesRequest } from "./types.ts";
 
 const BACKENDS: Record<AdapterId, Backend> = { "gpt-responses": runResponses, "claude-messages": runAnthropic, "deepseek-chat": runDeepSeek };
@@ -25,7 +27,7 @@ function upstreamHttpFailure(res: ServerResponse, error: UpstreamHttpError): voi
   res.writeHead(error.status, Object.fromEntries(headers));
   res.end(error.body);
 }
-async function readRequest(req: IncomingMessage): Promise<ResponsesRequest> {
+async function readRequest(req: IncomingMessage, exchange?: Exchange): Promise<ResponsesRequest> {
   let size = 0;
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
@@ -33,10 +35,13 @@ async function readRequest(req: IncomingMessage): Promise<ResponsesRequest> {
     if (size > MAX_BODY_BYTES) throw new BridgeError("Request exceeds 64 MiB", "invalid_prompt", 413);
     chunks.push(chunk);
   }
+  const text = Buffer.concat(chunks).toString("utf8");
+  exchange?.received(text);
   let request: any;
-  try { request = JSON.parse(Buffer.concat(chunks).toString("utf8")); }
+  try { request = JSON.parse(text); }
   catch { throw new BridgeError("Request body must be JSON"); }
   if (!request || typeof request !== "object" || Array.isArray(request)) throw new BridgeError("Request must be an object");
+  exchange?.parsed(request);
   if (typeof request.model !== "string") throw new BridgeError("model is required");
   if (request.input !== undefined && typeof request.input !== "string" && !Array.isArray(request.input)) throw new BridgeError("input must be a string or an array");
   if (Array.isArray(request.input) && request.input.some((x: unknown) => !x || typeof x !== "object" || Array.isArray(x))) throw new BridgeError("input items must be objects");
@@ -62,7 +67,8 @@ export function createBridgeServer(value: BridgeConfig): Server {
   if (config.token_env && !token) throw new BridgeError(`Missing bridge token environment variable: ${config.token_env}`);
   const host = config.host ?? "127.0.0.1";
   if (!["127.0.0.1", "::1", "localhost"].includes(host) && !token) throw new BridgeError("Set token_env when listening outside loopback");
-  return createServer(async (req, res) => {
+  const inspector = new Inspector(config);
+  return createServer((req, res) => void inspector.scope(async () => {
     const controller = new AbortController();
     const abort = () => { if (!res.writableEnded) controller.abort(new Error("Client disconnected")); };
     res.on("close", abort);
@@ -70,11 +76,16 @@ export function createBridgeServer(value: BridgeConfig): Server {
     let keepalive: NodeJS.Timeout | undefined;
     let startStream: (() => void) | undefined;
     try {
+      const url = new URL(req.url ?? "/", "http://localhost");
+      if (isInspectorPath(url.pathname)) {
+        await serveInspector(req, res, url, inspector, { configured: !!token, valid: () => authenticated(req, token) });
+        return;
+      }
       if (!authenticated(req, token)) { json(res, 401, { error: { code: "invalid_api_key", message: "Invalid bridge token" } }); return; }
       if (req.headers.origin !== undefined && !token) {
         throw new BridgeError("Browser requests require a configured bridge token", "invalid_prompt", 403);
       }
-      const path = new URL(req.url ?? "/", "http://localhost").pathname.replace(/^\/v1(?=\/)/, "");
+      const path = url.pathname.replace(/^\/v1(?=\/)/, "");
       if (req.method === "GET" && path === "/health") { json(res, 200, { status: "ok" }); return; }
       if (req.method === "GET" && path === "/models") {
         if (catalogBytes > MAX_HTTP_CATALOG_BYTES) {
@@ -87,10 +98,12 @@ export function createBridgeServer(value: BridgeConfig): Server {
         json(res, 404, { error: { code: "invalid_prompt", message: "Use POST /v1/responses with remote_compaction = v2" } }); return;
       }
       res.setHeader("x-models-etag", catalogEtag);
-      const request = await readRequest(req);
+      const exchange = inspector.begin(req, res);
+      const request = await readRequest(req, exchange);
       const route = resolveModel(config, request.model);
       const responsesLite = req.headers["x-openai-internal-codex-responses-lite"] === "true" ||
         (Array.isArray(request.input) && request.input.some((item) => item.type === "additional_tools"));
+      exchange?.routed(route, responsesLite);
       const backend = BACKENDS[route.profile.id];
       const streaming = request.stream === true;
       writer = new ResponseWriter(streaming ? res : { write() {} }, { model: request.model, showSummary: reasoningSummaryRequested(request) });
@@ -153,5 +166,5 @@ export function createBridgeServer(value: BridgeConfig): Server {
       if (keepalive) clearInterval(keepalive);
       res.off("close", abort);
     }
-  });
+  }));
 }

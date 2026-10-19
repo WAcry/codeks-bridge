@@ -1,6 +1,7 @@
 import { encodeCompaction } from "./carrier.ts";
 import { BridgeError } from "./errors.ts";
 import { newId } from "./ids.ts";
+import { withCaptureLabel } from "./inspect/capture.ts";
 import { SUMMARIZATION_PROMPT } from "./prompts.ts";
 import type { Backend, BackendContext, ResponsesRequest } from "./types.ts";
 import { ResponseWriter } from "./writer.ts";
@@ -107,9 +108,9 @@ export async function compact(context: BackendContext, backend: Backend): Promis
       context.onAccepted?.(context.route.compaction.mode === "summary" ? headers : undefined);
     }
   } };
-  const run = async <T>(request: ResponsesRequest, decode: (output: readonly unknown[]) => T) => {
+  const run = async <T>(label: string, request: ResponsesRequest, decode: (output: readonly unknown[]) => T) => {
     try {
-      const result = await collect({ ...shared, request }, backend);
+      const result = await withCaptureLabel(label, () => collect({ ...shared, request }, backend));
       return { value: decode(result.output), usage: result.usage };
     } catch (error) {
       cancel.abort(error);
@@ -117,9 +118,9 @@ export async function compact(context: BackendContext, backend: Backend): Promis
     }
   };
   // Both requests read the same original history. Neither receives the other's output.
-  const summaryPromise = run(prompt, summaryText);
+  const summaryPromise = run("summary", prompt, summaryText);
   const nativePromise = context.route.compaction.mode === "dual"
-    ? run({ ...context.request, stream: true }, nativeItem)
+    ? run("native", { ...context.request, stream: true }, nativeItem)
     : Promise.resolve(undefined);
   const results = await Promise.allSettled([summaryPromise, nativePromise]);
   const failure = results.find((result) => result.status === "rejected");
