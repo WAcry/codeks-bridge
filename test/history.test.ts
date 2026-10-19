@@ -108,6 +108,15 @@ test("unattributed compaction and stored references fail instead of losing histo
   assert.throws(() => prepareHistory([{ type: "bridge_reasoning", state: { data: "unselected" } }], defaults.a), /Internal reasoning/);
 });
 
+test("deferred checkpoints replay natively but require materialization before text translation", () => {
+  const deferred = { type: "compaction", encrypted_content: encodeCompaction({
+    native: { source: defaults.a.origin, format: defaults.a.profile.native_compaction_format!, data: native },
+    handoff: { prefix: [], parameters: { model: "a" }, responsesLite: true },
+  }) };
+  assert.deepEqual(prepareHistory([deferred], defaults.a), [native]);
+  assert.throws(() => prepareHistory([deferred], defaults.claude), /not been materialized/);
+});
+
 test("images and tool call identities survive history selection", () => {
   const input = [
     { type: "message", role: "user", content: [{ type: "input_image", image_url: "data:image/png;base64,c3ludGhldGlj" }] },

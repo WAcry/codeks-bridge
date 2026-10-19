@@ -46,6 +46,7 @@
 | `host` | 默认 `127.0.0.1` |
 | `port` | 默认 `8787`；程序集成测试可用 `0` 分配端口 |
 | `token_env` | 保存 bridge 入口 Bearer token 的环境变量名称 |
+| `compaction_cache_dir` | 延迟复述缓存目录；默认 `$XDG_CACHE_HOME/codeks-bridge/compaction`，未设置 XDG 时为 `~/.cache/codeks-bridge/compaction` |
 | `upstreams` | 上游连接配置表 |
 | `models` | 客户端模型别名表 |
 
@@ -113,6 +114,18 @@ model_reasoning_summary = "auto"
 也可选择 `concise`、`detailed` 或 `none`。Claude 和 DeepSeek 目录沿用 GPT-6.1 Sol 的 `default_reasoning_summary: "none"`；客户端配置为 `none` 时省略请求的 summary 字段。bridge 对缺省或 `none` 不展示可见摘要，对其他上述值请求或展示可用内容；Claude 使用原生 summarized 显示，DeepSeek 展示原生 reasoning 文本。它不承诺所有模型区分摘要长度，也不因此关闭实际推理或历史载荷回放。
 
 `input_modalities` 用于客户端能力声明，不是 bridge 的模型能力预检。bridge 负责转换能表达的输入，具体模型能否处理由上游裁决。
+
+## 压缩模式
+
+`models.<别名>.compaction.mode` 可选择 `summary`、`dual` 或 `lazy`。GPT 默认 `dual`：先生成原生检查点，再用 handoff prompt 复述，两步都成功才交付。Claude/DeepSeek 默认且只支持 `summary`，继续用标准 prompt 压缩原历史。
+
+若通常只使用原目标，可显式选择延迟复述：
+
+```json
+{ "compaction": { "mode": "lazy", "native_replay": true } }
+```
+
+`lazy` 初始只生成原生检查点；目标无法按来源策略回放它时，先向原模型和原连接生成文字。原来源须继续在配置中可用。成功摘要及辅助 usage 存入顶层 `compaction_cache_dir`，重启后可复用；它不是上游 prompt cache。生成模式不改变下面的原生状态复用策略。详见[压缩](compaction.md)。
 
 ## 状态复用
 

@@ -9,6 +9,7 @@ import { runResponses } from "./backends/responses.ts";
 import { runAnthropic } from "./backends/anthropic.ts";
 import { runDeepSeek } from "./backends/deepseek.ts";
 import { compact, isCompactionRequest } from "./compaction.ts";
+import { LazyCompactionStore } from "./lazy-compaction.ts";
 import type { AdapterId, Backend, BridgeConfig, ResponsesRequest } from "./types.ts";
 
 const BACKENDS: Record<AdapterId, Backend> = { "gpt-responses": runResponses, "claude-messages": runAnthropic, "deepseek-chat": runDeepSeek };
@@ -55,6 +56,7 @@ function authenticated(req: IncomingMessage, token: string | undefined): boolean
 /** Creates a server without opening a socket, so callers control its lifecycle. */
 export function createBridgeServer(value: BridgeConfig): Server {
   const config = validateConfig(value);
+  const compactions = new LazyCompactionStore(config, BACKENDS);
   const catalog = JSON.stringify(buildCatalog(config));
   const catalogBytes = Buffer.byteLength(catalog);
   const catalogEtag = `"${createHash("sha256").update(catalog).digest("hex")}"`;
@@ -109,6 +111,7 @@ export function createBridgeServer(value: BridgeConfig): Server {
         }
         startStream?.();
       } };
+      context.request = await compactions.materialize(context);
       let result;
       if (isCompactionRequest(request)) {
         const compacted = await compact(context, backend);
@@ -135,8 +138,8 @@ export function createBridgeServer(value: BridgeConfig): Server {
         return;
       }
       if (cause instanceof ResponsesStreamError) {
-        // A compaction branch can fail in its stream while its sibling still
-        // awaits headers. Preserve that first failure as an SSE error.
+        // Auxiliary compaction can fail before the target request starts.
+        // Preserve the upstream error code even while HTTP headers are withheld.
         startStream?.();
         if (res.headersSent && writer) {
           if (cause.response) writer.nativeFailed(cause.response, cause.event);

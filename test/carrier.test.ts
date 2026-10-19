@@ -22,8 +22,9 @@ test("versioned envelopes preserve source facts and raw structured payloads thro
     native: { source, format: "responses.compaction.v1", data: { type: "compaction", encrypted_content: "synthetic-ciphertext" } },
   };
   const stored = JSON.parse(JSON.stringify(encodeCompaction(checkpoint)));
-  assert.match(stored, /^cxbc2:/);
+  assert.match(stored, /^cxbc3:/);
   assert.deepEqual(decodeCompaction(stored), checkpoint);
+  assert.deepEqual(decodeCompaction(encoded("cxbc2:", checkpoint)), checkpoint);
 });
 
 test("damaged current reasoning envelopes fail; unrelated and obsolete formats are not decoded", () => {
@@ -37,13 +38,20 @@ test("damaged current reasoning envelopes fail; unrelated and obsolete formats a
   ]) assert.throws(() => decodeReasoning(value), /Malformed bridge reasoning/);
 });
 
-test("compaction cannot lose its summary or native source metadata", () => {
+test("compaction requires a summary or a complete deferred handoff", () => {
+  const native = { source, format: "responses.compaction.v1", data: { type: "compaction", encrypted_content: "synthetic-ciphertext" } };
+  const handoff = { prefix: [], parameters: { model: "test" }, responsesLite: true };
+  assert.deepEqual(decodeCompaction(encodeCompaction({ native, handoff })), { native, handoff });
+  assert.deepEqual(decodeCompaction(encodeCompaction({ summary: "Complete", native, handoff })), { summary: "Complete", native, handoff });
   for (const value of [
-    { summary: "" }, { summary: "   " },
+    {}, { summary: "" }, { summary: "   " }, { native }, { handoff },
+    { native, handoff: { ...handoff, prefix: [null] } },
+    { native, handoff: { ...handoff, parameters: {} } },
+    { native, handoff: { ...handoff, responsesLite: undefined } },
     { summary: "valid", native: { source, data: "cipher" } },
     { summary: "valid", native: { source, format: "responses.compaction.v1" } },
   ]) {
-    assert.equal(decodeCompaction(encoded("cxbc2:", value)), undefined);
+    assert.equal(decodeCompaction(encoded("cxbc3:", value)), undefined);
     assert.throws(() => encodeCompaction(value as any), /Invalid compaction/);
   }
 });

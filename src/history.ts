@@ -1,8 +1,15 @@
 import { decodeCompaction, decodeReasoning } from "./carrier.ts";
+import type { CompactionCarrier } from "./carrier.ts";
 import { BridgeError } from "./errors.ts";
 import { SUMMARY_PREFIX } from "./prompts.ts";
 import { translateToolHistory } from "./tool-history.ts";
 import type { ResolvedModel, ResponsesRequest } from "./types.ts";
+
+export function isNativeReplayAllowed(carrier: CompactionCarrier, route: ResolvedModel): boolean {
+  return !!carrier.native && route.compaction.native_replay &&
+    route.replay.native_compaction.has(carrier.native.source.id) &&
+    carrier.native.format === route.profile.native_compaction_format;
+}
 
 /** Selects model-specific opaque state without changing the stored history. */
 export function prepareHistory(input: ResponsesRequest["input"], route: ResolvedModel): Record<string, any>[] {
@@ -55,13 +62,12 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
     if (item.type === "compaction" || item.type === "compaction_summary") {
       const carrier = decodeCompaction(item.encrypted_content);
       if (!carrier) {
-        throw new BridgeError("This compaction item has no portable summary; start with history created through this bridge");
+        throw new BridgeError("This compaction item has no portable summary or handoff recipe; use history created through this bridge");
       }
-      if (carrier.native && route.compaction.native_replay &&
-          route.replay.native_compaction.has(carrier.native.source.id) &&
-          carrier.native.format === route.profile.native_compaction_format) {
-        result.push(carrier.native.data as Record<string, any>);
+      if (isNativeReplayAllowed(carrier, route)) {
+        result.push(carrier.native!.data as Record<string, any>);
       } else {
+        if (!carrier.summary) throw new BridgeError("Deferred compaction summary has not been materialized");
         result.push({
           type: "message",
           role: "user",

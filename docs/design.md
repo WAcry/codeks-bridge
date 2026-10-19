@@ -24,7 +24,7 @@ flowchart LR
 
 Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于历史中的 `additional_tools` 项，普通函数和 custom 工具归入默认 `functions` namespace。GPT 路径保留这些声明的位置、顺序、schema 和 grammar，并发送 `x-openai-internal-codex-responses-lite: true`。Claude/DeepSeek 只在各自协议转换入口提取声明，组合为原生工具表；声明不会变成 user reminder。中途提醒保留所在对话位置；若插在一次完整的工具交换内，则移至该批结果之后，以满足目标协议的配对要求。
 
-已核对 Codex `0.163.0`：Lite 设置 `reasoning.context: "all_turns"` 和 `parallel_tool_calls: false`。bridge 保留客户端传入值，原生 options 仍可按配置覆盖普通参数。reasoning 的来源筛选与服务端 context 语义是两件事：前者决定发送哪些载荷，后者决定 GPT 如何使用它们。双压缩的原生与文字分支都延续同一 Lite 工具前缀及 transport 标记。
+已核对 Codex `0.163.0`：Lite 设置 `reasoning.context: "all_turns"` 和 `parallel_tool_calls: false`。bridge 保留客户端传入值，原生 options 仍可按配置覆盖普通参数。reasoning 的来源筛选与服务端 context 语义是两件事：前者决定发送哪些载荷，后者决定 GPT 如何使用它们。原生压缩与随后的复述保留源 Lite 工具声明及 transport 标记。
 
 该版本最新 OpenAI GPT 目录启用 Lite，但原生 AWS Bedrock 目录仍主动关闭 Lite 和 Code Mode。统一启用是本项目的明确选择，不能把它描述为所有官方 provider 当前完全相同的默认值。上游是否接受请求由端点裁决，错误直接返回；bridge 不自动转回另一种协议。升级时复核 `core/src/client.rs`、`tools/src/tool_spec.rs`、`core/src/context/world_state/top_level_tools.rs` 和 provider 的模型目录处理。
 
@@ -46,9 +46,9 @@ Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于
 
 ## 历史保存事实，配置决定恢复
 
-Reasoning 载荷记录来源、格式和原始数据；压缩载荷保存文字摘要及可选原生状态。它们写入 Responses item 的 `encrypted_content`，由 codeks 原样持久化。bridge 无需数据库、响应 ID 索引或跨请求状态缓存。
+Reasoning 载荷记录来源、格式和原始数据；压缩载荷保存文字摘要及可选原生状态，或保存原生状态与延迟复述配方。它们写入 Responses item 的 `encrypted_content`，由 codeks 原样持久化。bridge 不维护完整会话或响应 ID 索引；延迟复述的成功结果及独立 usage 另存本地文件缓存，避免重复付费和服务重启后重复生成。
 
-来源包括连接指纹、adapter 和实际模型，独立于显示别名和复用配置。端点与凭据不写进载荷。外层编码不提供加密：文字 reasoning、签名、压缩摘要的保存权限与普通聊天历史相同。
+来源包括连接指纹、adapter 和实际模型，独立于显示别名和复用配置。端点与凭据不写进载荷；复述配方只保存源请求前缀及选定参数。外层编码不提供加密：文字 reasoning、签名、压缩摘要及请求前缀按普通聊天历史保护，延迟复述缓存以 `0600` 文件权限保存。
 
 每次请求按当前配置选取历史，不改写已保存载荷。Reasoning 和原生压缩有独立的允许来源列表，默认只接受自身，关系有方向且不传递。修改配置即可改变已有历史的恢复方式；格式版本负责解释数据，不编码“永远隔离”这类策略。
 
@@ -64,9 +64,11 @@ GPT 原生 HTTP 失败保留 status、body 和诊断 header，流内失败保留
 
 ## 压缩的生成和恢复分开
 
-`compaction.mode` 决定生成文字摘要，或并行生成原生结果与摘要；`native_replay` 和来源列表决定恢复已有检查点时是否使用原生表示。支持原生格式不等于每个部署都提供生成能力，因此同一 GPT adapter 可配置不同模式。
+`compaction.mode` 决定如何生成：`summary` 用标准 prompt 汇总原历史；`dual` 先完成原生压缩，再由原来源复述检查点；`lazy` 只在需要文字时执行同一复述。GPT 默认仍为 `dual`。用户选择先原生再复述，是为了以原生压缩整理的状态为交接基础；选择 lazy 则可省去始终使用兼容目标时的额外推理。
 
-双压缩两条请求都成功才发布检查点。恢复时，原生格式可读、来源允许且开启 native replay，便优先使用原生；其他情况按配置选择文字摘要。这是发送前的表示选择，已经发送的原生状态被上游拒绝时不会自动降级。[压缩细节](compaction.md)
+两种原生模式共用 `U + K + handoff prompt`：`U` 是近期保留历史，`K` 是原生检查点。dual 按可观察的客户端规则近似选取 U，lazy 直接使用客户端实际保留的 U，不保存完整旧历史，也不把检查点后的新工作纳入旧摘要。复述 prompt 是用户给定的 Codex prompt 微调版，要求完整复述已有状态；summary 模式继续使用现有的详细标准 prompt。
+
+`native_replay` 和来源列表决定恢复时是否使用原生表示，独立于生成模式。目标无法使用原生时，选择已有文字或向原来源延迟生成文字。lazy 假定原模型、原端点和配置仍可用；缓存只复用成功结果，错误直接返回。已经发送的原生状态被上游拒绝时不会自动降级。支持原生格式不等于每个部署都提供生成能力，因此同一 GPT adapter 可配置不同模式。[压缩细节](compaction.md)
 
 ## 协议边界
 
@@ -76,4 +78,4 @@ Responses 后端保留原生事件及 response envelope，其他后端由 writer
 
 Codex 的命名通知可以没有 `call_id`，Code Mode 的多次 `notify()` 也可以复用同一个调用 ID。非 Responses 目标将无配对通知及追加结果转成带身份的 user 消息，保留文字和图片，不补造工具调用或改写此前结果。转换只影响当前出站请求；规则和边界见[工具转换](tools.md)。
 
-设计参考了现有 Responses、Messages 和 Chat 转换实践，没有复制其他项目的运行时代码。文字压缩使用完整的交接摘要提示词；摘要恢复前缀逐字来自 Apache-2.0 许可的 OpenAI Codex，出处列在 `NOTICE`。
+协议转换参考了现有 Responses、Messages 和 Chat 实践。标准文字压缩使用详细摘要提示词；原生检查点复述 prompt 改编自 Codex，摘要恢复前缀逐字来自 Codex，保留历史算法也适配了客户端源码。Apache-2.0 许可归属列在 `NOTICE`。

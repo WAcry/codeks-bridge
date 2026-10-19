@@ -27,6 +27,7 @@ export function validateConfig(value: unknown): BridgeConfig {
   if (value.host !== undefined && (typeof value.host !== "string" || !value.host)) fail("host must be a string");
   if (value.port !== undefined && (!Number.isInteger(value.port) || value.port < 0 || value.port > 65535)) fail("port must be 0..65535");
   if (value.token_env !== undefined && (typeof value.token_env !== "string" || !value.token_env)) fail("token_env must name an environment variable");
+  if (value.compaction_cache_dir !== undefined && (typeof value.compaction_cache_dir !== "string" || !value.compaction_cache_dir.trim())) fail("compaction_cache_dir must be a nonempty path");
   for (const [name, up] of Object.entries(value.upstreams)) {
     if (!object(up)) fail(`upstream ${name}: expected a connection object`);
     let url: URL;
@@ -66,9 +67,9 @@ export function validateConfig(value: unknown): BridgeConfig {
     if (model.compaction !== undefined) {
       const c = model.compaction;
       if (!object(c)) fail(`model ${slug}: compaction must be an object`);
-      if (c.mode !== undefined && !["dual", "summary"].includes(c.mode)) fail(`model ${slug}: compaction.mode must be dual or summary`);
+      if (c.mode !== undefined && !["dual", "summary", "lazy"].includes(c.mode)) fail(`model ${slug}: compaction.mode must be dual, summary, or lazy`);
       if (c.native_replay !== undefined && typeof c.native_replay !== "boolean") fail(`model ${slug}: compaction.native_replay must be boolean`);
-      if (!profile.native_compaction_format && (c.mode === "dual" || c.native_replay === true)) fail(`model ${slug}: adapter has no native compaction representation`);
+      if (!profile.native_compaction_format && (c.mode === "dual" || c.mode === "lazy" || c.native_replay === true)) fail(`model ${slug}: adapter has no native compaction representation`);
     }
   }
   // References are directional. Validate decodability, not provider compatibility.

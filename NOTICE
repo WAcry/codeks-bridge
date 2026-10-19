@@ -6,6 +6,11 @@ licensed under the Apache License, Version 2.0:
 
 - src/prompts.ts contains a summary prefix copied from:
   codex-rs/prompts/templates/compact/summary_prefix.md
+- src/prompts.ts contains handoff instructions adapted from:
+  codex-rs/prompts/templates/compact/prompt.md
+- src/compaction-history.ts adapts retained-history selection and truncation from:
+  codex-rs/core/src/compact_remote_v2.rs
+  codex-rs/utils/string/src/truncate.rs
 - catalog/*.json contains model metadata and prompts copied or adapted from:
   codex-rs/models-manager/models.json
   Each catalog entry records its source tag, commit, and changes.
