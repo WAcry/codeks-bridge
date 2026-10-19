@@ -13,7 +13,7 @@ Reasoning 默认只恢复给产生它的目标，配置可以允许其他来源�
 Responses reasoning item 的 `encrypted_content` 保存：
 
 ```text
-cxbr2:<base64url(JSON)>
+cxbr1:<base64url(JSON)>
 ```
 
 JSON 的结构如下，示例指纹为占位值：

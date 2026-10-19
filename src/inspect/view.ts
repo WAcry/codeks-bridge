@@ -281,13 +281,13 @@ function annotations(exchange: Exchange, client: ReturnType<typeof messageView>)
   }
   if (client?.events) {
     client.events.forEach((event, index) => {
-      if (!event.data.includes("cxbr2:") && !event.data.includes("cxbc1:")) return;
+      if (!event.data.includes("cxbr1:") && !event.data.includes("cxbc1:")) return;
       const data = parse(event.data);
       if (data?.type !== "response.output_item.done") return;
       const note = outputNote(inspector, data.item, { target: "client.response", event: index, pointer: "/item" });
       if (note) notes.push(note);
     });
-  } else if (client && (client.body.text.includes("cxbr2:") || client.body.text.includes("cxbc1:"))) {
+  } else if (client && (client.body.text.includes("cxbr1:") || client.body.text.includes("cxbc1:"))) {
     const output = parse(client.body.text)?.output;
     if (Array.isArray(output)) output.forEach((item: any, index: number) => {
       const note = outputNote(inspector, item, { target: "client.response", pointer: `/output/${index}` });

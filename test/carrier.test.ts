@@ -14,7 +14,7 @@ test("versioned envelopes preserve source facts and raw structured payloads thro
   for (const data of ["中文:opaque:payload", { thinking: "Reason", signature: "synthetic-signature" }, { text: "Keep the flag." }]) {
     const state = { source, format: "example.reasoning.v1", data };
     const stored = JSON.parse(JSON.stringify(encodeReasoning(state)));
-    assert.match(stored, /^cxbr2:/);
+    assert.match(stored, /^cxbr1:/);
     assert.deepEqual(decodeReasoning(stored), state);
   }
   const checkpoint = {
@@ -26,14 +26,14 @@ test("versioned envelopes preserve source facts and raw structured payloads thro
   assert.deepEqual(decodeCompaction(stored), checkpoint);
 });
 
-test("damaged current reasoning envelopes fail; unrelated and obsolete formats are not decoded", () => {
+test("damaged reasoning envelopes fail; unrelated payloads are not decoded", () => {
   for (const value of [undefined, "native-ciphertext"]) assert.equal(decodeReasoning(value), undefined);
   for (const value of [
-    "cxbr2:invalid-json",
-    encoded("cxbr2:", { format: "reasoning.text.v1", data: "text" }),
-    encoded("cxbr2:", { source: { ...source, model: "" }, format: "reasoning.text.v1", data: "text" }),
-    encoded("cxbr2:", { source, data: "text" }),
-    encoded("cxbr2:", { source, format: "reasoning.text.v1" }),
+    "cxbr1:invalid-json",
+    encoded("cxbr1:", { format: "reasoning.text.v1", data: "text" }),
+    encoded("cxbr1:", { source: { ...source, model: "" }, format: "reasoning.text.v1", data: "text" }),
+    encoded("cxbr1:", { source, data: "text" }),
+    encoded("cxbr1:", { source, format: "reasoning.text.v1" }),
   ]) assert.throws(() => decodeReasoning(value), /Malformed bridge reasoning/);
 });
 

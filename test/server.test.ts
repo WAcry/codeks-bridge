@@ -700,7 +700,7 @@ test("replay policy changes apply to saved state independently and only in the c
     assert.equal(outbound.some((item: any) => item.type === "reasoning"), expectedReasoning);
     assert.equal(outbound.some((item: any) => item.type === "compaction"), expectedNative);
     assert.equal(JSON.stringify(outbound).includes(summary), !expectedNative);
-    assert.doesNotMatch(JSON.stringify(outbound), /cxbr2:|cxbc[23]:/);
+    assert.doesNotMatch(JSON.stringify(outbound), /cxbr1:|cxbc1:/);
     return responseJson(response);
   }
 

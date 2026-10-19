@@ -53,7 +53,7 @@ node dist/cli.js serve --config /absolute/path/bridge.json --capture
 | 原始 | 原始字节 |
 | 头部 | 状态码与 header |
 
-大内容只在显示时折叠，记录本身完整。长字符串显示开头和结尾，中间注明省略的字符数，可以展开全部、复制或下载；`cxbr2:` 与 `cxbc1:` 载荷可以直接解码。很长的列表分批显示，可以继续加载。Responses Lite 的终止事件可能省略完整 `output`；结构视图会用之前的 `response.output_item.done` 还原输出，原始事件保持不变。
+大内容只在显示时折叠，记录本身完整。长字符串显示开头和结尾，中间注明省略的字符数，可以展开全部、复制或下载；`cxbr1:` 与 `cxbc1:` 载荷可以直接解码。很长的列表分批显示，可以继续加载。Responses Lite 的终止事件可能省略完整 `output`；结构视图会用之前的 `response.output_item.done` 还原输出，原始事件保持不变。
 
 “概要”给出路由配置、每个调用的时间线和上游调用表。“标注”列出全部回放决定，点击可定位到对应项。“对比”选择任意两次交换的任意一段做结构比较，常用的是和同一线程上一轮的客户端请求或上游请求比较；数组按类型和角色对齐，新增、删除的项单独标出。
 
@@ -108,7 +108,7 @@ node dist/cli.js serve --config /absolute/path/bridge.json --capture
 
 响应侧标注 bridge 新生成的 reasoning 与压缩项（决定为 `output`）。流式响应指向 `response.output_item.done` 事件里的 `/item`，非流式响应指向 `/output/k`。只有文字摘要的压缩项没有原生部分，来源和格式为空；`native` 检查点的来源和格式取原生部分。
 
-每条标注附来源别名、部署名、adapter、来源指纹、载荷格式和解码后的 carrier。`cxbr2:` 与 `cxbc1:` 只是编码，解码后可以看到文字 reasoning、压缩摘要和原生载荷；GPT 原生 `encrypted_content` 本身仍是密文，只能看到原样字符串。
+每条标注附来源别名、部署名、adapter、来源指纹、载荷格式和解码后的 carrier。`cxbr1:` 与 `cxbc1:` 只是编码，解码后可以看到文字 reasoning、压缩摘要和原生载荷；GPT 原生 `encrypted_content` 本身仍是密文，只能看到原样字符串。
 
 ## 内存、清空与导出
 

@@ -20,7 +20,7 @@ const REASON = {
     allowed_source: '来源在 replay 白名单内',
     source_not_allowed: '来源未在 replay 白名单',
     format_mismatch: '载荷格式与目标不匹配',
-    not_bridge_state: '不是 bridge 载荷（无 cxbr2 前缀）',
+    not_bridge_state: '不是 bridge 载荷（无 cxbr1 前缀）',
     malformed: 'bridge 载荷损坏，无法解码',
   },
   compaction: {
