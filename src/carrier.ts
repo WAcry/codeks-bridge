@@ -3,7 +3,7 @@ import type { ResponsesRequest, StateOrigin } from "./types.ts";
 
 // Versioned, self-contained state stored in the client's encrypted_content field.
 // These envelopes encode source facts and payloads, never replay policy.
-const REASONING_PREFIX = "cxbr2:";
+const REASONING_PREFIX = "cxbr1:";
 const COMPACTION_PREFIX = "cxbc1:";
 
 export interface HandoffRecipe {

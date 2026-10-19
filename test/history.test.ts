@@ -99,7 +99,7 @@ test("portable summaries and string input normalize to user messages; unknown re
   assert.match(prepareHistory([item], defaults.a)[0].content[0].text, /A portable checkpoint/);
   assert.deepEqual(prepareHistory("Hello", defaults.a), [{ type: "message", role: "user", content: [{ type: "input_text", text: "Hello" }] }]);
   assert.deepEqual(prepareHistory([{ type: "reasoning", encrypted_content: "unattributed-cipher" }], defaults.a), []);
-  assert.throws(() => prepareHistory([{ type: "reasoning", encrypted_content: "cxbr2:broken" }], defaults.a), /Malformed bridge reasoning/);
+  assert.throws(() => prepareHistory([{ type: "reasoning", encrypted_content: "cxbr1:broken" }], defaults.a), /Malformed bridge reasoning/);
 });
 
 test("unattributed compaction and stored references fail instead of losing history", () => {
