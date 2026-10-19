@@ -154,7 +154,7 @@ function b64ToBytes(b64) {
   return out;
 }
 
-export const CARRIER_RE = /^(cxbr2|cxbc2):/;
+export const CARRIER_RE = /^(cxbr2|cxbc1):/;
 
 /** Decodes a bridge state envelope: prefix + base64url(JSON). */
 export function decodeCarrier(s) {

@@ -69,4 +69,4 @@ codeks 的明文 `agent_message` 在 GPT Responses 中保持原格式；Claude/D
 
 GPT 出站请求移除 item 顶层 `id`，保留工具配对的 `call_id`，使用 `store: false`。这样消息不会继续通过服务器 item ID 引用已过滤的 reasoning。请求必须包含完整历史，不能只带 `item_reference` 或 `previous_response_id`。
 
-原生压缩另用 `cxbc2:`，有独立的允许来源和文字摘要，详见[压缩](compaction.md)。
+压缩另用 `cxbc1:`，有独立的允许来源，保存文字摘要或按需复述配方。详见[压缩](compaction.md)。

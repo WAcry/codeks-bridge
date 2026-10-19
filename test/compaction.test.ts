@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { decodeCompaction } from "../src/carrier.ts";
 import { resolveModel, validateConfig } from "../src/config.ts";
-import { compact, isCompactionRequest, summaryRequest } from "../src/compaction.ts";
+import { collectHandoff, compact, handoffRequest, isCompactionRequest, summaryRequest } from "../src/compaction.ts";
 import { BridgeError } from "../src/errors.ts";
-import { SUMMARIZATION_PROMPT } from "../src/prompts.ts";
+import { HANDOFF_PROMPT, SUMMARIZATION_PROMPT } from "../src/prompts.ts";
 import type { AdapterId, Backend, BackendContext, ModelConfig } from "../src/types.ts";
 import type { Usage } from "../src/writer.ts";
 
@@ -47,7 +47,7 @@ function successfulBackend(onCall?: (ctx: BackendContext) => void): Backend {
   };
 }
 
-test("native compaction stores both representations and accounts for both requests", async () => {
+test("native compaction stores a deferred handoff recipe and accounts only for the native request", async () => {
   const ctx = context();
   let accepted = 0;
   ctx.onAccepted = () => { accepted++; };
@@ -55,18 +55,21 @@ test("native compaction stores both representations and accounts for both reques
   const calls: BackendContext[] = [];
   const result = await compact(ctx, successfulBackend((call) => calls.push(call)));
   assert.deepEqual(ctx.request, original);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 1);
+  assert.equal(isCompactionRequest(calls[0].request), true);
   assert.equal(accepted, 1);
-  assert.ok(calls.every((call) => call.compacting === true));
+  assert.equal(calls[0].compacting, true);
   assert.equal(result.item.type, "compaction");
   assert.match(String(result.item.id), /^cmp_/);
   assert.deepEqual(decodeCompaction(result.item.encrypted_content), {
-    summary: "The task must preserve the number 42.",
     native: { source: ctx.route.origin, format: "responses.compaction.v1", data: checkpoint },
+    handoff: {
+      prefix: [],
+      parameters: { model: ctx.request.model, instructions: ctx.request.instructions, tools: ctx.request.tools },
+      responsesLite: false,
+    },
   });
-  assert.deepEqual(result.usage, {
-    input_tokens: 200, output_tokens: 20, cached_tokens: 170, cache_write_tokens: 3, reasoning_tokens: 4,
-  });
+  assert.deepEqual(result.usage, nativeUsage);
 });
 
 for (const adapter of ["claude-messages", "deepseek-chat"] as const) {
@@ -77,6 +80,7 @@ for (const adapter of ["claude-messages", "deepseek-chat"] as const) {
     assert.equal(calls.length, 1);
     assert.equal(accepted, 1);
     assert.equal(isCompactionRequest(calls[0].request), false);
+    assert.equal((calls[0].request.input as any[]).at(-1).content[0].text, SUMMARIZATION_PROMPT);
     assert.deepEqual(decodeCompaction(result.item.encrypted_content), {
       summary: "The task must preserve the number 42.",
     });
@@ -113,47 +117,47 @@ test("a compaction trigger must be unique and last", async () => {
   assert.equal(isCompactionRequest({ model: "example-model", input: "hello" }), false);
 });
 
-for (const failingSide of ["native", "summary"]) {
-  test(`${failingSide} failure aborts the other request and publishes no checkpoint`, async () => {
+for (const stage of ["native", "handoff"]) {
+  test(`${stage} failures pass through unchanged`, async () => {
     const failure = new BridgeError("Temporary capacity shortage", "server_is_overloaded", 503, { "retry-after": "15" });
-    let siblingAborted = false;
     let calls = 0;
-    const backend: Backend = async (ctx) => {
-      calls++;
-      if (isCompactionRequest(ctx.request) === (failingSide === "native")) {
-        // Give both jobs a chance to enter the backend before either rejects.
-        await Promise.resolve();
-        throw failure;
-      }
-      await new Promise<void>((resolve) => {
-        ctx.signal.addEventListener("abort", () => { siblingAborted = true; resolve(); }, { once: true });
-      });
-      ctx.signal.throwIfAborted();
-      return { usage: summaryUsage };
-    };
-    await assert.rejects(compact(context(), backend), (error) => error === failure);
-    assert.equal(calls, 2);
-    assert.equal(siblingAborted, true);
+    const backend: Backend = async () => { calls++; throw failure; };
+    const run = stage === "native" ? compact : collectHandoff;
+    await assert.rejects(run(context(), backend), (error) => error === failure);
+    assert.equal(calls, 1);
   });
 }
 
-test("a completed native half is not returned while the summary is pending", async () => {
-  let finishSummary!: () => void;
-  const waitForSummary = new Promise<void>((resolve) => { finishSummary = resolve; });
-  let resolved = false;
-  const pending = compact(context(), async (ctx, writer) => {
-    if (isCompactionRequest(ctx.request)) {
-      writer.addItem(checkpoint);
-      return { usage: nativeUsage };
-    }
-    await waitForSummary;
-    writer.textDelta("Both halves completed.");
-    return { usage: summaryUsage };
-  }).then((value) => { resolved = true; return value; });
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(resolved, false);
-  finishSummary();
-  assert.equal(decodeCompaction((await pending).item.encrypted_content)?.summary, "Both halves completed.");
+test("the handoff uses source instructions and the exact retained input with native state", async () => {
+  const ctx = context("gpt-responses", new AbortController().signal, { native_replay: false });
+  const declaration = { type: "additional_tools", role: "developer", tools: ctx.request.tools };
+  const instructions = { type: "message", role: "developer", content: "Follow the project conventions." };
+  const user = { type: "message", role: "user", content: [{ type: "input_text", text: "Keep the exact value 42." }] };
+  ctx.request.input = [
+    declaration, instructions, user,
+    { type: "message", role: "assistant", content: [{ type: "output_text", text: "Old work" }] },
+    { type: "function_call", name: "lookup", call_id: "call_old", arguments: "{}" },
+    { type: "function_call_output", call_id: "call_old", output: "Old tool output" },
+    { type: "reasoning", summary: [], encrypted_content: "old-reasoning" },
+    { type: "compaction_trigger" },
+  ];
+  const native = await compact(ctx, successfulBackend());
+  const recipe = decodeCompaction(native.item.encrypted_content)!.handoff!;
+  const retained = [user, { type: "message", role: "developer", content: "Client-retained update." }];
+  const handoff = handoffRequest(recipe, retained, native.item);
+  const calls: BackendContext[] = [];
+  const result = await collectHandoff({ ...ctx, request: handoff }, successfulBackend(call => calls.push(call)));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].route.compaction.native_replay, true);
+  assert.equal(ctx.route.compaction.native_replay, false);
+  assert.deepEqual(result, { summary: "The task must preserve the number 42.", usage: summaryUsage });
+  assert.equal(handoff.instructions, ctx.request.instructions);
+  assert.deepEqual(handoff.tools, ctx.request.tools);
+  assert.equal(handoff.tool_choice, "none");
+  assert.equal(handoff.text, undefined);
+  assert.deepEqual(handoff.input, [declaration, instructions, ...retained, native.item, {
+    type: "message", role: "user", content: [{ type: "input_text", text: HANDOFF_PROMPT }],
+  }]);
 });
 
 test("missing, duplicate, and empty native checkpoints are rejected", async () => {
@@ -183,23 +187,33 @@ test("empty, refused, tool, and unfinished summaries never replace history", asy
       return { usage: summaryUsage, endTurn: false };
     },
   ];
-  for (const backend of backends) await assert.rejects(compact(context("deepseek-chat"), backend), BridgeError);
+  for (const backend of backends) {
+    await assert.rejects(compact(context("deepseek-chat"), backend), BridgeError);
+    await assert.rejects(collectHandoff(context(), backend), BridgeError);
+  }
 });
 
-test("caller cancellation reaches both upstream requests", async () => {
-  const cancel = new AbortController();
-  const seenSignals: AbortSignal[] = [];
-  const pending = compact(context("gpt-responses", cancel.signal), async (ctx) => {
-    seenSignals.push(ctx.signal);
-    await new Promise<void>((resolve) => { ctx.signal.addEventListener("abort", () => resolve(), { once: true }); });
-    ctx.signal.throwIfAborted();
-    return { usage: summaryUsage };
+for (const phase of ["native", "handoff"]) {
+  test(`caller cancellation reaches the active ${phase} request`, async () => {
+    const cancel = new AbortController();
+    let started!: () => void;
+    const active = new Promise<void>(resolve => { started = resolve; });
+    const seenSignals: AbortSignal[] = [];
+    const run = phase === "native" ? compact : collectHandoff;
+    const pending = run(context("gpt-responses", cancel.signal), async (ctx) => {
+      seenSignals.push(ctx.signal);
+      started();
+      await new Promise<void>((resolve) => { ctx.signal.addEventListener("abort", () => resolve(), { once: true }); });
+      ctx.signal.throwIfAborted();
+      return { usage: summaryUsage };
+    });
+    await active;
+    cancel.abort(new Error("Caller disconnected"));
+    await assert.rejects(pending, /Caller disconnected/);
+    assert.equal(seenSignals.length, 1);
+    assert.ok(seenSignals.every((signal) => signal.aborted));
   });
-  cancel.abort(new Error("Caller disconnected"));
-  await assert.rejects(pending, /Caller disconnected/);
-  assert.equal(seenSignals.length, 2);
-  assert.ok(seenSignals.every((signal) => signal.aborted));
-});
+}
 
 test("an already canceled request makes no upstream requests", async () => {
   const signal = AbortSignal.abort(new Error("Canceled"));
@@ -218,18 +232,12 @@ test("summary-only Responses compaction is configured independently from native 
   assert.deepEqual(result.usage, summaryUsage);
 });
 
-test("a completed half followed by an upstream error never produces a partial checkpoint", async () => {
-  for (const failingSide of ["native", "summary"]) {
-    const error = new BridgeError("Native upstream detail", "upstream_error", 502, { "retry-after": "23" });
-    const backend: Backend = async (ctx, writer) => {
-      if (isCompactionRequest(ctx.request) === (failingSide === "native")) {
-        await new Promise<void>((resolve) => setImmediate(resolve));
-        throw error;
-      }
-      if (isCompactionRequest(ctx.request)) writer.addItem(checkpoint);
-      else writer.textDelta("Complete text half.");
-      return { usage: summaryUsage };
-    };
-    await assert.rejects(compact(context(), backend), (actual) => actual === error);
-  }
+test("unfinished native compaction never produces a checkpoint", async () => {
+  let calls = 0;
+  await assert.rejects(compact(context(), async (_ctx, writer) => {
+    calls++;
+    writer.addItem(checkpoint);
+    return { usage: nativeUsage, endTurn: false };
+  }), /did not finish/);
+  assert.equal(calls, 1);
 });

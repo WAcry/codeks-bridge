@@ -17,7 +17,7 @@ export interface Annotation {
   pointer: string;
   event?: number;
   kind: "reasoning" | "compaction";
-  decision: "replay" | "drop" | "native" | "summary" | "reject" | "output";
+  decision: "replay" | "drop" | "native" | "summary" | "handoff" | "reject" | "output";
   reason: string;
   source: { aliases: string[]; model: string; adapter: string; origin_id: string } | null;
   format: string | null;
@@ -245,7 +245,7 @@ function compactionInput(inspector: Inspector, route: ResolvedModel, item: any, 
       : !route.compaction.native_replay ? "native_replay_disabled"
         : !route.replay.native_compaction.has(native.source.id) ? "source_not_allowed" : "format_mismatch";
   return {
-    ...base, decision: restored ? "native" : "summary", reason,
+    ...base, decision: restored ? "native" : carrier.summary !== undefined ? "summary" : "handoff", reason,
     source: native ? source(inspector, native.source) : null, format: native?.format ?? null, decoded: carrier,
   };
 }
@@ -281,13 +281,13 @@ function annotations(exchange: Exchange, client: ReturnType<typeof messageView>)
   }
   if (client?.events) {
     client.events.forEach((event, index) => {
-      if (!event.data.includes("cxbr2:") && !event.data.includes("cxbc2:")) return;
+      if (!event.data.includes("cxbr2:") && !event.data.includes("cxbc1:")) return;
       const data = parse(event.data);
       if (data?.type !== "response.output_item.done") return;
       const note = outputNote(inspector, data.item, { target: "client.response", event: index, pointer: "/item" });
       if (note) notes.push(note);
     });
-  } else if (client && (client.body.text.includes("cxbr2:") || client.body.text.includes("cxbc2:"))) {
+  } else if (client && (client.body.text.includes("cxbr2:") || client.body.text.includes("cxbc1:"))) {
     const output = parse(client.body.text)?.output;
     if (Array.isArray(output)) output.forEach((item: any, index: number) => {
       const note = outputNote(inspector, item, { target: "client.response", pointer: `/output/${index}` });

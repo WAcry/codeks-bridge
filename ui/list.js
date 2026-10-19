@@ -65,7 +65,7 @@ function rowEl(s, flat, onSelect) {
   const key = threadKey(s);
   if (key) { el.classList.add('hued'); el.style.setProperty('--thue', hashHue(key)); }
   const status = s.status != null ? ` ${s.status}` : '';
-  put(el, 
+  put(el,
     h('div', { class: 'x1' },
       h('span', { class: 'x-time' }, fmtTime(s.started_at)),
       h('span', { class: `chip kind k-${s.kind}` }, KIND_LABEL[s.kind] ?? s.kind ?? '?'),

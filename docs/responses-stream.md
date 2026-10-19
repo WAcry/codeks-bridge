@@ -24,7 +24,7 @@ GPT 的 `response.incomplete` 保留原类型、原因和 usage，不改成通�
 
 流式入口等上游成功响应头到达后，才发送下游 HTTP 200 并开始 SSE。上游 HTTP 失败保留 status、body 内容和诊断 header，包括 `Retry-After`；不解析后重新包装错误体。fetch 已解压响应体，因此去掉原 `Content-Encoding`、`Content-Length`，以及只适用于当前连接的传输 header。
 
-上游流内错误保留完整 error 对象，放入 `response.failed.response.error`；上游提供完整 response envelope 时也一并保留。`code`、`type`、`misalignment`、`plan_type`、`resets_at` 等字段不改写，也不按 GPT 错误码白名单分类。只有 error 中缺少 `retry-after` 而上游 HTTP header 提供了它时，才补入 `error.headers`。非流式客户端收到相同原生错误，HTTP 状态为 502；它不能恢复已经成功建立的上游流的 HTTP 错误状态。成功响应另保留上游的 `x-request-id`、`request-id`，便于关联诊断；双压缩有两个请求，不选取其中一个冒充整体请求 ID。
+上游流内错误保留完整 error 对象，放入 `response.failed.response.error`；上游提供完整 response envelope 时也一并保留。`code`、`type`、`misalignment`、`plan_type`、`resets_at` 等字段不改写，也不按 GPT 错误码白名单分类。只有 error 中缺少 `retry-after` 而上游 HTTP header 提供了它时，才补入 `error.headers`。非流式客户端收到相同原生错误，HTTP 状态为 502；它不能恢复已经成功建立的上游流的 HTTP 错误状态。成功响应另保留上游的 `x-request-id`、`request-id`，便于关联诊断。按需复述后的恢复返回目标请求的 ID，辅助导出不占用该 header，不制造复合请求 ID。
 
 这是保留客户端行为的协议边界。已核对 Codex `0.163.0` 的 `codex-rs/codex-api/src/api_bridge.rs` 与 `sse/responses_error.rs`：HTTP 和 SSE 使用不同的错误处理路径，部分专用提示依赖原错误字段，未知 SSE code 则会进入可重试分支。把 HTTP 400 改成 200 + SSE，或把原生策略错误改名为 `upstream_error`，都可能把原本会停止的请求变成重试。bridge 因此接受等待响应头期间没有心跳的代价，不自行维护另一套 GPT 重试分类。
 
@@ -57,11 +57,11 @@ HTTP 失败发生在建立下游流之前，响应体使用顶层 `error`，Retr
 
 原始错误体保留厂商 code/type 和其他诊断。这个转换表只适用于非 Responses 上游，不用于改写 GPT 原生错误。网络错误保留可用的原因链。缺少凭据、凭据命令失败、输出为空或多行均返回 HTTP 400 + `invalid_prompt`，保持原本的终止语义；命令的 stdout/stderr 不外传。
 
-bridge 不重试、不替换端点，也不因错误移除 reasoning、关闭 thinking 或改用文字压缩。客户端决定重试预算和退避。下游取消会取消相关上游请求，包括双压缩的两条请求。
+bridge 不重试、不替换端点，也不因错误移除 reasoning、关闭 thinking 或改用文字压缩。客户端决定重试预算和退避。下游取消会取消当前相关上游请求，包括正在进行的原生压缩或复述；尚未开始的后续步骤不会执行。
 
 ## Usage
 
-GPT 保留原始 usage，包括提供的 cache write 等分项；DeepSeek 使用 prompt/completion 与 cache hit；Claude 将普通 input、cache read、cache creation 相加得到完整 input。转换后的总数只计算 input + output；reasoning 作为输出分项，不重复叠加。双压缩 usage 是两条实际请求之和，不是后续上下文大小。
+GPT 保留原始 usage，包括提供的 cache write 等分项；DeepSeek 使用 prompt/completion 与 cache hit；Claude 将普通 input、cache read、cache creation 相加得到完整 input。转换后的总数只计算 input + output；reasoning 作为输出分项，不重复叠加。`native` 初始只返回原生压缩用量；后续辅助复述的 usage 独立保存在本地缓存，不加入目标回答的 usage。
 
 成功响应的必需 usage 缺失或无效时返回错误，不使用零值影响客户端压缩判断。原生失败或 incomplete 保留上游提供的用量，不以 usage 校验覆盖原始终止原因。
 
@@ -69,6 +69,10 @@ GPT 保留原始 usage，包括提供的 cache write 等分项；DeepSeek 使用
 
 等待上游响应头期间不发送下游响应头或 keepalive。上游接受请求后，每 15 秒发送 JSON `keepalive` 事件，客户端忽略内容并刷新流空闲计时。SSE 注释不能提供同样效果。
 
-双压缩须等两条请求都收到成功响应头，才建立下游流；生成完成前只发送 keepalive，不交付任一分支的部分内容。如果一条已进入 SSE 的分支先失败，另一条还在等待响应头，则取消另一条，并以原生 SSE 错误结束下游请求。这保持已经发生的错误所属的协议路径，不伪造 HTTP 失败。
+`native` 初始压缩在原生请求被接受后建立流；后续需要按需复述时，先完成并缓存文字，再等待目标请求被接受。辅助复述不提前打开下游流。
+
+上述等待仍可能遇到上游流内失败。即使下游尚未建立流，bridge 也会以原生 SSE 错误结束请求，而非把已经发生的流内失败伪造成 HTTP 失败。HTTP 失败则保留原状态码和响应体。辅助请求的 `response.failed` 保留原 error 及其他 response 字段，但清空 output、移除 usage，避免把源请求的部分结果算成目标回答。辅助请求的 `response.incomplete` 视为压缩不完整，返回 `invalid_prompt`，原 response 留在 `upstream.body` 供诊断，不交付其部分输出。
+
+按需复述的等待可能覆盖完整的辅助推理，客户端空闲超时应足以容纳该等待。
 
 上游空闲超时独立控制，默认 300 秒，可设置 `upstreams.<id>.stream_idle_timeout_ms`，也覆盖等待响应头和读取错误体的阶段。只有上游字节重置它，下游 keepalive 不延长它。因此已接受的慢压缩可以保持客户端连接，卡住的上游仍会超时报错。

@@ -26,23 +26,17 @@ function callKeys(calls) {
   });
 }
 
-function apiGuess(d) {
-  if (d.route?.api) return d.route.api;
-  return { 'claude-messages': 'anthropic', 'deepseek-chat': 'chat', 'gpt-responses': 'responses' }[d.adapter] ?? d.api ?? 'responses';
-}
-
 /** All panes of an exchange, in pipeline order. */
 export function stagesOf(d) {
-  const api = apiGuess(d);
   const keys = callKeys(d.upstream);
   const out = [{ key: 'overview', type: 'overview', title: '概要' },
-    { key: 'req', type: 'request', num: '①', title: 'codeks → bridge', sub: '客户端请求', api: 'responses', target: 'client.request', msg: d.client?.request ?? null }];
+    { key: 'req', type: 'request', num: '①', title: 'codeks → bridge', sub: '客户端请求', target: 'client.request', msg: d.client?.request ?? null }];
   (d.upstream ?? []).forEach((call, i) => {
     const label = callLabel(call.label);
-    out.push({ key: `up:${keys[i]}`, type: 'request', num: '②', title: 'bridge → 上游', sub: label, api, call, msg: call });
-    out.push({ key: `upres:${keys[i]}`, type: 'response', num: '③', title: '上游 → bridge', sub: label, api, call, resp: call.response ?? null });
+    out.push({ key: `up:${keys[i]}`, type: 'request', num: '②', title: 'bridge → 上游', sub: label, call, msg: call });
+    out.push({ key: `upres:${keys[i]}`, type: 'response', num: '③', title: '上游 → bridge', sub: label, call, resp: call.response ?? null });
   });
-  out.push({ key: 'res', type: 'response', num: '④', title: 'bridge → codeks', sub: '客户端响应', api: 'responses', target: 'client.response', resp: d.client?.response ?? null });
+  out.push({ key: 'res', type: 'response', num: '④', title: 'bridge → codeks', sub: '客户端响应', target: 'client.response', resp: d.client?.response ?? null });
   out.push({ key: 'ann', type: 'ann', title: `标注 ${d.annotations?.length ?? 0}` });
   out.push({ key: 'diff', type: 'diff', title: '对比' });
   return out;
@@ -445,7 +439,7 @@ export class DetailView {
     if (isReq) {
       const r = parseBody(body);
       if (!r.ok) return h('div', null, h('div', { class: 'note' }, `正文不是合法 JSON：${r.error}`), strBlock(body?.text ?? ''));
-      return structureView(r.value, { state: st, ann, annChip: chip, note: stage.target ? null : `上游 API：${stage.api}` });
+      return structureView(r.value, { state: st, ann, annChip: chip });
     }
     const fo = finalObject(resp);
     return structureView(fo.value, { state: st, ann, annChip: chip, note: fo.note });

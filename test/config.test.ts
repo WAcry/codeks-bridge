@@ -42,7 +42,7 @@ test("configuration validates local references and formats without guessing endp
   c.models.second.catalog = "gpt-6.1-sol";
   assert.throws(() => validateConfig(c), /cannot decode/);
   delete c.models.second.replay;
-  c.models.first.compaction = { mode: "dual" };
+  c.models.first.compaction = { mode: "native" };
   assert.throws(() => validateConfig(c), /native compaction representation/);
   delete c.models.first.compaction;
   c.upstreams.a.base_url = "https://key@example.com";
@@ -70,13 +70,31 @@ test("catalog and adapter share configured efforts while unknown request values 
   assert.match(configSnippet(c, "/tmp/catalog.json"), /remote_compaction = "v2"/);
 });
 
+test("compaction defaults follow the adapter's native representation", () => {
+  const c = config();
+  assert.deepEqual(resolveModel(c, "first").compaction, { mode: "summary", native_replay: false });
+  c.models.first.catalog = "gpt-6.1-sol";
+  assert.deepEqual(resolveModel(validateConfig(c), "first").compaction, { mode: "native", native_replay: true });
+});
+
 test("native compaction generation and replay are independently configured", () => {
   const c = config();
   c.models.first.catalog = "gpt-6.1-sol";
   c.models.first.compaction = { mode: "summary", native_replay: true };
   assert.deepEqual(resolveModel(validateConfig(c), "first").compaction, { mode: "summary", native_replay: true });
-  c.models.first.compaction = { mode: "dual", native_replay: false };
-  assert.deepEqual(resolveModel(validateConfig(c), "first").compaction, { mode: "dual", native_replay: false });
+  c.models.first.compaction = { mode: "native", native_replay: false };
+  assert.deepEqual(resolveModel(validateConfig(c), "first").compaction, { mode: "native", native_replay: false });
+  c.models.first.catalog = "deepseek-flash";
+  assert.throws(() => validateConfig(c), /native compaction representation/);
+});
+
+test("compaction cache directory is optional and validates explicit paths", () => {
+  const c = config();
+  assert.equal(c.compaction_cache_dir, undefined);
+  c.compaction_cache_dir = "/tmp/synthetic-compaction-cache";
+  assert.equal(validateConfig(c).compaction_cache_dir, c.compaction_cache_dir);
+  c.compaction_cache_dir = "  ";
+  assert.throws(() => validateConfig(c), /compaction_cache_dir/);
 });
 
 test("credential commands keep diagnostics private and adapters own protocol headers", async () => {

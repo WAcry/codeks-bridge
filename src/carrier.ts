@@ -1,10 +1,17 @@
 import { BridgeError } from "./errors.ts";
-import type { StateOrigin } from "./types.ts";
+import type { ResponsesRequest, StateOrigin } from "./types.ts";
 
 // Versioned, self-contained state stored in the client's encrypted_content field.
 // These envelopes encode source facts and payloads, never replay policy.
 const REASONING_PREFIX = "cxbr2:";
-const COMPACTION_PREFIX = "cxbc2:";
+const COMPACTION_PREFIX = "cxbc1:";
+
+export interface HandoffRecipe {
+  prefix: Record<string, any>[];
+  parameters: Pick<ResponsesRequest, "model"> & Partial<Pick<ResponsesRequest,
+    "instructions" | "tools" | "reasoning" | "prompt_cache_key" | "max_output_tokens" | "service_tier" | "parallel_tool_calls">>;
+  responsesLite: boolean;
+}
 
 export interface StatePayload {
   source: StateOrigin;
@@ -14,8 +21,10 @@ export interface StatePayload {
 
 export interface CompactionCarrier {
   /** The prompt-based summary. Any model can read it. */
-  summary: string;
+  summary?: string;
   native?: StatePayload;
+  /** Source request information needed to materialize a deferred summary. */
+  handoff?: HandoffRecipe;
 }
 
 function object(value: unknown): value is Record<string, any> {
@@ -30,8 +39,13 @@ function statePayload(value: unknown): value is StatePayload {
 }
 
 function compactionCarrier(value: unknown): value is CompactionCarrier {
-  return object(value) && typeof value.summary === "string" && !!value.summary.trim() &&
-    (value.native === undefined || statePayload(value.native));
+  if (!object(value) || (value.native !== undefined && !statePayload(value.native))) return false;
+  if (value.summary !== undefined && (typeof value.summary !== "string" || !value.summary.trim())) return false;
+  if (value.handoff !== undefined && (!object(value.handoff) ||
+    !Array.isArray(value.handoff.prefix) || !value.handoff.prefix.every(object) ||
+    !object(value.handoff.parameters) || typeof value.handoff.parameters.model !== "string" ||
+    typeof value.handoff.responsesLite !== "boolean")) return false;
+  return value.summary !== undefined || (value.native !== undefined && value.handoff !== undefined);
 }
 
 function encode(prefix: string, value: unknown): string {

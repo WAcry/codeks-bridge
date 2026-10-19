@@ -65,11 +65,12 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
     if (item.type === "compaction" || item.type === "compaction_summary") {
       const carrier = decodeCompaction(item.encrypted_content);
       if (!carrier) {
-        throw new BridgeError("This compaction item has no portable summary; start with history created through this bridge");
+        throw new BridgeError("This compaction item has no portable summary or handoff recipe; use history created through this bridge");
       }
       if (restoresNativeCompaction(carrier, route)) {
         result.push(carrier.native!.data as Record<string, any>);
       } else {
+        if (!carrier.summary) throw new BridgeError("Deferred compaction summary has not been materialized");
         result.push({
           type: "message",
           role: "user",

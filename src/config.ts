@@ -27,6 +27,7 @@ export function validateConfig(value: unknown): BridgeConfig {
   if (value.host !== undefined && (typeof value.host !== "string" || !value.host)) fail("host must be a string");
   if (value.port !== undefined && (!Number.isInteger(value.port) || value.port < 0 || value.port > 65535)) fail("port must be 0..65535");
   if (value.token_env !== undefined && (typeof value.token_env !== "string" || !value.token_env)) fail("token_env must name an environment variable");
+  if (value.compaction_cache_dir !== undefined && (typeof value.compaction_cache_dir !== "string" || !value.compaction_cache_dir.trim())) fail("compaction_cache_dir must be a nonempty path");
   if (value.inspect !== undefined) {
     const inspect = value.inspect;
     if (!object(inspect)) fail("inspect must be an object");
@@ -72,9 +73,9 @@ export function validateConfig(value: unknown): BridgeConfig {
     if (model.compaction !== undefined) {
       const c = model.compaction;
       if (!object(c)) fail(`model ${slug}: compaction must be an object`);
-      if (c.mode !== undefined && !["dual", "summary"].includes(c.mode)) fail(`model ${slug}: compaction.mode must be dual or summary`);
+      if (c.mode !== undefined && !["summary", "native"].includes(c.mode)) fail(`model ${slug}: compaction.mode must be summary or native`);
       if (c.native_replay !== undefined && typeof c.native_replay !== "boolean") fail(`model ${slug}: compaction.native_replay must be boolean`);
-      if (!profile.native_compaction_format && (c.mode === "dual" || c.native_replay === true)) fail(`model ${slug}: adapter has no native compaction representation`);
+      if (!profile.native_compaction_format && (c.mode === "native" || c.native_replay === true)) fail(`model ${slug}: adapter has no native compaction representation`);
     }
   }
   // References are directional. Validate decodability, not provider compatibility.
@@ -104,7 +105,7 @@ export function resolveModel(config: BridgeConfig, slug: string): ResolvedModel 
     slug, config: model, upstream: config.upstreams[model.upstream], profile, origin: source,
     replay: { reasoning: allowed(model.replay?.reasoning_from), native_compaction: allowed(model.replay?.native_compaction_from) },
     compaction: {
-      mode: model.compaction?.mode ?? (profile.native_compaction_format ? "dual" : "summary"),
+      mode: model.compaction?.mode ?? (profile.native_compaction_format ? "native" : "summary"),
       native_replay: model.compaction?.native_replay ?? !!profile.native_compaction_format,
     },
   };

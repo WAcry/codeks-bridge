@@ -1,8 +1,10 @@
 import { encodeCompaction } from "./carrier.ts";
-import { BridgeError } from "./errors.ts";
+import type { CompactionCarrier, HandoffRecipe } from "./carrier.ts";
+import { splitCompactionPrefix } from "./compaction-history.ts";
+import { BridgeError, ResponsesIncompleteError, ResponsesStreamError } from "./errors.ts";
 import { newId } from "./ids.ts";
 import { withCaptureLabel } from "./inspect/capture.ts";
-import { SUMMARIZATION_PROMPT } from "./prompts.ts";
+import { HANDOFF_PROMPT, SUMMARIZATION_PROMPT } from "./prompts.ts";
 import type { Backend, BackendContext, ResponsesRequest } from "./types.ts";
 import { ResponseWriter } from "./writer.ts";
 import type { Usage } from "./writer.ts";
@@ -46,9 +48,44 @@ export function summaryRequest(request: ResponsesRequest): ResponsesRequest {
   return result;
 }
 
+const HANDOFF_PARAMETERS = ["model", "instructions", "tools", "reasoning", "prompt_cache_key",
+  "max_output_tokens", "service_tier", "parallel_tool_calls"] as const;
+
+function handoffRecipe(context: BackendContext, prefix: Item[]): HandoffRecipe {
+  const parameters = Object.fromEntries(HANDOFF_PARAMETERS
+    .filter(key => context.request[key] !== undefined).map(key => [key, context.request[key]]));
+  return structuredClone({ prefix, parameters, responsesLite: context.responsesLite === true }) as HandoffRecipe;
+}
+
+/** Rephrase the checkpoint using the exact history retained by the client. */
+export function handoffRequest(recipe: HandoffRecipe, retained: Item[], checkpoint: Item): ResponsesRequest {
+  const parameters = Object.fromEntries(HANDOFF_PARAMETERS
+    .filter(key => recipe.parameters[key] !== undefined).map(key => [key, recipe.parameters[key]]));
+  return {
+    ...parameters,
+    model: recipe.parameters.model,
+    input: [...recipe.prefix, ...retained, checkpoint,
+      { type: "message", role: "user", content: [{ type: "input_text", text: HANDOFF_PROMPT }] }],
+    tool_choice: "none", stream: true,
+  };
+}
+
 async function collect(context: BackendContext, backend: Backend): Promise<CollectedResponse> {
   const writer = new ResponseWriter({ write() {} }, { model: context.request.model, showSummary: false });
-  const result = await backend(context, writer);
+  let result;
+  try {
+    result = await backend(context, writer);
+  } catch (cause) {
+    // Auxiliary output and usage must not become the client's replacement history.
+    if (cause instanceof ResponsesIncompleteError) {
+      throw new BridgeError(cause.message, "invalid_prompt", 400, undefined, { upstream: { body: cause.response }, cause });
+    }
+    if (cause instanceof ResponsesStreamError && cause.response) {
+      const { output: _output, usage: _usage, ...response } = cause.response;
+      throw new ResponsesStreamError(cause.error, { ...response, output: [] }, cause.event);
+    }
+    throw cause;
+  }
   context.signal.throwIfAborted();
   writer.complete(result.usage);
   if (result.endTurn === false) throw new BridgeError("Compaction did not finish its response.");
@@ -73,6 +110,14 @@ function summaryText(output: readonly unknown[]): string {
   return summary;
 }
 
+export async function collectHandoff(context: BackendContext, backend: Backend): Promise<{ summary: string; usage: Usage }> {
+  // Generating text from the source's own native state is independent of whether
+  // that route normally chooses to replay native checkpoints in ordinary turns.
+  const route = { ...context.route, compaction: { ...context.route.compaction, native_replay: true } };
+  const result = await withCaptureLabel("handoff", () => collect({ ...context, route, compacting: true }, backend));
+  return { summary: summaryText(result.output), usage: result.usage };
+}
+
 function nativeItem(output: readonly unknown[]): Record<string, unknown> {
   const items = output.filter((value) => {
     const item = value as Item;
@@ -84,63 +129,28 @@ function nativeItem(output: readonly unknown[]): Record<string, unknown> {
   return items[0];
 }
 
-function combinedUsage(first: Usage, second?: Usage): Usage {
-  if (!second) return first;
-  const result: Usage = {
-    input_tokens: first.input_tokens + second.input_tokens,
-    output_tokens: first.output_tokens + second.output_tokens,
-  };
-  for (const field of ["cached_tokens", "cache_write_tokens", "reasoning_tokens"] as const) {
-    if (first[field] !== undefined || second[field] !== undefined) result[field] = (first[field] ?? 0) + (second[field] ?? 0);
-  }
-  return result;
-}
-
-/** Publish one checkpoint only when every required representation is complete. */
+/** Publish a complete native checkpoint or portable text summary. */
 export async function compact(context: BackendContext, backend: Backend): Promise<CompactionResult> {
-  const prompt = summaryRequest(context.request);
+  const input = compactionInput(context.request);
   context.signal.throwIfAborted();
-  const cancel = new AbortController();
-  const signal = AbortSignal.any([context.signal, cancel.signal]);
-  let pendingAcceptance = context.route.compaction.mode === "dual" ? 2 : 1;
-  const shared = { ...context, compacting: true, signal, onAccepted: (headers?: Headers) => {
-    if (--pendingAcceptance === 0 && !signal.aborted) {
-      context.onAccepted?.(context.route.compaction.mode === "summary" ? headers : undefined);
-    }
-  } };
-  const run = async <T>(label: string, request: ResponsesRequest, decode: (output: readonly unknown[]) => T) => {
-    try {
-      const result = await withCaptureLabel(label, () => collect({ ...shared, request }, backend));
-      return { value: decode(result.output), usage: result.usage };
-    } catch (error) {
-      cancel.abort(error);
-      throw error;
-    }
-  };
-  // Both requests read the same original history. Neither receives the other's output.
-  const summaryPromise = run("summary", prompt, summaryText);
-  const nativePromise = context.route.compaction.mode === "dual"
-    ? run("native", { ...context.request, stream: true }, nativeItem)
-    : Promise.resolve(undefined);
-  const results = await Promise.allSettled([summaryPromise, nativePromise]);
-  const failure = results.find((result) => result.status === "rejected");
-  if (failure?.status === "rejected") throw signal.reason ?? failure.reason;
-  signal.throwIfAborted();
-  const summary = (results[0] as PromiseFulfilledResult<Awaited<typeof summaryPromise>>).value;
-  const native = (results[1] as PromiseFulfilledResult<Awaited<typeof nativePromise>>).value;
+  const item = (carrier: CompactionCarrier) => ({
+    type: "compaction", id: newId("cmp"), encrypted_content: encodeCompaction(carrier),
+  });
+  if (context.route.compaction.mode === "summary") {
+    const result = await withCaptureLabel("summary", () => collect({
+      ...context, compacting: true, request: summaryRequest(context.request),
+    }, backend));
+    return { item: item({ summary: summaryText(result.output) }), usage: result.usage };
+  }
+  const native = await withCaptureLabel("native", () => collect({
+    ...context, compacting: true, request: { ...context.request, stream: true },
+  }, backend));
+  const { prefix } = splitCompactionPrefix(input);
   return {
-    item: {
-      type: "compaction",
-      id: newId("cmp"),
-      encrypted_content: encodeCompaction({
-        summary: summary.value,
-        ...(native ? { native: {
-          source: context.route.origin,
-          format: context.route.profile.native_compaction_format!,
-          data: native.value,
-        } } : {}),
-      }),
-    },
-    usage: combinedUsage(summary.usage, native?.usage),
+    item: item({
+      native: { source: context.route.origin, format: context.route.profile.native_compaction_format!, data: nativeItem(native.output) },
+      handoff: handoffRecipe(context, prefix),
+    }),
+    usage: native.usage,
   };
 }

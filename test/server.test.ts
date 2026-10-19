@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { gzipSync } from "node:zlib";
@@ -7,6 +10,7 @@ import test, { type TestContext } from "node:test";
 import { createBridgeServer } from "../src/server.ts";
 import { buildCatalog } from "../src/catalog.ts";
 import { decodeCompaction, decodeReasoning } from "../src/carrier.ts";
+import { HANDOFF_PROMPT, SUMMARIZATION_PROMPT } from "../src/prompts.ts";
 import type { BridgeConfig } from "../src/types.ts";
 
 type Handler = (body: any, req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
@@ -24,6 +28,8 @@ async function close(server: Server): Promise<void> {
 }
 
 async function fixture(t: TestContext, handler: Handler, patch: Partial<BridgeConfig> = {}, configure?: (config: BridgeConfig) => void) {
+  const compactionCacheDir = await mkdtemp(join(tmpdir(), "codeks-bridge-server-"));
+  t.after(() => rm(compactionCacheDir, { recursive: true, force: true }));
   const seen: { path: string; body: any }[] = [];
   const upstream = createServer(async (req, res) => {
     try {
@@ -39,6 +45,7 @@ async function fixture(t: TestContext, handler: Handler, patch: Partial<BridgeCo
   t.after(async () => close(upstream));
   const origin = await listen(upstream);
   const config: BridgeConfig = {
+    compaction_cache_dir: compactionCacheDir,
     upstreams: {
       native: { base_url: `${origin}/native` },
       alternate: { base_url: `${origin}/alternate` },
@@ -77,8 +84,8 @@ function sse(res: ServerResponse, events: any[], finish = true) {
 
 const nativeUsage = { input_tokens: 20, output_tokens: 3, total_tokens: 23, input_tokens_details: { cached_tokens: 10 }, output_tokens_details: { reasoning_tokens: 1 } };
 const message = (text: string) => ({ type: "message", id: "msg_synthetic", role: "assistant", status: "completed", content: [{ type: "output_text", text }] });
-function nativeSuccess(res: ServerResponse, output: any[]) {
-  sse(res, [{ type: "response.completed", response: { id: "resp_synthetic", status: "completed", output, usage: nativeUsage } }]);
+function nativeSuccess(res: ServerResponse, output: any[], usage = nativeUsage) {
+  sse(res, [{ type: "response.completed", response: { id: "resp_synthetic", status: "completed", output, usage } }]);
 }
 function chatSuccess(res: ServerResponse, text: string) {
   sse(res, [
@@ -296,7 +303,7 @@ test("HTTP nonstream and SSE responses contain complete output and usage", async
   assert.equal(anthropic.end_turn, true);
 });
 
-test("GPT keeps Lite declarations, transport and reasoning through dual compaction", async (t) => {
+test("GPT keeps Lite declarations, transport and reasoning through native compaction and deferred handoff", async (t) => {
   const headers: (string | string[] | undefined)[] = [];
   const f = await fixture(t, (body, req, res) => {
     headers.push(req.headers["x-openai-internal-codex-responses-lite"]);
@@ -320,9 +327,10 @@ test("GPT keeps Lite declarations, transport and reasoning through dual compacti
   const compacted = await responseJson(await post(f.url, { ...body, input: [...input, { type: "compaction_trigger" }] }));
   assert.equal(compacted.status, "completed");
   const checkpoint = decodeCompaction(compacted.output[0].encrypted_content)!;
-  assert.equal(checkpoint.summary, "Portable summary");
+  assert.equal(checkpoint.summary, undefined);
+  await responseJson(await post(f.url, { ...body, model: "gpt-region", input: [...input, compacted.output[0]] }));
   assert.equal((checkpoint.native!.data as Record<string, unknown>).encrypted_content, "synthetic-native-checkpoint");
-  assert.deepEqual(headers, ["true", "true", "true", "true"]);
+  assert.deepEqual(headers, ["true", "true", "true", "true", "true"]);
   assert.deepEqual(f.seen[0].body.input, input);
   for (const { body: sent } of [f.seen[0], ...f.seen.slice(2)]) {
     assert.equal(Object.hasOwn(sent, "tools"), false);
@@ -330,98 +338,85 @@ test("GPT keeps Lite declarations, transport and reasoning through dual compacti
     assert.equal(sent.reasoning.context, "all_turns");
     assert.equal(sent.parallel_tool_calls, false);
   }
-  assert(f.seen.slice(2).some(({ body: sent }) => sent.input.at(-1).type === "compaction_trigger"));
-  assert(f.seen.slice(2).some(({ body: sent }) => sent.tool_choice === "none"));
+  assert.equal(f.seen[2].body.input.at(-1).type, "compaction_trigger");
+  const handoff = f.seen[3].body;
+  assert.equal(handoff.tool_choice, "none");
+  assert.deepEqual(handoff.input, [...input,
+    { type: "compaction", encrypted_content: "synthetic-native-checkpoint" },
+    { type: "message", role: "user", content: [{ type: "input_text", text: HANDOFF_PROMPT }] },
+  ]);
 });
 
-test("dual compaction waits for both successful upstream headers before sending HTTP 200", { timeout: 5000 }, async (t) => {
-  let nativeResponse!: ServerResponse;
-  let ready!: () => void;
-  let calls = 0;
-  const bothStarted = new Promise<void>((resolve) => { ready = resolve; });
-  const f = await fixture(t, (body, _req, res) => {
-    if (body.input.some((item: any) => item.type === "compaction_trigger")) nativeResponse = res;
-    else nativeSuccess(res, [message("Portable summary")]);
-    if (++calls === 2) ready();
+test("checkpoint handoff waits for the destination to accept before HTTP 200", { timeout: 5000 }, async (t) => {
+  let handoffResponse!: ServerResponse;
+  let targetResponse!: ServerResponse;
+  let handoffStarted!: () => void;
+  let targetStarted!: () => void;
+  const firstStarted = new Promise<void>(resolve => { handoffStarted = resolve; });
+  const secondStarted = new Promise<void>(resolve => { targetStarted = resolve; });
+  const f = await fixture(t, (body, req, res) => {
+    if (body.input.some((item: any) => item.type === "compaction_trigger")) {
+      nativeSuccess(res, [{ type: "compaction", encrypted_content: "synthetic-checkpoint" }]);
+    } else if (req.url!.startsWith("/native")) {
+      handoffResponse = res;
+      sse(res, [{ type: "response.created", response: { id: "resp_handoff" } }], false);
+      handoffStarted();
+    } else {
+      targetResponse = res;
+      targetStarted();
+    }
   });
+  const compacted = await responseJson(await post(f.url, { model: "gpt", input: [{ type: "compaction_trigger" }] }));
   let responseReceived = false;
-  const pending = post(f.url, { model: "gpt", input: [{ type: "compaction_trigger" }], stream: true })
+  const pending = post(f.url, { model: "gpt-region", input: compacted.output, stream: true })
     .then((response) => { responseReceived = true; return response; });
-  await bothStarted;
-  await new Promise((resolve) => setTimeout(resolve, 30));
+  await firstStarted;
+  await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal(responseReceived, false);
-  nativeSuccess(nativeResponse, [{ type: "compaction", encrypted_content: "synthetic-checkpoint" }]);
+  assert.equal(f.seen.length, 2);
+  handoffResponse.end(`data: ${JSON.stringify({ type: "response.completed", response: {
+    id: "resp_handoff", status: "completed", output: [message("Portable summary")], usage: nativeUsage,
+  } })}\n\n`);
+  await secondStarted;
+  assert.equal(responseReceived, false);
+  assert.equal(f.seen.length, 3);
+  nativeSuccess(targetResponse, [message("Destination answer")]);
   const response = await pending;
   assert.equal(response.status, 200);
   const frames = await events(response);
   assert.equal(frames.at(-1).type, "response.completed");
-  assert.equal(frames.at(-1).response.output[0].type, "compaction");
-  assert.equal(f.seen.length, 2);
+  assert.equal(frames.at(-1).response.output[0].content[0].text, "Destination answer");
 });
 
-test("a dual-compaction HTTP failure keeps its HTTP error and cancels the accepted sibling", { timeout: 5000 }, async (t) => {
-  let ready!: () => void;
-  let closed!: () => void;
-  let calls = 0;
-  const bothStarted = new Promise<void>((resolve) => { ready = resolve; });
-  const siblingClosed = new Promise<void>((resolve) => { closed = resolve; });
-  const body = { error: { code: "invalid_encrypted_content", message: "Synthetic checkpoint rejection" } };
-  const f = await fixture(t, async (request, _req, res) => {
-    const native = request.input.some((item: any) => item.type === "compaction_trigger");
-    if (!native) {
-      res.on("close", closed);
-      sse(res, [{ type: "response.created", response: { id: "resp_summary" } }], false);
-    }
-    if (++calls === 2) ready();
-    await bothStarted;
-    if (native) {
-      res.writeHead(400, { "content-type": "application/json", "retry-after": "11" });
-      res.end(JSON.stringify(body));
-    }
+test("native compaction HTTP failure retains its original HTTP response", async (t) => {
+  const error = { error: { code: "invalid_encrypted_content", message: "Synthetic checkpoint rejection", future_detail: 17 } };
+  const f = await fixture(t, (_body, _req, res) => {
+    res.writeHead(400, { "content-type": "application/json", "retry-after": "11" });
+    res.end(JSON.stringify(error));
   });
   const response = await post(f.url, { model: "gpt", input: [{ type: "compaction_trigger" }], stream: true });
   assert.equal(response.status, 400);
   assert.equal(response.headers.get("retry-after"), "11");
-  assert.deepEqual(await responseJson(response), body);
-  await siblingClosed;
-  assert.equal(f.seen.length, 2);
+  assert.deepEqual(await responseJson(response), error);
+  assert.equal(f.seen.length, 1);
 });
 
-for (const siblingAccepted of [false, true]) {
-  test(`dual-compaction native stream failure survives with sibling headers ${siblingAccepted ? "accepted" : "pending"}`, { timeout: 5000 }, async (t) => {
-    const error = { code: "misalignment_policy_violation", message: "Synthetic policy failure", misalignment: { reason: "synthetic_reason" }, future_field: { retained: true } };
-    let ready!: () => void;
-    let closed!: () => void;
-    let failNative!: () => void;
-    let calls = 0;
-    const bothStarted = new Promise<void>((resolve) => { ready = resolve; });
-    const siblingClosed = new Promise<void>((resolve) => { closed = resolve; });
-    const f = await fixture(t, async (request, _req, res) => {
-      const native = request.input.some((item: any) => item.type === "compaction_trigger");
-      if (native) {
-        sse(res, [{ type: "response.created", response: { id: "resp_native" } }], false);
-        failNative = () => res.end(`data: ${JSON.stringify({ type: "response.failed", response: { error } })}\n\n`);
-      } else {
-        res.on("close", closed);
-        if (siblingAccepted) sse(res, [{ type: "response.created", response: { id: "resp_summary" } }], false);
-      }
-      if (++calls === 2) ready();
-    });
-    const pending = post(f.url, { model: "gpt", input: [{ type: "compaction_trigger" }], stream: true });
-    await bothStarted;
-    // Once both headers are accepted the downstream stream must already exist.
-    const response = siblingAccepted ? await pending : undefined;
-    failNative();
-    const received = response ?? await pending;
-    assert.equal(received.status, 200);
-    const frames = await events(received);
-    assert.equal(frames.at(-1).type, "response.failed");
-    assert.deepEqual(frames.at(-1).response.error, error);
-    assert.equal(frames.some((frame) => frame.type === "response.completed" || frame.item?.type === "compaction"), false);
-    await siblingClosed;
-    assert.equal(f.seen.length, 2);
+test("native compaction stream failure preserves diagnostics and publishes no checkpoint", async (t) => {
+  const error = { code: "misalignment_policy_violation", message: "Synthetic policy failure", misalignment: { reason: "synthetic_reason" }, future_field: { retained: true } };
+  const f = await fixture(t, (_body, _req, res) => {
+    sse(res, [
+      { type: "response.created", response: { id: "resp_failed" } },
+      { type: "response.failed", response: { id: "resp_failed", status: "failed", error } },
+    ]);
   });
-}
+  const response = await post(f.url, { model: "gpt", input: [{ type: "compaction_trigger" }], stream: true });
+  assert.equal(response.status, 200);
+  const frames = await events(response);
+  assert.equal(frames.at(-1).type, "response.failed");
+  assert.deepEqual(frames.at(-1).response.error, error);
+  assert.equal(frames.some(frame => frame.type === "response.completed" || frame.item?.type === "compaction"), false);
+  assert.equal(f.seen.length, 1);
+});
 
 test("translated HTTP errors preserve capacity classification and Retry-After before starting a stream", async (t) => {
   let status = 429;
@@ -643,10 +638,10 @@ test("native and portable checkpoints survive server restart and switches betwee
   const completed = frames.find((frame) => frame.type === "response.completed").response;
   const checkpoint = JSON.parse(JSON.stringify(completed.output[0]));
   assert.equal(checkpoint.type, "compaction");
-  assert.equal(decodeCompaction(checkpoint.encrypted_content)?.summary, summary);
+  assert.equal(decodeCompaction(checkpoint.encrypted_content)?.summary, undefined);
   assert.equal((decodeCompaction(checkpoint.encrypted_content)?.native?.data as any)?.encrypted_content, "native-checkpoint-synthetic");
-  assert.equal(completed.usage.input_tokens, 40);
-  assert.equal(f.seen.length, 2);
+  assert.equal(completed.usage.input_tokens, 20);
+  assert.equal(f.seen.length, 1);
   await f.restart();
 
   for (const model of ["gpt", "claude", "flash", "gpt-region", "gpt"]) {
@@ -664,7 +659,7 @@ test("native and portable checkpoints survive server restart and switches betwee
     } else {
       assert.ok(serialized.includes(summary));
       assert.equal(serialized.includes("native-checkpoint-synthetic"), false);
-      assert.equal(serialized.includes("cxbc2:"), false);
+      assert.equal(serialized.includes("cxbc"), false);
     }
     assert.equal(JSON.stringify(input), snapshot);
   }
@@ -679,7 +674,7 @@ test("native and portable checkpoints survive server restart and switches betwee
     const resumed = await post(f.url, { model: "gpt", input: [portable, { type: "message", role: "user", content: "Continue" }] });
     assert.equal(resumed.status, 200);
     assert.ok(JSON.stringify(f.seen.at(-1)!.body.input).includes(summary));
-    assert.equal(JSON.stringify(f.seen.at(-1)!.body.input).includes("cxbc2:"), false);
+    assert.equal(JSON.stringify(f.seen.at(-1)!.body.input).includes("cxbc"), false);
   }
 });
 
@@ -705,7 +700,7 @@ test("replay policy changes apply to saved state independently and only in the c
     assert.equal(outbound.some((item: any) => item.type === "reasoning"), expectedReasoning);
     assert.equal(outbound.some((item: any) => item.type === "compaction"), expectedNative);
     assert.equal(JSON.stringify(outbound).includes(summary), !expectedNative);
-    assert.doesNotMatch(JSON.stringify(outbound), /cxbr2:|cxbc2:/);
+    assert.doesNotMatch(JSON.stringify(outbound), /cxbr2:|cxbc[23]:/);
     return responseJson(response);
   }
 
@@ -787,6 +782,7 @@ test("a Responses model configured for summary compaction sends exactly one ordi
   assert.equal(checkpoint?.native, undefined);
   assert.equal(f.seen.length, 1);
   assert.equal(f.seen[0].body.input.some((item: any) => item.type === "compaction_trigger"), false);
+  assert.equal(f.seen[0].body.input.at(-1).content[0].text, SUMMARIZATION_PROMPT);
   assert.equal(f.seen[0].body.tool_choice, "none");
   assert.equal(result.usage.input_tokens, 20);
 });
@@ -837,3 +833,208 @@ test("HTTP summary opt-in controls visible reasoning while preserving replay car
     }
   }
 });
+
+for (const target of ["claude", "flash"]) {
+  test(`native compaction exports only when ${target} needs text and reuses its persisted handoff`, async (t) => {
+    const summary = "The checkpoint preserves the exact answer 42.";
+    let exports = 0;
+    const f = await fixture(t, (body, req, res) => {
+      if (req.url!.startsWith("/messages")) { messagesSuccess(res, "Target answer"); return; }
+      if (req.url!.startsWith("/chat")) { chatSuccess(res, "Target answer"); return; }
+      if (body.input.some((item: any) => item.type === "compaction_trigger")) {
+        nativeSuccess(res, [{ type: "compaction", encrypted_content: "synthetic-checkpoint-checkpoint" }]);
+      } else if (body.input.at(-1)?.content?.[0]?.text === HANDOFF_PROMPT) {
+        exports++;
+        nativeSuccess(res, [message(summary)], { ...nativeUsage, input_tokens: 900, output_tokens: 100, total_tokens: 1000 });
+      } else nativeSuccess(res, [message("Source continuation")]);
+    }, {}, config => { config.models.gpt.compaction = { mode: "native" }; });
+    const prefix = [
+      { type: "additional_tools", role: "developer", tools: [{ type: "function", name: "lookup", parameters: { type: "object", properties: {} } }] },
+      { type: "message", role: "developer", content: [{ type: "input_text", text: "Original source developer instructions." }] },
+    ];
+    const user = { type: "message", role: "user", content: [{ type: "input_text", text: "Keep the number 42." }] };
+    const oldWork = [
+      message("Old assistant work"),
+      { type: "function_call", name: "lookup", call_id: "call_before", arguments: "{}" },
+      { type: "function_call_output", call_id: "call_before", output: "Old tool results" },
+      { type: "reasoning", encrypted_content: "old-reasoning", summary: [] },
+    ];
+    const compacted = await responseJson(await post(f.url, {
+      model: "gpt", instructions: "Original source instructions.",
+      input: [...prefix, user, ...oldWork, { type: "compaction_trigger" }],
+      reasoning: { effort: "high", context: "all_turns" },
+    }));
+    assert.equal(compacted.status, "completed");
+    assert.equal(f.seen.length, 1);
+    assert.equal(exports, 0);
+    assert.equal(compacted.usage.total_tokens, 23);
+    const checkpoint = compacted.output[0];
+    const state = decodeCompaction(checkpoint.encrypted_content)!;
+    assert.equal(state.summary, undefined);
+    assert.equal((state.native!.data as any).encrypted_content, "synthetic-checkpoint-checkpoint");
+    const newWork = { type: "message", role: "user", content: [{ type: "input_text", text: "BBBB: new work after the checkpoint." }] };
+    const input = [...prefix, user, checkpoint, newWork];
+    const snapshot = JSON.stringify(input);
+    const sameSource = await responseJson(await post(f.url, { model: "gpt", input }));
+    assert.equal(sameSource.status, "completed");
+    assert.equal(exports, 0);
+    assert.equal(f.seen.length, 2);
+    assert(f.seen[1].body.input.some((item: any) => item.encrypted_content === "synthetic-checkpoint-checkpoint"));
+
+    const switched = await responseJson(await post(f.url, { model: target, instructions: "Current target instructions.", input }));
+    assert.equal(switched.status, "completed");
+    assert.equal(exports, 1);
+    assert.deepEqual(f.seen.slice(2).map(call => call.path), ["/native/responses", target === "claude" ? "/messages/messages" : "/chat/chat/completions"]);
+    assert.equal(switched.usage.input_tokens, 20);
+    assert.equal(switched.usage.output_tokens, 3);
+    assert.equal(switched.usage.total_tokens, 23);
+    const exported = f.seen[2].body;
+    assert.equal(exported.model, "gpt-example");
+    assert.equal(exported.instructions, "Original source instructions.");
+    assert.equal(exported.reasoning.effort, "high");
+    assert.equal(exported.tool_choice, "none");
+    assert.deepEqual(exported.input, [...prefix, user,
+      { type: "compaction", encrypted_content: "synthetic-checkpoint-checkpoint" },
+      { type: "message", role: "user", content: [{ type: "input_text", text: HANDOFF_PROMPT }] },
+    ]);
+    const downstream = JSON.stringify(f.seen[3].body);
+    assert(downstream.includes(summary));
+    assert(downstream.includes("BBBB: new work after the checkpoint."));
+    assert(!downstream.includes("synthetic-checkpoint-checkpoint"));
+    assert(!downstream.includes("cxbc"));
+    assert.equal(JSON.stringify(input), snapshot);
+
+    for (const restart of [false, true]) {
+      if (restart) await f.restart();
+      const before: number = f.seen.length;
+      const again = await responseJson(await post(f.url, { model: target, input }));
+      assert.equal(again.status, "completed");
+      assert.equal(exports, 1);
+      assert.equal(f.seen.length, before + 1);
+    }
+  });
+}
+
+test("checkpoint handoff can use native state when ordinary native replay is disabled", async (t) => {
+  const summary = "Portable source handoff.";
+  const f = await fixture(t, (body, _req, res) => {
+    if (body.input.some((item: any) => item.type === "compaction_trigger")) {
+      nativeSuccess(res, [{ type: "compaction", encrypted_content: "synthetic-source-state" }]);
+    } else if (body.input.at(-1)?.content?.[0]?.text === HANDOFF_PROMPT) {
+      assert(body.input.some((item: any) => item.encrypted_content === "synthetic-source-state"));
+      nativeSuccess(res, [message(summary)]);
+    } else {
+      assert(!body.input.some((item: any) => item.type === "compaction"));
+      assert(JSON.stringify(body.input).includes(summary));
+      nativeSuccess(res, [message("Continued with portable state")]);
+    }
+  }, {}, config => { config.models.gpt.compaction = { mode: "native", native_replay: false }; });
+  const compacted = await responseJson(await post(f.url, { model: "gpt", input: [{ type: "compaction_trigger" }] }));
+  assert.equal(f.seen.length, 1);
+  const continued = await responseJson(await post(f.url, { model: "gpt", input: compacted.output }));
+  assert.equal(continued.status, "completed");
+  assert.equal(f.seen.length, 3);
+  assert.equal(continued.usage.total_tokens, 23);
+});
+
+for (const transport of ["http", "stream"]) {
+  test(`checkpoint handoff ${transport} failure reaches the client before any destination request`, async (t) => {
+    const error = { code: "invalid_encrypted_content", message: "Synthetic export failure", future_detail: { preserved: true } };
+    let failExport = true;
+    const f = await fixture(t, (body, req, res) => {
+      if (req.url!.startsWith("/messages")) { messagesSuccess(res, "Destination answer"); return; }
+      if (body.input.some((item: any) => item.type === "compaction_trigger")) {
+        nativeSuccess(res, [{ type: "compaction", encrypted_content: "synthetic-checkpoint-failure" }]);
+      } else if (!failExport) nativeSuccess(res, [message("Successful retried handoff")]);
+      else if (transport === "http") {
+        res.writeHead(400, { "content-type": "application/json", "retry-after": "19" });
+        res.end(JSON.stringify({ error }));
+      } else sse(res, [
+        { type: "response.created", response: { id: "resp_export" } },
+        { type: "response.failed", response: { id: "resp_export", status: "failed", error, output: [message("Partial export")], usage: nativeUsage } },
+      ]);
+    }, {}, config => { config.models.gpt.compaction = { mode: "native" }; });
+    const compacted = await responseJson(await post(f.url, { model: "gpt", input: [{ type: "compaction_trigger" }] }));
+    const input = [...compacted.output, { type: "message", role: "user", content: "Continue on the destination." }];
+    const response = await post(f.url, { model: "claude", input, stream: true });
+    if (transport === "http") {
+      assert.equal(response.status, 400);
+      assert.equal(response.headers.get("retry-after"), "19");
+      assert.deepEqual(await responseJson(response), { error });
+    } else {
+      assert.equal(response.status, 200);
+      const frames = await events(response);
+      assert.equal(frames.at(-1).type, "response.failed");
+      assert.deepEqual(frames.at(-1).response.error, error);
+      assert.deepEqual(frames.at(-1).response.output, []);
+      assert.equal(frames.at(-1).response.usage, undefined);
+      assert.equal(frames.some(frame => frame.type === "response.completed" || frame.item?.type === "message"), false);
+    }
+    assert.deepEqual(f.seen.map(call => call.path), ["/native/responses", "/native/responses"]);
+    failExport = false;
+    assert.equal((await responseJson(await post(f.url, { model: "claude", input }))).status, "completed");
+    assert.deepEqual(f.seen.slice(2).map(call => call.path), ["/native/responses", "/messages/messages"]);
+  });
+}
+
+test("client cancellation during checkpoint handoff closes the source and never calls the destination", { timeout: 5000 }, async (t) => {
+  let exportStarted!: () => void;
+  let exportClosed!: () => void;
+  const started = new Promise<void>(resolve => { exportStarted = resolve; });
+  const closed = new Promise<void>(resolve => { exportClosed = resolve; });
+  const f = await fixture(t, (body, _req, res) => {
+    if (body.input.some((item: any) => item.type === "compaction_trigger")) {
+      nativeSuccess(res, [{ type: "compaction", encrypted_content: "synthetic-checkpoint-cancellation" }]);
+    } else {
+      res.on("close", exportClosed);
+      sse(res, [{ type: "response.created", response: { id: "resp_export" } }], false);
+      exportStarted();
+    }
+  }, {}, config => { config.models.gpt.compaction = { mode: "native" }; });
+  const compacted = await responseJson(await post(f.url, { model: "gpt", input: [{ type: "compaction_trigger" }] }));
+  const controller = new AbortController();
+  const pending = post(f.url, { model: "claude", input: compacted.output, stream: true }, { signal: controller.signal });
+  await started;
+  controller.abort();
+  await assert.rejects(pending, /abort/i);
+  await closed;
+  assert.deepEqual(f.seen.map(call => call.path), ["/native/responses", "/native/responses"]);
+});
+
+for (const phase of ["native", "summary", "handoff"]) {
+  test(`incomplete ${phase} compaction exposes diagnostics without publishing partial state`, async (t) => {
+    const incomplete = {
+      id: "resp_incomplete_auxiliary", status: "incomplete", incomplete_details: { reason: "max_output_tokens", future_detail: 19 },
+      output: phase === "native" ? [{ type: "compaction", encrypted_content: "synthetic-incomplete-state" }] : [message("Partial handoff")],
+      usage: { ...nativeUsage, input_tokens: 900, output_tokens: 100, total_tokens: 1000 },
+    };
+    const f = await fixture(t, (body, _req, res) => {
+      const native = body.input.some((item: any) => item.type === "compaction_trigger");
+      if (native && phase !== "native") {
+        nativeSuccess(res, [{ type: "compaction", encrypted_content: "synthetic-complete-state" }]);
+      } else sse(res, [{ type: "response.incomplete", response: incomplete }]);
+    }, {}, config => { config.models.gpt.compaction = { mode: phase === "summary" ? "summary" : "native" }; });
+    let input: any[] = [{ type: "compaction_trigger" }];
+    if (phase === "handoff") {
+      const compacted = await responseJson(await post(f.url, { model: "gpt", input }));
+      input = compacted.output;
+    }
+    const response = await post(f.url, { model: phase === "handoff" ? "claude" : "gpt", input, stream: true });
+    let error: any;
+    if (phase === "handoff") {
+      assert.equal(response.status, 400);
+      error = (await responseJson(response)).error;
+    } else {
+      assert.equal(response.status, 200);
+      const frames = await events(response);
+      assert.equal(frames.at(-1).type, "response.failed");
+      assert.equal(frames.some(frame => frame.type === "response.completed" || frame.item?.type === "compaction" || frame.item?.type === "message"), false);
+      assert.deepEqual(frames.at(-1).response.output, []);
+      error = frames.at(-1).response.error;
+    }
+    assert.equal(error.code, "invalid_prompt");
+    assert.deepEqual(error.upstream.body.incomplete_details, incomplete.incomplete_details);
+    assert.equal(error.upstream.body.usage.input_tokens, 900);
+    assert.deepEqual(f.seen.map(call => call.path), Array(phase === "handoff" ? 2 : 1).fill("/native/responses"));
+  });
+}

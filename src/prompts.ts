@@ -1,4 +1,4 @@
-/** Detailed handoff instructions shared by every text compaction path. */
+/** Summary-only compaction operates on the original conversation. */
 export const SUMMARIZATION_PROMPT = `CRITICAL: Respond with TEXT ONLY. Do NOT call any tools.
 
 - Do NOT call any tools.
@@ -105,3 +105,14 @@ REMINDER: Do NOT call any tools. Respond with plain text only — an <analysis> 
 // Copied from openai/codex rust-v0.162.1, codex-rs/prompts/templates/compact/summary_prefix.md.
 // Licensed under Apache-2.0. See NOTICE.
 export const SUMMARY_PREFIX = `Another language model started to solve this problem and produced a summary of its thinking process. You also have access to the state of the tools that were used by that language model. Use this to build on the work that has already been done and avoid duplicating work. Here is the summary produced by the other language model, use the information in this summary to assist with your own analysis:`;
+
+/** Restate an existing native checkpoint without deliberately compressing it again. */
+export const HANDOFF_PROMPT = `The previous conversation has already been compacted. We are handing this task over to another model. Create a handoff summary for another LLM that will resume the task. Restate the task state currently available to you fully and comprehensively, rather than condensing or compressing it again.
+
+Include:
+- Current progress and key decisions made
+- Important context, constraints, or user preferences
+- What remains to be done (clear next steps)
+- Any critical data, examples, or references needed to continue
+
+Be concise, structured, and focused on helping the next LLM seamlessly continue the work.`;

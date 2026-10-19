@@ -7,7 +7,7 @@
 3. 上游返回的原始响应，含 SSE 事件和到达时间；
 4. bridge 写回 codeks 的响应。
 
-普通轮次只有一个上游调用 `main`。压缩请求有文字摘要调用 `summary`，双压缩模式下还有并行的原生调用 `native`。路由前失败的请求（例如 JSON 无效或模型别名未知）没有上游调用，只有前后两段。
+普通轮次使用上游调用 `main`。压缩请求按模式使用文字摘要调用 `summary` 或原生调用 `native`。请求需要按需复述且缓存尚无结果时，先执行 `handoff`，成功后再执行目标调用；命中缓存时不产生这条辅助调用。路由前失败的请求（例如 JSON 无效或模型别名未知）没有上游调用，只有前后两段。
 
 ## 打开
 
@@ -43,7 +43,7 @@ node dist/cli.js serve --config /absolute/path/bridge.json --capture
 
 左侧列表每行是一次交换，显示开始时间、模型别名和 adapter、类型（轮次或压缩）、每个上游调用的状态、token 用量、子代理与父线程标记和预览。顶部可以按文字筛选（按 `/` 聚焦），或只看错误、压缩、进行中的交换；“按线程分组”把同一线程的请求放在一起。`↑`/`↓` 切换选中项。列表每 1.5 秒刷新，标签页隐藏时暂停。
 
-右侧顶部的卡片按数据流排列：① codeks → bridge，② bridge → 上游，③ 上游 → bridge，④ bridge → codeks。压缩请求的 `summary` 与 `native` 各占一行。点击卡片查看这一段的正文，Shift+点击在右侧并排打开第二段。每段正文有几种视图：
+右侧顶部的卡片按数据流排列：① codeks → bridge，② bridge → 上游，③ 上游 → bridge，④ bridge → codeks。每个实际上游调用各占一行，并显示 `main`、`summary`、`native` 或 `handoff` 标签。点击卡片查看这一段的正文，Shift+点击在右侧并排打开第二段。每段正文有几种视图：
 
 | 视图 | 内容 |
 | --- | --- |
@@ -53,7 +53,7 @@ node dist/cli.js serve --config /absolute/path/bridge.json --capture
 | 原始 | 原始字节 |
 | 头部 | 状态码与 header |
 
-大内容只在显示时折叠，记录本身完整。长字符串显示开头和结尾，中间注明省略的字符数，可以展开全部、复制或下载；`cxbr2:` 载荷可以直接解码。很长的列表分批显示，可以继续加载。Responses Lite 的终止事件可能省略完整 `output`；结构视图会用之前的 `response.output_item.done` 还原输出，原始事件保持不变。
+大内容只在显示时折叠，记录本身完整。长字符串显示开头和结尾，中间注明省略的字符数，可以展开全部、复制或下载；`cxbr2:` 与 `cxbc1:` 载荷可以直接解码。很长的列表分批显示，可以继续加载。Responses Lite 的终止事件可能省略完整 `output`；结构视图会用之前的 `response.output_item.done` 还原输出，原始事件保持不变。
 
 “概要”给出路由配置、每个调用的时间线和上游调用表。“标注”列出全部回放决定，点击可定位到对应项。“对比”选择任意两次交换的任意一段做结构比较，常用的是和同一线程上一轮的客户端请求或上游请求比较；数组按类型和角色对齐，新增、删除的项单独标出。
 
@@ -77,7 +77,7 @@ node dist/cli.js serve --config /absolute/path/bridge.json --capture
 | --- | --- |
 | `active` | 仍在传输 |
 | `complete` | 读完或写完 |
-| `unread` | bridge 已不再读取这个上游响应，例如收到终止事件后结束，或压缩的另一分支失败后取消；剩余字节没有读取 |
+| `unread` | bridge 已不再读取这个上游响应，例如收到终止事件后结束；剩余字节没有读取 |
 | `cancelled` | 客户端断开；仍在进行的上游调用随之标记为 `cancelled` |
 | `error` | 传输出错，`error` 字段给出原因 |
 
@@ -99,14 +99,16 @@ node dist/cli.js serve --config /absolute/path/bridge.json --capture
 | reasoning | `reject` | `malformed` | 有 bridge 前缀但无法解码，bridge 会拒绝请求 |
 | compaction | `native` | `native_restored` | 恢复原生加密检查点 |
 | compaction | `summary` | `no_native` | 检查点只有文字摘要 |
-| compaction | `summary` | `native_replay_disabled` | 当前目标关闭了原生恢复 |
-| compaction | `summary` | `source_not_allowed` | 原生检查点来源不在允许列表 |
-| compaction | `summary` | `format_mismatch` | 原生检查点格式与当前 adapter 不同 |
+| compaction | `summary` / `handoff` | `native_replay_disabled` | 当前目标关闭了原生恢复 |
+| compaction | `summary` / `handoff` | `source_not_allowed` | 原生检查点来源不在允许列表 |
+| compaction | `summary` / `handoff` | `format_mismatch` | 原生检查点格式与当前 adapter 不同 |
 | compaction | `reject` | `not_bridge_state` | 不是 bridge 生成的压缩项，bridge 会拒绝请求 |
 
-响应侧标注 bridge 新生成的 reasoning 与压缩项（决定为 `output`）。流式响应指向 `response.output_item.done` 事件里的 `/item`，非流式响应指向 `/output/k`。只有文字摘要的压缩项没有原生部分，来源和格式为空；双压缩成功时来源和格式取原生检查点。
+`summary` 表示直接使用载荷中已有的文字，`handoff` 表示先取得文字交接：可以复用本地缓存，也可以向原来源生成。只有实际发起辅助请求时，上游调用列表才出现 `handoff`；这条状态标注本身不表示发生了额外 HTTP 请求。
 
-每条标注附来源别名、部署名、adapter、来源指纹、载荷格式和解码后的 carrier。`cxbr2:` 与 `cxbc2:` 只是编码，解码后可以看到文字 reasoning、压缩摘要和原生载荷；GPT 原生 `encrypted_content` 本身仍是密文，只能看到原样字符串。
+响应侧标注 bridge 新生成的 reasoning 与压缩项（决定为 `output`）。流式响应指向 `response.output_item.done` 事件里的 `/item`，非流式响应指向 `/output/k`。只有文字摘要的压缩项没有原生部分，来源和格式为空；`native` 检查点的来源和格式取原生部分。
+
+每条标注附来源别名、部署名、adapter、来源指纹、载荷格式和解码后的 carrier。`cxbr2:` 与 `cxbc1:` 只是编码，解码后可以看到文字 reasoning、压缩摘要和原生载荷；GPT 原生 `encrypted_content` 本身仍是密文，只能看到原样字符串。
 
 ## 内存、清空与导出
 

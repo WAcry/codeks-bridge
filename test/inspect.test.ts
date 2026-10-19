@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { mkdtemp, rm } from "node:fs/promises";
 import { createServer, request as httpRequest, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import test, { type TestContext } from "node:test";
 import { createBridgeServer } from "../src/server.ts";
@@ -35,7 +38,10 @@ async function fixture(t: TestContext, handler: Handler, configure?: (config: Br
   });
   t.after(async () => close(upstream));
   const origin = await listen(upstream);
+  const cache = await mkdtemp(join(tmpdir(), "bridge-inspect-"));
+  t.after(() => rm(cache, { recursive: true }));
   const config: BridgeConfig = {
+    compaction_cache_dir: cache,
     inspect: { capture: true },
     upstreams: {
       native: { base_url: `${origin}/native` },
@@ -133,7 +139,7 @@ test("capture keeps all four stages byte for byte and redacts only credential he
   assert.deepEqual(detail.upstream_calls, [{ label: "main", status: 200, end: "complete" }]);
 });
 
-test("compaction branches are labeled and annotations report the bridge replay decisions", async (t) => {
+test("native compaction and on-demand handoffs have accurate labels and replay annotations", async (t) => {
   const f = await fixture(t, (body, _req, res) => {
     if (_req.url!.endsWith("/messages")) {
       sse(res, [
@@ -161,28 +167,52 @@ test("compaction branches are labeled and annotations report the bridge replay d
   assert.match(compacted, /response\.completed/);
   const compaction = await latest(f.url);
   assert.equal(compaction.kind, "compaction");
-  assert.deepEqual(compaction.upstream.map((call: any) => call.label).sort(), ["native", "summary"]);
+  assert.deepEqual(compaction.upstream.map((call: any) => call.label), ["native"]);
   const output = compaction.annotations.find((note: any) => note.target === "client.response");
   assert.equal(output.kind, "compaction");
-  assert.equal(output.decoded.summary, "Portable summary");
+  assert.equal(output.decoded.summary, undefined);
+  assert.equal(output.decoded.handoff.parameters.model, "gpt");
   assert.equal(output.decoded.native.data.encrypted_content, "synthetic-native-checkpoint");
   const event = compaction.client.response.events[output.event];
   assert.equal(JSON.parse(event.data).type, "response.output_item.done");
   const checkpoint = JSON.parse(event.data).item;
+  assert.match(checkpoint.encrypted_content, /^cxbc1:/);
 
   const history = [checkpoint, reasoning, { type: "reasoning", encrypted_content: "foreign-opaque-state", summary: [] }, { type: "message", role: "user", content: "Continue." }];
   const decisions: Record<string, string[][]> = {};
+  const calls: Record<string, string[]> = {};
   for (const model of ["gpt", "gpt-region", "claude"]) {
     assert.equal((await post(f.url, { model, input: history })).status, 200);
-    decisions[model] = (await latest(f.url)).annotations
+    const exchange = await latest(f.url);
+    calls[model] = exchange.upstream.map((call: any) => call.label);
+    assert.equal(JSON.parse(exchange.client.request.body.text).input[0].encrypted_content, checkpoint.encrypted_content);
+    decisions[model] = exchange.annotations
       .filter((note: any) => note.target === "client.request")
       .map((note: any) => [note.pointer, note.decision, note.reason]);
   }
   assert.deepEqual(decisions, {
     gpt: [["/input/0", "native", "native_restored"], ["/input/1", "replay", "same_source"], ["/input/2", "drop", "not_bridge_state"]],
-    "gpt-region": [["/input/0", "summary", "source_not_allowed"], ["/input/1", "replay", "allowed_source"], ["/input/2", "drop", "not_bridge_state"]],
-    claude: [["/input/0", "summary", "native_replay_disabled"], ["/input/1", "drop", "source_not_allowed"], ["/input/2", "drop", "not_bridge_state"]],
+    "gpt-region": [["/input/0", "handoff", "source_not_allowed"], ["/input/1", "replay", "allowed_source"], ["/input/2", "drop", "not_bridge_state"]],
+    claude: [["/input/0", "handoff", "native_replay_disabled"], ["/input/1", "drop", "source_not_allowed"], ["/input/2", "drop", "not_bridge_state"]],
   });
+  assert.deepEqual(calls, { gpt: ["main"], "gpt-region": ["handoff", "main"], claude: ["main"] });
+});
+
+test("summary compaction is captured as one text call and reports its portable output", async (t) => {
+  const f = await fixture(t, (_body, _req, res) => nativeSuccess(res, [message("Portable summary")]), config => {
+    config.models.gpt.compaction = { mode: "summary" };
+  });
+  const response = await post(f.url, { model: "gpt", input: [{ type: "compaction_trigger" }] });
+  const body = await response.json() as any;
+  assert.match(body.output[0].encrypted_content, /^cxbc1:/);
+  const detail = await latest(f.url);
+  assert.deepEqual(detail.upstream.map((call: any) => call.label), ["summary"]);
+  assert.equal(detail.annotations[0].decoded.summary, "Portable summary");
+  assert.equal(detail.annotations[0].decoded.native, undefined);
+  await (await post(f.url, { model: "gpt", input: body.output })).text();
+  const replay = await latest(f.url);
+  assert.equal(replay.annotations[0].decision, "summary");
+  assert.equal(replay.annotations[0].reason, "no_native");
 });
 
 test("capture is off by default, follows the toggle, and evicts only finished exchanges", async (t) => {

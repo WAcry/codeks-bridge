@@ -380,7 +380,7 @@ export class Inspector {
   }
 }
 
-/** Labels upstream calls made inside fn, such as the two compaction branches. */
+/** Labels upstream calls made inside fn, such as native compaction or a handoff. */
 export function withCaptureLabel<T>(label: string, fn: () => T): T {
   const slot = scope.getStore();
   return slot?.exchange ? scope.run({ ...slot, label }, fn) : fn();

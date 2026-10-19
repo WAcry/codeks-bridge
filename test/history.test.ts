@@ -87,7 +87,7 @@ test("format checks keep incompatible payloads out even for an accepted source",
 
 test("native replay can be disabled independently from compaction generation", () => {
   const disabled = routes({ a: { compaction: { native_replay: false } } }).a;
-  assert.equal(disabled.compaction.mode, "dual");
+  assert.equal(disabled.compaction.mode, "native");
   const selected = prepareHistory([checkpoint(defaults.a)], disabled);
   assert.equal(selected[0].role, "user");
   assert.match(selected[0].content[0].text, /Keep the violet flag\.$/);
@@ -106,6 +106,15 @@ test("unattributed compaction and stored references fail instead of losing histo
   assert.throws(() => prepareHistory([{ type: "compaction", encrypted_content: "unknown" }], defaults.a), /portable summary/);
   assert.throws(() => prepareHistory([{ type: "item_reference", id: "msg_stored" }], defaults.a), /complete conversation/);
   assert.throws(() => prepareHistory([{ type: "bridge_reasoning", state: { data: "unselected" } }], defaults.a), /Internal reasoning/);
+});
+
+test("deferred checkpoints replay natively but require materialization before text translation", () => {
+  const deferred = { type: "compaction", encrypted_content: encodeCompaction({
+    native: { source: defaults.a.origin, format: defaults.a.profile.native_compaction_format!, data: native },
+    handoff: { prefix: [], parameters: { model: "a" }, responsesLite: true },
+  }) };
+  assert.deepEqual(prepareHistory([deferred], defaults.a), [native]);
+  assert.throws(() => prepareHistory([deferred], defaults.claude), /not been materialized/);
 });
 
 test("images and tool call identities survive history selection", () => {

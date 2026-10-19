@@ -31,8 +31,8 @@ node dist/cli.js config-snippet --config /absolute/path/bridge.json
 
 - 上游错误保留原始详情交给客户端；bridge 不自动换端点、重试或更换压缩方式。
 - Reasoning 默认只回放给原目标。原生压缩与 reasoning 的跨目标复用分别配置，实际兼容性由上游决定。
-- 压缩始终保存文字摘要；GPT 默认同时生成原生加密检查点，两条请求都成功才完成。其他模型使用文字摘要。
-- 历史由 codeks 保存，bridge 无需数据库。封装只是编码，文字 reasoning 与压缩摘要在会话文件中可读。
+- GPT 默认使用 `compaction.mode: "native"`：先做原生加密压缩，需要文字表示时再向原来源复述并缓存。其他模型使用标准文字压缩。
+- 历史由 codeks 保存；按需复述的成功结果另存本地缓存。封装只是编码，文字 reasoning、摘要及复述配方可读。
 - Lark/regex 转为工具描述约束。图片理解由模型支持，客户端配置关闭网页搜索和图片生成。
 
 ## 调试
