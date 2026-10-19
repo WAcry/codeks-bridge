@@ -4,25 +4,24 @@
 
 项目维护一份有限的[模型目录](catalog/README.md)。GPT 保留 Codex 源码中各自的条目，第三方模型采用经精调的现代模板。客户端使用 Responses Lite、Code Mode Only 和多代理；配置可分别指定模型别名、目录条目和真实部署名。
 
-## 本地使用
+## 安装和使用
 
-需要 Node.js ≥ 22.18 和已安装的 codeks。项目尚在开发中，未发布 npm 包。
+需要 Node.js ≥ 22.18 和已安装的 codeks。
 
 ```sh
-npm ci
-npm run build
+npm install -g @wacry/codeks-bridge
 ```
 
 把[示例配置](examples/config.json)复制到仓库外，填写端点与 API key 环境变量，保留需要的模型。`catalog` 选择受支持的模型，`upstream` 选择连接，`model` 是实际发给上游的部署名；窗口与参数可以覆盖目录默认值。
 
 ```sh
-node dist/cli.js serve --config /absolute/path/bridge.json
+codeks-bridge serve --config /absolute/path/bridge.json
 ```
 
 另一个终端生成客户端配置：
 
 ```sh
-node dist/cli.js config-snippet --config /absolute/path/bridge.json
+codeks-bridge config-snippet --config /absolute/path/bridge.json
 ```
 
 将输出合并到 codeks 的 `config.toml`，顶层配置放在表定义前，替换已有同名项。codeks 会从 bridge 的 `/v1/models` 读取公开模型的完整目录，然后可按配置中的别名选择模型。专用预设可设 `expose: false`，保留内部调用而不占模型列表。已有 `model_catalog_json` 会优先使用本地文件；迁移到 HTTP 目录时应移除它。修改 bridge 配置后重启服务。
@@ -39,4 +38,4 @@ node dist/cli.js config-snippet --config /absolute/path/bridge.json
 
 `serve` 加 `--capture` 后打开日志里的 `/inspect/` 地址，可以逐条查看 codeks 请求、发往上游的请求、上游原始响应和写回 codeks 的响应，以及 reasoning 与压缩状态的回放决定。记录只在内存中，也可以在页面上开关捕获、清空或导出。详见[调试检查器](docs/inspect.md)。
 
-[配置与模型目录](docs/config.md) · [整体设计](docs/design.md) · [Reasoning](docs/reasoning.md) · [压缩](docs/compaction.md) · [工具](docs/tools.md) · [调试检查器](docs/inspect.md) · [验证](docs/testing.md)
+[配置与模型目录](docs/config.md) · [整体设计](docs/design.md) · [Reasoning](docs/reasoning.md) · [压缩](docs/compaction.md) · [工具](docs/tools.md) · [调试检查器](docs/inspect.md) · [验证](docs/testing.md) · [发布](docs/releasing.md)

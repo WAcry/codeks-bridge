@@ -196,7 +196,7 @@ bridge 的 `GET /v1/models` 返回 Codex 专用的 `{"models": [...]}`，每项�
 ### HTTP 发现
 
 ```sh
-node dist/cli.js config-snippet --config /absolute/path/bridge.json
+codeks-bridge config-snippet --config /absolute/path/bridge.json
 ```
 
 默认输出 `model_providers.bridge.model_catalog_url`，指向 bridge 的 `/v1/models`。只设置 `base_url` 不足以让自定义 provider 使用这份目录。codeks 的 API key 模型发现功能默认启用；若用户配置关闭了 `api_key_model_discovery`，需要重新启用。
@@ -220,9 +220,9 @@ bridge 使用 HTTP/SSE。已核对 Codex `0.163.0` 的 `codex-rs/model-provider-
 需要固定本地快照时，可导出相同的完整目录：
 
 ```sh
-node dist/cli.js catalog --config /absolute/path/bridge.json \
+codeks-bridge catalog --config /absolute/path/bridge.json \
   --output /absolute/path/models.json
-node dist/cli.js config-snippet --config /absolute/path/bridge.json \
+codeks-bridge config-snippet --config /absolute/path/bridge.json \
   --catalog /absolute/path/models.json
 ```
 

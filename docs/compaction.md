@@ -65,7 +65,7 @@ Claude 摘要保留工具及公共前缀的 `1h` 缓存，只将最后的摘要�
 
 复述由生成 `K` 的原模型和原连接执行。原生请求移除普通回答的输出预算，交由上游管理；复述使用普通回答预算。源请求前缀包括开头的 system/developer 消息和工具声明；中途新增的 Lite 工具声明也按原顺序收集，确保原工具仍可解释。工具声明集中放在源前缀，不保留它们与旧对话的交错位置；因此精确保留 `U` 不代表完整工具布局也逐字一致。复述保留源 instructions、reasoning、缓存 key、工具选择和未知请求参数，重新构造 input、stream，并移除文字输出约束。
 
-这是用户选择的质量策略：优先让原生压缩整理任务状态，再把该状态交接给其他模型。复述 prompt 是 Codex 压缩 prompt 的微调英文版本，明确说明此前已压缩，要求全面完整地复述现有任务状态，覆盖进度、决策、约束、待办和关键引用；不再要求再次精简，也不强制标准文字压缩的 `<analysis>/<summary>` 格式。保留用户给定的正文，末尾补充只输出文字、不调用工具的要求。原文集中在 [`src/prompts.ts`](../src/prompts.ts) 的 `HANDOFF_PROMPT`。
+这是用户选择的质量策略：优先让原生压缩整理任务状态，再把该状态交接给其他模型。复述 prompt 是 Codex 压缩 prompt 的微调英文版本，明确说明此前已压缩，要求全面完整地复述现有任务状态，覆盖进度、决策、约束、待办和关键引用；不再要求再次精简，也不强制标准文字压缩的 `<analysis>/<summary>` 格式。保留用户给定的正文，末尾补充只输出文字、不调用工具的要求。原文集中在 [`src/prompts.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/prompts.ts) 的 `HANDOFF_PROMPT`。
 
 复述仍是模型生成，并不是密文的可逆解码，可能遗漏或误述细节。实测的长度和事实覆盖用于选择提示词，不能保证任意历史都无损；输出 token 数也不是独立的质量证明。
 
@@ -173,4 +173,4 @@ cxbc1:<base64url(JSON)>
 
 近期保留消息可能与摘要包含相同信息，这是客户端历史策略的一部分。客户端压缩后可能按 `encrypted_content` 长度粗估 token，复述配方会让估算偏保守；下一次正常响应的 usage 提供实际用量。bridge 不伪造 usage 或修改客户端公式。
 
-实现见 [`src/compaction.ts`](../src/compaction.ts)、[`src/compaction-history.ts`](../src/compaction-history.ts)、[`src/compaction-handoff.ts`](../src/compaction-handoff.ts)、[`src/carrier.ts`](../src/carrier.ts) 和 [`src/history.ts`](../src/history.ts)。
+实现见 [`src/compaction.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/compaction.ts)、[`src/compaction-history.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/compaction-history.ts)、[`src/compaction-handoff.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/compaction-handoff.ts)、[`src/carrier.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/carrier.ts) 和 [`src/history.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/history.ts)。

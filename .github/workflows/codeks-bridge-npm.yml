@@ -1,0 +1,87 @@
+name: codeks-bridge npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the verified package to npm
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeks-bridge-npm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tarball: ${{ steps.pack.outputs.tarball }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Require a version tag on main before publishing
+        if: inputs.publish
+        run: |
+          package_version=$(node -p "require('./package.json').version")
+          test "$GITHUB_REF" = "refs/tags/v${package_version}"
+          git merge-base --is-ancestor HEAD origin/main
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run check
+      - name: Pack once
+        id: pack
+        run: |
+          mkdir -p artifacts
+          npm pack --pack-destination artifacts --json > artifacts/pack.json
+          node --input-type=module <<'JS'
+          import { appendFileSync, readFileSync } from 'node:fs';
+          const [pack] = JSON.parse(readFileSync('artifacts/pack.json', 'utf8'));
+          appendFileSync(process.env.GITHUB_OUTPUT, `tarball=artifacts/${pack.filename}\n`);
+          JS
+      - name: Smoke-test the package
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: node scripts/package-smoke.ts "$TARBALL"
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: npm-package
+          path: ${{ steps.pack.outputs.tarball }}
+          if-no-files-found: error
+
+  publish:
+    if: inputs.publish
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - run: npm install --global npm@11 --registry=https://registry.npmjs.org
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: npm-package
+          path: artifacts
+      - name: Publish with trusted publishing
+        env:
+          TARBALL: ${{ needs.package.outputs.tarball }}
+        run: npm publish "$TARBALL" --access public --provenance --registry=https://registry.npmjs.org
