@@ -68,7 +68,7 @@ Claude 摘要保留工具及公共前缀的 `1h` 缓存，只将最后的摘要�
 
 按需复述保留了正常续聊的 `U + K` 前缀，有机会复用 prompt cache；真实命中还受请求布局、服务路由和缓存有效期影响，不保证命中。确定的收益是始终使用兼容目标时，完全没有额外的文字复述请求。
 
-原来源在配置中继续可用。bridge 优先选择配方记录的原别名，也接受连接、adapter 和实际部署相同的其他别名；实际鉴权与 options 读取当前配置。配方保存源请求前缀，以及除 `input`、`stream`、`text` 外的请求 body，避免参数白名单遗漏未来字段；不保存 HTTP header、连接凭据或完整 `AAAA`。复述时如何处理会话 header 与跨连接 sticky，见 [header 边界](responses-stream.md#header-与转发边界)。
+原来源在配置中继续可用。bridge 优先选择配方记录的原别名，也接受连接、adapter 和实际部署相同的其他别名；实际鉴权与 options 读取当前配置。配方保存源请求前缀，以及除 `input`、`stream`、`text` 外的请求 body，避免参数白名单遗漏未来字段；不保存 HTTP header、连接凭据或完整 `AAAA`。复述沿用本次客户端请求的 metadata，见 [header 边界](responses-stream.md#header-与转发边界)。
 
 成功的复述及其独立 usage 写入 `compaction_cache_dir`。缓存键包含原来源、实际复述请求及 prompt，不包含 `BBBB`；同一输入的后续请求与服务重启可以复用结果。文件以 `0600` 权限原子写入，新目录使用 `0700`。同一服务实例内，相同键的请求排队后读取已有结果，各自取消互不牵连；不同进程之间没有去重协调。
 

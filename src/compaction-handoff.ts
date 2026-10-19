@@ -6,7 +6,7 @@ import { decodeCompaction, encodeCompaction, type CompactionCarrier } from "./ca
 import { collectHandoff, handoffRequest } from "./compaction.ts";
 import { splitCompactionPrefix } from "./compaction-history.ts";
 import { resolveModel } from "./config.ts";
-import { BridgeError, ResponsesStreamError, UpstreamHttpError } from "./errors.ts";
+import { BridgeError } from "./errors.ts";
 import { restoresNativeCompaction } from "./history.ts";
 import type { AdapterId, Backend, BackendContext, BridgeConfig, ResolvedModel, ResponsesRequest } from "./types.ts";
 
@@ -21,15 +21,6 @@ function waitForTurn(previous: Promise<void>, signal: AbortSignal): Promise<void
       else resolve();
     });
   });
-}
-
-function removeTurnState(headers: unknown): void {
-  if (headers instanceof Headers) headers.delete("x-codex-turn-state");
-  else if (headers && typeof headers === "object") {
-    for (const name of Object.keys(headers)) {
-      if (name.toLowerCase() === "x-codex-turn-state") delete (headers as Record<string, unknown>)[name];
-    }
-  }
 }
 
 /** Successful exports survive restarts; each caller owns only its own cancellation. */
@@ -82,28 +73,11 @@ export class CompactionHandoffStore {
       }
       signal.throwIfAborted();
       const route = this.source(carrier);
-      const crossConnection = route.origin.connection !== context.route.origin.connection;
-      let requestHeaders = context.requestHeaders;
-      if (requestHeaders && crossConnection) {
-        // A different connection cannot consume the destination's turn routing state.
-        requestHeaders = new Headers(requestHeaders);
-        requestHeaders.delete("x-codex-turn-state");
-      }
-      let result;
-      try {
-        result = await collectHandoff({
-          request: { ...request, model: route.slug }, route, signal, requestHeaders,
-          responsesLite: carrier.handoff!.responsesLite,
-        }, this.backends[route.profile.id]);
-      } catch (error) {
-        // Failure diagnostics reach the client, but source routing state cannot
-        // become the destination's sticky state on its next retry.
-        if (crossConnection) {
-          if (error instanceof UpstreamHttpError || error instanceof ResponsesStreamError || error instanceof BridgeError) removeTurnState(error.headers);
-          if (error instanceof ResponsesStreamError) removeTurnState(error.error.headers);
-        }
-        throw error;
-      }
+      const result = await collectHandoff({
+        request: { ...request, model: route.slug }, route, signal,
+        requestHeaders: context.requestHeaders,
+        responsesLite: carrier.handoff!.responsesLite,
+      }, this.backends[route.profile.id]);
       signal.throwIfAborted();
       await mkdir(this.directory, { recursive: true, mode: 0o700 });
       const temporary = join(this.directory, `.${key}.${randomUUID()}.tmp`);

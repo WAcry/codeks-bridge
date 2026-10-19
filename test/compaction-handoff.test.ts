@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 import { decodeCompaction, encodeCompaction, type CompactionCarrier } from "../src/carrier.ts";
 import { resolveModel, validateConfig } from "../src/config.ts";
-import { BridgeError, UpstreamHttpError } from "../src/errors.ts";
+import { UpstreamHttpError } from "../src/errors.ts";
 import { CompactionHandoffStore } from "../src/compaction-handoff.ts";
 import type { AdapterId, Backend, BackendContext, BridgeConfig } from "../src/types.ts";
 
@@ -75,11 +75,7 @@ test("handoff forwards current request headers without persisting them", async t
   let calls = 0;
   const f = await setup(t, async (ctx, writer) => {
     calls++;
-    assert.equal(ctx.requestHeaders?.get("session-id"), "synthetic-session");
-    assert.equal(ctx.requestHeaders?.get("thread-id"), "synthetic-thread");
-    assert.equal(ctx.requestHeaders?.get("x-future-metadata"), "synthetic-metadata");
-    assert.equal(ctx.requestHeaders?.get("authorization"), "Bearer synthetic-secret");
-    assert.equal(ctx.requestHeaders?.has("x-codex-turn-state"), false);
+    assert.equal(ctx.requestHeaders, headers);
     return succeed(ctx, writer);
   });
   f.context.requestHeaders = headers;
@@ -90,18 +86,6 @@ test("handoff forwards current request headers without persisting them", async t
   }
   await f.store.materialize({ ...f.context, requestHeaders: new Headers({ "session-id": "new-synthetic-session" }) });
   assert.equal(calls, 1, "Routing headers do not change an already generated summary");
-});
-
-test("handoff preserves turn routing state on the same connection", async t => {
-  const headers = new Headers({ "x-codex-turn-state": "synthetic-source-sticky" });
-  const f = await setup(t, async (ctx, writer) => {
-    assert.equal(ctx.requestHeaders, headers);
-    assert.equal(ctx.requestHeaders.get("x-codex-turn-state"), "synthetic-source-sticky");
-    return succeed(ctx, writer);
-  });
-  f.config.models.target.upstream = "native";
-  f.context.route = resolveModel(f.config, "target");
-  await f.store.materialize({ ...f.context, requestHeaders: headers });
 });
 
 test("memo identity includes retained history but excludes destination prefix and later work", async t => {
@@ -159,24 +143,6 @@ test("source failures propagate unchanged and do not create cache entries or ret
   await assert.rejects(f.store.materialize(f.context), error => error === failure);
   assert.equal(calls, 1);
   assert.deepEqual(await readdir(f.directory), []);
-});
-
-test("mapped handoff errors retain metadata while isolating cross-connection sticky state", async t => {
-  for (const crossConnection of [false, true]) {
-    const failure = new BridgeError("Synthetic source failure", "server_is_overloaded", 503, {
-      "X-Codex-Turn-State": "synthetic-source-sticky", "x-request-id": "req_synthetic", "x-future-metadata": "retained",
-    });
-    const f = await setup(t, async () => { throw failure; });
-    if (!crossConnection) {
-      f.config.models.target.upstream = "native";
-      f.context.route = resolveModel(f.config, "target");
-    }
-    await assert.rejects(f.store.materialize(f.context), error => error === failure);
-    assert.equal(failure.headers!["X-Codex-Turn-State"], crossConnection ? undefined : "synthetic-source-sticky");
-    assert.equal(failure.headers!["x-request-id"], "req_synthetic");
-    assert.equal(failure.headers!["x-future-metadata"], "retained");
-    assert.deepEqual(await readdir(f.directory), []);
-  }
 });
 
 test("same-key callers serialize and a canceled queued caller cannot unlock the active export", async t => {

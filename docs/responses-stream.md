@@ -8,9 +8,11 @@
 
 每段 HTTP 连接独立负责传输：去掉 hop-by-hop header、`Connection` 指定的字段，以及重写或解压后失效的 `Content-Length`、`Content-Encoding`。出站请求重新生成 Host 与压缩协商，不转发客户端的 `Authorization`、API key、Cookie 或所选连接的自定义鉴权 header；上游静态 headers 覆盖同名客户端值，再由该连接的凭据配置设置鉴权。返回 body 被转换时由 bridge 设置 Content-Type，`x-models-etag` 始终属于 bridge 自己的模型目录。其余字段不按厂商或名称白名单筛选。
 
-按需复述使用本次客户端的请求 metadata 和原来源的当前鉴权，header 不写进检查点或摘要缓存。若复述来源与当前目标是不同连接，仅去掉 `x-codex-turn-state`：该 token 绑定 turn 的路由及鉴权归属，不能交给另一连接；相同连接仍保留。`session-id`、`thread-id` 和未知 header 继续转发。普通回答、原生压缩和标准文字压缩不改变 sticky token。这个边界来自 Codex `0.163.0` 的 `core/src/client.rs`，不是上游拒绝后的回退。
+普通回答、原生压缩、文字摘要及按需复述统一透传客户端 metadata，包括 `session-id`、`thread-id` 和 `x-codex-turn-state`。按需复述使用本次请求的 metadata 和原来源的当前鉴权，header 不写进检查点或摘要缓存。
 
-成功的辅助复述不把响应 header 混入目标响应；最终返回目标请求的 header。辅助请求发生 HTTP 或流内失败时保留其请求 ID 等诊断及未知 header；跨连接时同样去掉来源返回的 `x-codex-turn-state`，避免客户端重试目标时携带来源的 sticky token，相同连接则保留。
+OpenAI 订阅端点的实测确认了 `x-codex-turn-state` 的实际使用，也观察到携带错误或合成 state 的请求被接受并收到新的 state。本项目据此选择默认透传，由上游处理；出现可复现的不兼容时再针对性调整。这项证据仅来自 OpenAI 订阅端点，不代表 Azure 或 AWS 的处理方式。
+
+成功的辅助复述不把响应 header 混入目标响应；最终返回目标请求的 header。辅助请求发生 HTTP 或流内失败时，默认透传该失败的响应 header，包括请求 ID、路由状态和未知诊断字段。
 
 ## 事件与交付
 

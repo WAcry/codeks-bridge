@@ -179,9 +179,9 @@ test("HTTP failures preserve diagnostic headers and upstream bodies without retr
   assert.equal(calls, 3);
 });
 
-test("handoff failures retain diagnostic headers but keep sticky state within its connection", async t => {
-  for (const transport of ["http", "stream"]) for (const crossConnection of [false, true]) for (const stream of [false, true]) {
-    await t.test(`${transport}, crossConnection=${crossConnection}, stream=${stream}`, async t => {
+test("handoff failures retain upstream headers and diagnostics", async t => {
+  for (const transport of ["http", "stream"]) for (const stream of [false, true]) {
+    await t.test(`${transport}, stream=${stream}`, async t => {
       let calls = 0;
       const original = { code: "invalid_encrypted_content", message: "Synthetic source failure", future_detail: { retained: true },
         headers: { "X-Codex-Turn-State": "synthetic-source-state", "x-future-error": "synthetic-payload-detail" } };
@@ -198,10 +198,8 @@ test("handoff failures retain diagnostic headers but keep sticky state within it
             output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: "Partial handoff" }] }], usage },
         })}\n\n`);
       }, config => {
-        if (crossConnection) {
-          config.upstreams.alternate = { base_url: `${config.upstreams.remote.base_url}/alternate` };
-          config.models.flash.upstream = "alternate";
-        }
+        config.upstreams.alternate = { base_url: `${config.upstreams.remote.base_url}/alternate` };
+        config.models.flash.upstream = "alternate";
       });
       const source = resolveModel(f.config, "gpt");
       const checkpoint = { type: "compaction", encrypted_content: encodeCompaction({
@@ -212,7 +210,7 @@ test("handoff failures retain diagnostic headers but keep sticky state within it
         body: JSON.stringify({ model: "flash", input: [checkpoint], stream }) });
       assert.equal(response.headers.get("x-request-id"), "req_synthetic_handoff");
       assert.equal(response.headers.get("x-future-response"), "synthetic-source-metadata");
-      assert.equal(response.headers.get("x-codex-turn-state"), crossConnection ? null : "synthetic-source-state");
+      assert.equal(response.headers.get("x-codex-turn-state"), "synthetic-source-state");
       if (transport === "http") {
         assert.equal(response.status, 403);
         assert.deepEqual(await response.json(), { error: original }, "Native HTTP bodies remain unchanged");
@@ -221,10 +219,7 @@ test("handoff failures retain diagnostic headers but keep sticky state within it
         const result: any = stream
           ? (await response.text()).split("\n\n").filter(Boolean).map(frame => JSON.parse(frame.slice(6))).at(-1).response
           : await response.json();
-        assert.equal(result.error.code, original.code);
-        assert.deepEqual(result.error.future_detail, original.future_detail);
-        assert.equal(result.error.headers["x-future-error"], "synthetic-payload-detail");
-        assert.equal(result.error.headers["X-Codex-Turn-State"], crossConnection ? undefined : "synthetic-source-state");
+        assert.deepEqual(result.error, original);
         assert.deepEqual(result.output, []);
         assert.equal(result.usage, undefined);
       }
