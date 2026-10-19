@@ -50,6 +50,7 @@ export function validateConfig(value: unknown): BridgeConfig {
   for (const [slug, model] of Object.entries(value.models)) {
     if (!slug || !object(model) || typeof model.model !== "string" || !model.model || typeof model.upstream !== "string" || !Object.hasOwn(value.upstreams, model.upstream)) fail(`model ${slug}: model and an existing upstream are required`);
     if (typeof model.catalog !== "string" || !model.catalog) fail(`model ${slug}: catalog is required`);
+    if (model.expose !== undefined && typeof model.expose !== "boolean") fail(`model ${slug}: expose must be boolean`);
     for (const field of ["context_window", "max_output_tokens"]) {
       if (model[field] !== undefined && (!Number.isSafeInteger(model[field]) || model[field] <= 0)) fail(`model ${slug}: ${field} must be a positive integer`);
     }
@@ -101,7 +102,7 @@ export async function loadConfig(path: string): Promise<BridgeConfig> {
   return validateConfig(JSON.parse(await readFile(path, "utf8")));
 }
 export function resolveModel(config: BridgeConfig, slug: string): ResolvedModel {
-  if (typeof slug !== "string" || !Object.hasOwn(config.models, slug)) throw new BridgeError("Unknown model. Use GET /v1/models to list configured models.");
+  if (typeof slug !== "string" || !Object.hasOwn(config.models, slug)) throw new BridgeError("Unknown model. Use GET /v1/models to list exposed models.");
   const model = config.models[slug];
   const profile = modelProfile(model);
   const source = origin(config, model);

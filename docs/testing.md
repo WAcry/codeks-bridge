@@ -17,7 +17,7 @@ npm run check
 - 流：跨字节分块的 UTF-8、CR/LF、SSE 多行数据、结束标记、非法 JSON。
 - Responses 输出：先 added 后 delta/done、完整历史项、usage、reasoning carrier、原生消息 phase（含 `partial_answer`）、缺省 phase 与 `end_turn` 的关系、摘要分段索引和最终数组一致、明文多代理参数、失败时不执行尚未提交的工具。
 - 配置与目录：有限 key、原始 GPT 条目保留、第三方精调、别名与部署名分离、窗口覆盖、effort 映射及默认值、catalog 与出站参数一致、options 覆盖顺序。
-- 目录发现：Codex 专用 `/models` 响应、入口鉴权、ETag 与响应版本标记、连接及凭据配置不进入目录。
+- 目录发现：Codex 专用 `/models` 响应、入口鉴权、ETag 与响应版本标记、连接及凭据配置不进入目录；`expose` 过滤、首个公开别名作为默认、空目录报错边界及隐藏模型继续参与委托压缩和 handoff。
 - 状态：reasoning 与原生压缩的独立允许来源、定向非传递关系、配置改变后恢复已有 carrier、身份与显示别名分离、输入历史不变。
 - 压缩：生成模式与 native replay 独立；summary 保留标准 prompt；工具定义、选择及未知参数保留，意外工具调用明确失败；GPT 默认 native 生成原生检查点；所有必需步骤成功才交付；失败、截断与取消保持原路径。
 - 按需复述：兼容目标不导出，其他目标向原来源导出；不包含检查点后的新工作；来源别名恢复、缓存及重启复用、同键排队与独立取消；辅助 usage 不进入目标上下文统计。

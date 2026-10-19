@@ -48,7 +48,7 @@
 | `token_env` | 保存 bridge 入口 Bearer token 的环境变量名称 |
 | `compaction_cache_dir` | 按需复述缓存目录；默认 `$XDG_CACHE_HOME/codeks-bridge/compaction`，未设置 XDG 时为 `~/.cache/codeks-bridge/compaction` |
 | `upstreams` | 上游连接配置表 |
-| `models` | 客户端模型别名表 |
+| `models` | 模型别名表，是否进入客户端目录由各自的 `expose` 控制 |
 | `inspect` | 可选；`capture` 决定启动时是否捕获，`max_mib` 是内存软上限，见[调试检查器](inspect.md) |
 
 监听非 loopback 地址时必须配置 `token_env`，客户端也要设置同一个变量。它是 bridge 入口鉴权，不是上游 API key。HTTP 请求体最多 64 MiB，包含所有图片编码；入口没有 CORS。携带 `Origin` 的请求必须使用配置好的 bridge token，即使监听 loopback 也一样，避免网页的简单 POST 在无法读取响应时仍触发上游调用。没有 `Origin` 的 codeks 请求保持原行为。`GET /health`、`GET /v1/models` 和 `POST /v1/responses` 使用同一鉴权。`/inspect/` 页面与接口使用[自己的规则](inspect.md#访问与鉴权)。
@@ -74,6 +74,7 @@
 | `upstream` | 连接表中的 ID；不同区域或凭据域使用不同 ID |
 | `model` | 实际上游模型名；可以是部署别名 |
 | `catalog` | 必填，已审阅条目的 key；条目决定 adapter |
+| `expose` | 默认 `true`；设为 `false` 时不进入客户端 HTTP 目录和 CLI 导出的静态目录 |
 | `context_window` | 可选窗口预算；设置时同时覆盖客户端的 `context_window` 和 `max_context_window` |
 | `max_output_tokens` | 覆盖目录的默认回答输出预算；请求中的显式值优先于模型配置 |
 | `input_modalities` | 可选，覆盖条目中的 `text`/`image` 能力声明 |
@@ -81,6 +82,8 @@
 | `replay` | 分别允许哪些来源的 reasoning、原生压缩 |
 | `compaction` | 压缩方式、执行模型，以及本目标是否接收原生压缩 |
 | `options` | 原生请求参数，覆盖上游级 options |
+
+`expose` 控制目录展示，不改变别名的路由、来源身份或访问权限。隐藏模型仍可用于压缩、handoff 和状态复用，显式按别名发送请求也仍可调用；inspector 保留其诊断记录。`config-snippet` 选择首个公开别名作为默认模型；全部隐藏时目录为空，该命令明确报错。
 
 不设置窗口时，原条目的两个窗口字段各自保留。当前 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；Opus 5.5、Sonnet 5.5 和 DeepSeek Flash 的两个字段均为 `1000000`。压缩阈值沿用模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 必须提供 `max_tokens`，对应目录外层默认预算为 `128000`；GPT 和 DeepSeek 使用请求、模型配置或上游提供的默认值。原生 options 也可调整预算，实际限制由部署端点裁决。
 
@@ -139,13 +142,14 @@ GPT 的默认配置等价于：
     },
     "gpt-compactor": {
       "catalog": "gpt-6.1-sol", "upstream": "openai", "model": "gpt-6.1-sol",
+      "expose": false,
       "reasoning": { "default_effort": "xhigh" }
     }
   }
 }
 ```
 
-这里的 `anthropic` 和 `openai` 使用已有 `upstreams` 连接。执行模型与普通别名一样出现在客户端目录中，不需要另一套压缩器注册表。压缩只跟随一次 `compaction.model`，不继续读取执行模型自己的委托配置或生成模式。工作模型的窗口与压缩阈值仍决定何时压缩，执行模型须能接收实际历史；超限由上游报错。
+这里的 `anthropic` 和 `openai` 使用已有 `upstreams` 连接。`gpt-compactor` 通过 `expose: false` 隐藏于客户端目录，仍复用普通模型配置，不需要另一套压缩器注册表。压缩只跟随一次 `compaction.model`，不继续读取执行模型自己的委托配置或生成模式。工作模型的窗口与压缩阈值仍决定何时压缩，执行模型须能接收实际历史；超限由上游报错。
 
 未设置 `compaction.model` 或显式引用自身别名时，沿用请求的 reasoning effort；引用其他别名时使用执行别名的 `reasoning.default_effort`，未设置则使用它的目录默认值，再按该模型的映射转换。即使两个别名指向同一部署，也可用专用压缩别名选择不同默认 effort。复述配方保留选定的请求 effort，后续切换工作模型不改变它。显式原生 options 仍按普通请求的规则覆盖推导参数；后续修改原来源的 options 也会作用于复述，它们不作为快照固化。
 

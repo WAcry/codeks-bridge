@@ -259,6 +259,16 @@ test("catalog ETags identify the same metadata on reads and both response transp
   const response = await post(f.url, { model: "gpt", input: "Hello" });
   assert.equal(response.headers.get("x-models-etag"), newEtag);
   await response.text();
+  f.config.models.gpt.expose = false;
+  await f.restart();
+  const filtered = await fetch(`${f.url}/v1/models`);
+  const filteredEtag = filtered.headers.get("etag");
+  assert.notEqual(filteredEtag, newEtag);
+  assert.deepEqual((await responseJson(filtered)).models.map((model: any) => model.slug), ["gpt-region", "claude", "flash"]);
+  const hidden = await post(f.url, { model: "gpt", input: "Explicit alias remains usable" });
+  assert.equal(hidden.status, 200);
+  assert.equal(hidden.headers.get("x-models-etag"), filteredEtag);
+  await hidden.text();
 });
 
 test("HTTP validates requests before opening an SSE stream or calling upstream", async (t) => {

@@ -77,6 +77,28 @@ test("compaction defaults follow the adapter's native representation", () => {
   assert.deepEqual(resolveModel(validateConfig(c), "first").compaction, { mode: "native", native_replay: true });
 });
 
+test("model exposure controls discovery and snippet defaults without changing state identity", () => {
+  const c = config();
+  const original = resolveModel(c, "first").origin;
+  c.models.second = { ...c.models.first, expose: true };
+  c.models.third = { ...c.models.first };
+  c.models.first.expose = false;
+  validateConfig(c);
+  assert.deepEqual(buildCatalog(c).models.map(({ slug, priority }) => [slug, priority]), [["second", 0], ["third", 1]]);
+  for (const catalog of [undefined, "/tmp/catalog.json"]) {
+    assert.match(configSnippet(c, catalog), /^model = "second"\n/);
+  }
+  assert.deepEqual(resolveModel(c, "first").origin, original);
+  c.models.second.expose = c.models.third.expose = false;
+  validateConfig(c);
+  assert.deepEqual(buildCatalog(c), { models: [] });
+  assert.throws(() => configSnippet(c), /at least one model with expose enabled/);
+  for (const value of ["false", 0, null]) {
+    c.models.first.expose = value as unknown as boolean;
+    assert.throws(() => validateConfig(c), /expose must be boolean/);
+  }
+});
+
 test("native compaction generation and replay are independently configured", () => {
   const c = config();
   c.models.first.catalog = "gpt-6.1-sol";

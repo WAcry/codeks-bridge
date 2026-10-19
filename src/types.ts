@@ -16,6 +16,8 @@ export interface ModelConfig {
   upstream: string;
   model: string;
   catalog: string;
+  /** Include this alias in the client catalog. Defaults to true. */
+  expose?: boolean;
   context_window?: number;
   max_output_tokens?: number;
   input_modalities?: ("text" | "image")[];

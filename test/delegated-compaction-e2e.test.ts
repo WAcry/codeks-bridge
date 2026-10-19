@@ -85,6 +85,7 @@ async function fixture(t: TestContext, handler: Handler, configure?: (config: Br
       claude: { catalog: "claude-sonnet-5-5", upstream: "claude", model: "synthetic-claude", compaction: { mode: "native", model: "compressor" } },
       compressor: {
         catalog: "gpt-6.1-sol", upstream: "gpt", model: "synthetic-gpt-compressor",
+        expose: false,
         reasoning: { default_effort: "high" }, replay: { native_compaction_from: ["gpt"] },
         compaction: { mode: "summary", model: "unused" },
       },
@@ -134,6 +135,8 @@ test("model switches retain native checkpoints for delegated recompression and a
     } else gpt(res, [{ type: "reasoning", summary: [], encrypted_content: "synthetic-gpt-reasoning" }, answer("GPT_WORK_COMPLETE")]);
   });
   const firstUser = user("RETAINED_USER_TASK");
+  const catalog: any = await (await fetch(`${f.url}/v1/models`)).json();
+  assert.deepEqual(catalog.models.map((model: any) => model.slug), ["gpt", "claude", "unused"]);
   const first = await result(await post(f.url, { model: "gpt", input: [tools, firstUser, answer("OLD_WORK"), trigger], reasoning: { effort: "xhigh" } }));
   const k1 = first.output[0];
   assert.equal(f.seen[0].body.reasoning.effort, "xhigh", "Self compaction keeps the working request's effort");
