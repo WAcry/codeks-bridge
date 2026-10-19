@@ -88,7 +88,7 @@ for (const adapter of ["claude-messages", "deepseek-chat"] as const) {
   });
 }
 
-test("summary requests retain the prefix and tools but permit only summary text", () => {
+test("summary requests retain the prefix and tools and remove the answer format", () => {
   const ctx = context();
   const request = summaryRequest(ctx.request);
   assert.equal(request.instructions, ctx.request.instructions);
@@ -97,9 +97,37 @@ test("summary requests retain the prefix and tools but permit only summary text"
   assert.deepEqual((request.input as unknown[]).at(-1), {
     type: "message", role: "user", content: [{ type: "input_text", text: SUMMARIZATION_PROMPT }],
   });
-  assert.equal(request.tool_choice, "none");
+  assert.equal(Object.hasOwn(request, "tool_choice"), false);
   assert.equal(request.text, undefined);
   assert.equal(request.stream, true);
+});
+
+test("summary and deferred handoff preserve tool choice and unknown request parameters", async () => {
+  for (const choice of [undefined, "auto", "none", "required", { type: "function", name: "lookup" }]) {
+    const ctx = context();
+    if (choice !== undefined) ctx.request.tool_choice = choice;
+    ctx.request.future_parameter = { mode: "synthetic-value" };
+    ctx.request.temperature = 0.7;
+    ctx.request.stream = false;
+    ctx.requestHeaders = new Headers({ authorization: "Bearer synthetic-private-credential" });
+    const original = structuredClone(ctx.request);
+    const summary = summaryRequest(ctx.request);
+    const native = await compact(ctx, successfulBackend());
+    const recipe = decodeCompaction(native.item.encrypted_content)!.handoff!;
+    assert.doesNotMatch(JSON.stringify(recipe), /synthetic-private-credential/);
+    const handoff = handoffRequest(recipe, [], native.item);
+    assert.deepEqual(ctx.request, original);
+    for (const request of [summary, recipe.parameters, handoff]) {
+      assert.equal(Object.hasOwn(request, "tool_choice"), choice !== undefined);
+      assert.deepEqual(request.tool_choice, choice);
+      assert.deepEqual(request.future_parameter, { mode: "synthetic-value" });
+      assert.equal(request.temperature, 0.7);
+      assert.equal(Object.hasOwn(request, "text"), false);
+    }
+    assert.equal(Object.hasOwn(recipe.parameters, "input"), false);
+    assert.equal(Object.hasOwn(recipe.parameters, "stream"), false);
+    assert.equal(handoff.stream, true);
+  }
 });
 
 test("a compaction trigger must be unique and last", async () => {
@@ -153,7 +181,7 @@ test("the handoff uses source instructions and the exact retained input with nat
   assert.deepEqual(result, { summary: "The task must preserve the number 42.", usage: summaryUsage });
   assert.equal(handoff.instructions, ctx.request.instructions);
   assert.deepEqual(handoff.tools, ctx.request.tools);
-  assert.equal(handoff.tool_choice, "none");
+  assert.equal(Object.hasOwn(handoff, "tool_choice"), false);
   assert.equal(handoff.text, undefined);
   assert.deepEqual(handoff.input, [declaration, instructions, ...retained, native.item, {
     type: "message", role: "user", content: [{ type: "input_text", text: HANDOFF_PROMPT }],
@@ -190,6 +218,25 @@ test("empty, refused, tool, and unfinished summaries never replace history", asy
   for (const backend of backends) {
     await assert.rejects(compact(context("deepseek-chat"), backend), BridgeError);
     await assert.rejects(collectHandoff(context(), backend), BridgeError);
+  }
+});
+
+test("summary tool calls fail explicitly without another request even when the turn is unfinished", async () => {
+  for (const stage of ["summary", "handoff"] as const) {
+    for (const kind of ["function", "custom"] as const) {
+      let calls = 0;
+      const backend: Backend = async (_ctx, writer) => {
+        calls++;
+        writer.textDelta("Partial summary must not replace history.");
+        if (kind === "function") writer.addFunctionCall({ call_id: "call_synthetic", name: "lookup", arguments: "{}" });
+        else writer.addCustomToolCall({ call_id: "call_synthetic", name: "exec", input: "synthetic input" });
+        return { usage: summaryUsage, endTurn: false };
+      };
+      const pending = stage === "summary" ? compact(context("deepseek-chat"), backend) : collectHandoff(context(), backend);
+      await assert.rejects(pending, (error) => error instanceof BridgeError && error.code === "invalid_prompt" &&
+        /tool call instead of a summary/.test(error.message));
+      assert.equal(calls, 1);
+    }
   }
 });
 

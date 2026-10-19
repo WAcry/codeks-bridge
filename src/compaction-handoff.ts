@@ -47,7 +47,8 @@ export class CompactionHandoffStore {
     throw new BridgeError("The original compaction source is not configured; restore its model and upstream to generate a handoff.");
   }
 
-  private async summary(carrier: CompactionCarrier, request: ResponsesRequest, signal: AbortSignal): Promise<string> {
+  private async summary(carrier: CompactionCarrier, request: ResponsesRequest, context: BackendContext): Promise<string> {
+    const { signal } = context;
     const key = createHash("sha256").update(JSON.stringify({
       source: carrier.native!.source,
       request,
@@ -74,6 +75,7 @@ export class CompactionHandoffStore {
       const route = this.source(carrier);
       const result = await collectHandoff({
         request: { ...request, model: route.slug }, route, signal,
+        requestHeaders: context.requestHeaders,
         responsesLite: carrier.handoff!.responsesLite,
       }, this.backends[route.profile.id]);
       signal.throwIfAborted();
@@ -107,7 +109,7 @@ export class CompactionHandoffStore {
       if (!carrier.native || !carrier.handoff) throw new BridgeError("This compaction checkpoint has no handoff recipe.");
       const { history } = splitCompactionPrefix(input.slice(0, i));
       const request = handoffRequest(carrier.handoff, history, item);
-      const summary = await this.summary(carrier, request, context.signal);
+      const summary = await this.summary(carrier, request, context);
       prepared[i] = { ...item, encrypted_content: encodeCompaction({ ...carrier, summary }) };
       changed = true;
     }

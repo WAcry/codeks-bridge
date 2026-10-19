@@ -74,11 +74,11 @@ test("request replay unwraps only matching reasoning and removes linked item ids
   assert.throws(() => responsesBody(context({ request: { model: "test", previous_response_id: "resp_stored" } })), /complete conversation/);
 });
 
-test("compaction summary stays plain text without tool calls despite options", () => {
+test("compaction summary preserves tool choice options and removes the answer format", () => {
   const configured = { ...route, config: { ...route.config, max_output_tokens: 1000, options: { tool_choice: "required", text: { format: { type: "json_object" } } } } };
   const body = responsesBody(context({ route: configured, compacting: true, request: { model: "test", input: "Summarize", max_output_tokens: 2000 } }));
   assert.equal(body.max_output_tokens, 2000);
-  assert.equal(body.tool_choice, "none");
+  assert.equal(body.tool_choice, "required");
   assert.equal(body.text, undefined);
   const native = responsesBody(context({
     route: { ...configured, config: { ...configured.config, options: { ...configured.config.options, max_output_tokens: 5000 } } },

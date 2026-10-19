@@ -340,7 +340,7 @@ test("GPT keeps Lite declarations, transport and reasoning through native compac
   }
   assert.equal(f.seen[2].body.input.at(-1).type, "compaction_trigger");
   const handoff = f.seen[3].body;
-  assert.equal(handoff.tool_choice, "none");
+  assert.equal(Object.hasOwn(handoff, "tool_choice"), false);
   assert.deepEqual(handoff.input, [...input,
     { type: "compaction", encrypted_content: "synthetic-native-checkpoint" },
     { type: "message", role: "user", content: [{ type: "input_text", text: HANDOFF_PROMPT }] },
@@ -783,7 +783,7 @@ test("a Responses model configured for summary compaction sends exactly one ordi
   assert.equal(f.seen.length, 1);
   assert.equal(f.seen[0].body.input.some((item: any) => item.type === "compaction_trigger"), false);
   assert.equal(f.seen[0].body.input.at(-1).content[0].text, SUMMARIZATION_PROMPT);
-  assert.equal(f.seen[0].body.tool_choice, "none");
+  assert.equal(Object.hasOwn(f.seen[0].body, "tool_choice"), false);
   assert.equal(result.usage.input_tokens, 20);
 });
 
@@ -892,7 +892,7 @@ for (const target of ["claude", "flash"]) {
     assert.equal(exported.model, "gpt-example");
     assert.equal(exported.instructions, "Original source instructions.");
     assert.equal(exported.reasoning.effort, "high");
-    assert.equal(exported.tool_choice, "none");
+    assert.equal(Object.hasOwn(exported, "tool_choice"), false);
     assert.deepEqual(exported.input, [...prefix, user,
       { type: "compaction", encrypted_content: "synthetic-checkpoint-checkpoint" },
       { type: "message", role: "user", content: [{ type: "input_text", text: HANDOFF_PROMPT }] },
@@ -912,6 +912,41 @@ for (const target of ["claude", "flash"]) {
       assert.equal(exports, 1);
       assert.equal(f.seen.length, before + 1);
     }
+  });
+}
+
+for (const stage of ["summary", "handoff"] as const) {
+  test(`${stage} tool calls fail without reaching the client or starting another request`, async t => {
+    const f = await fixture(t, (body, _req, res) => {
+      if (body.input.at(-1)?.type === "compaction_trigger") {
+        nativeSuccess(res, [{ type: "compaction", encrypted_content: "synthetic-checkpoint" }]);
+      } else nativeSuccess(res, [message("Partial summary"), {
+        type: "function_call", id: "fc_summary", call_id: "call_summary", name: "lookup", arguments: "{}",
+      }]);
+    }, {}, config => { config.models.gpt.compaction = { mode: stage === "summary" ? "summary" : "native" }; });
+    let request: Record<string, unknown> = {
+      model: "gpt", input: [{ type: "compaction_trigger" }], tool_choice: "auto", stream: true,
+    };
+    if (stage === "handoff") {
+      const native = await responseJson(await post(f.url, { ...request, stream: false }));
+      request = { model: "claude", input: native.output, stream: true };
+    }
+    const response = await post(f.url, request);
+    let error;
+    if (stage === "summary") {
+      const frames = await events(response);
+      assert.equal(frames.at(-1).type, "response.failed");
+      assert.equal(frames.some(frame => frame.type === "response.output_item.added" || frame.type === "response.completed"), false);
+      error = frames.at(-1).response.error;
+    } else {
+      assert.equal(response.status, 400);
+      error = (await responseJson(response)).error;
+    }
+    assert.equal(error.code, "invalid_prompt");
+    assert.match(error.message, /tool call instead of a summary/);
+    assert.equal(f.seen.length, stage === "summary" ? 1 : 2);
+    assert.equal(f.seen.at(-1)!.body.tool_choice, "auto");
+    assert(f.seen.every(call => call.path === "/native/responses"));
   });
 }
 

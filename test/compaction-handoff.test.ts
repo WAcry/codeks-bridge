@@ -69,6 +69,25 @@ test("handoff exports persist privately with separate usage and do not mutate in
   assert.equal(calls, 1);
 });
 
+test("handoff forwards current request headers without persisting them", async t => {
+  const headers = new Headers({ "session-id": "synthetic-session", "thread-id": "synthetic-thread",
+    "x-future-metadata": "synthetic-metadata", "x-codex-turn-state": "synthetic-sticky", authorization: "Bearer synthetic-secret" });
+  let calls = 0;
+  const f = await setup(t, async (ctx, writer) => {
+    calls++;
+    assert.equal(ctx.requestHeaders, headers);
+    return succeed(ctx, writer);
+  });
+  f.context.requestHeaders = headers;
+  await f.store.materialize(f.context);
+  assert.equal(headers.get("x-codex-turn-state"), "synthetic-sticky");
+  for (const file of await readdir(f.directory)) {
+    assert.doesNotMatch(await readFile(join(f.directory, file), "utf8"), /synthetic-session|synthetic-secret/);
+  }
+  await f.store.materialize({ ...f.context, requestHeaders: new Headers({ "session-id": "new-synthetic-session" }) });
+  assert.equal(calls, 1, "Routing headers do not change an already generated summary");
+});
+
 test("memo identity includes retained history but excludes destination prefix and later work", async t => {
   let calls = 0;
   const f = await setup(t, async (ctx, writer) => { calls++; return succeed(ctx, writer); });

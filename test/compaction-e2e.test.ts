@@ -79,7 +79,8 @@ async function fixture(t: TestContext) {
         assert.match(JSON.stringify(input), /CHECKPOINT_TOOL_MARKER/);
         native(res, [{ type: "compaction", id: "cmp_native", encrypted_content: "synthetic-native-checkpoint" }]);
       } else if (input.at(-1)?.content?.[0]?.text === HANDOFF_PROMPT) {
-        assert.equal(body.tool_choice, "none");
+        const source = upstreamRequests.find(call => call.body.input?.at(-1)?.type === "compaction_trigger")!;
+        assert.deepEqual(body.tool_choice, source.body.tool_choice);
         assert.ok(input.some(item => item.type === "compaction" && item.encrypted_content === "synthetic-native-checkpoint"));
         assert.match(JSON.stringify(input), /RETAINED_USER_TASK/);
         assert.doesNotMatch(JSON.stringify(input), /POST_CHECKPOINT_WORK|SWITCHED_MODEL_TASK/);

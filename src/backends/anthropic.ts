@@ -141,7 +141,6 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
   if (definitions.length) body.tools = definitions;
   else delete body.tools;
   if (context.compacting) {
-    body.tool_choice = { type: "none" };
     if (body.output_config) {
       body.output_config = { ...body.output_config };
       delete body.output_config.format;
@@ -167,7 +166,7 @@ function validateUsage(value: any, required: string[]): void {
 
 export const runAnthropic: Backend = async (context, writer) => {
   const { body, tools } = buildAnthropicRequest(context);
-  const response = await upstreamFetch(context.route, "/messages", body, context.signal);
+  const response = await upstreamFetch(context.route, "/messages", body, context.signal, context.requestHeaders);
   context.onAccepted?.(response.headers);
   if (!response.body) throw new BridgeError("Messages returned an empty stream.", "upstream_error", 502);
   const blocks = new Map<number, { value: Block; json: string }>();

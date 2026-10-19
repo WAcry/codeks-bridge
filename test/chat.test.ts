@@ -179,7 +179,7 @@ test("DeepSeek maps efforts for any deployment name and forwards forced tools an
   assert.deepEqual(body.thinking, { type: "disabled" });
   assert.deepEqual(body.tool_choice, { type: "function", function: { name: "agents__spawn_agent" } });
   ctx.compacting = true;
-  assert.equal(buildDeepSeekRequest(ctx).body.tool_choice, "none");
+  assert.deepEqual(buildDeepSeekRequest(ctx).body.tool_choice, { type: "function", function: { name: "agents__spawn_agent" } });
   assert.equal(buildDeepSeekRequest(ctx).body.response_format, undefined);
 });
 
@@ -288,7 +288,7 @@ test("DeepSeek stream errors preserve the original upstream event", async () => 
   await assert.rejects(exchange(context(), [failure], () => {}), (error: any) => {
     assert.equal(error.message, "Capacity unavailable.");
     assert.equal(error.code, "server_is_overloaded");
-    assert.deepEqual(error.headers, { "retry-after": "12" });
+    assert.equal(error.headers["retry-after"], "12");
     assert.deepEqual(error.upstream.body, failure);
     return true;
   });

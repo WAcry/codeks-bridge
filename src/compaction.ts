@@ -14,6 +14,7 @@ type Item = Record<string, any>;
 interface CollectedResponse {
   output: readonly unknown[];
   usage: Usage;
+  endTurn?: boolean;
 }
 
 export interface CompactionResult {
@@ -41,32 +42,25 @@ export function summaryRequest(request: ResponsesRequest): ResponsesRequest {
     ...request,
     input: [...input, { type: "message", role: "user", content: [{ type: "input_text", text: SUMMARIZATION_PROMPT }] }],
     stream: true,
-    tool_choice: "none",
   };
   // A conversation's structured output schema does not describe a handoff summary.
   delete result.text;
   return result;
 }
 
-const HANDOFF_PARAMETERS = ["model", "instructions", "tools", "reasoning", "prompt_cache_key",
-  "max_output_tokens", "service_tier", "parallel_tool_calls"] as const;
-
 function handoffRecipe(context: BackendContext, prefix: Item[]): HandoffRecipe {
-  const parameters = Object.fromEntries(HANDOFF_PARAMETERS
-    .filter(key => context.request[key] !== undefined).map(key => [key, context.request[key]]));
+  // The handoff rebuilds input and transport mode; a summary is not a structured answer.
+  const { input: _input, stream: _stream, text: _text, ...parameters } = context.request;
   return structuredClone({ prefix, parameters, responsesLite: context.responsesLite === true }) as HandoffRecipe;
 }
 
 /** Rephrase the checkpoint using the exact history retained by the client. */
 export function handoffRequest(recipe: HandoffRecipe, retained: Item[], checkpoint: Item): ResponsesRequest {
-  const parameters = Object.fromEntries(HANDOFF_PARAMETERS
-    .filter(key => recipe.parameters[key] !== undefined).map(key => [key, recipe.parameters[key]]));
   return {
-    ...parameters,
-    model: recipe.parameters.model,
+    ...recipe.parameters,
     input: [...recipe.prefix, ...retained, checkpoint,
       { type: "message", role: "user", content: [{ type: "input_text", text: HANDOFF_PROMPT }] }],
-    tool_choice: "none", stream: true,
+    stream: true,
   };
 }
 
@@ -82,22 +76,21 @@ async function collect(context: BackendContext, backend: Backend): Promise<Colle
     }
     if (cause instanceof ResponsesStreamError && cause.response) {
       const { output: _output, usage: _usage, ...response } = cause.response;
-      throw new ResponsesStreamError(cause.error, { ...response, output: [] }, cause.event);
+      throw new ResponsesStreamError(cause.error, { ...response, output: [] }, cause.event, cause.headers);
     }
     throw cause;
   }
   context.signal.throwIfAborted();
   writer.complete(result.usage);
-  if (result.endTurn === false) throw new BridgeError("Compaction did not finish its response.");
-  return { output: writer.outputItems, usage: result.usage };
+  return { output: writer.outputItems, usage: result.usage, endTurn: result.endTurn };
 }
 
-function summaryText(output: readonly unknown[]): string {
+function summaryText({ output, endTurn }: CollectedResponse): string {
   const parts: string[] = [];
   for (const value of output) {
     const item = value as Item;
     if (item.type === "function_call" || item.type === "custom_tool_call") {
-      throw new BridgeError("Compaction returned a tool call instead of a summary.");
+      throw new BridgeError("Compaction returned a tool call instead of a summary. No tools were executed.");
     }
     if (item.type !== "message" || item.role !== "assistant" || !Array.isArray(item.content)) continue;
     for (const part of item.content) {
@@ -105,6 +98,7 @@ function summaryText(output: readonly unknown[]): string {
       if (part.type === "output_text" && typeof part.text === "string") parts.push(part.text);
     }
   }
+  if (endTurn === false) throw new BridgeError("Compaction did not finish its response.");
   const summary = parts.join("\n").trim();
   if (!summary) throw new BridgeError("Compaction returned an empty summary.");
   return summary;
@@ -115,7 +109,7 @@ export async function collectHandoff(context: BackendContext, backend: Backend):
   // that route normally chooses to replay native checkpoints in ordinary turns.
   const route = { ...context.route, compaction: { ...context.route.compaction, native_replay: true } };
   const result = await withCaptureLabel("handoff", () => collect({ ...context, route, compacting: true }, backend));
-  return { summary: summaryText(result.output), usage: result.usage };
+  return { summary: summaryText(result), usage: result.usage };
 }
 
 function nativeItem(output: readonly unknown[]): Record<string, unknown> {
@@ -140,11 +134,12 @@ export async function compact(context: BackendContext, backend: Backend): Promis
     const result = await withCaptureLabel("summary", () => collect({
       ...context, compacting: true, request: summaryRequest(context.request),
     }, backend));
-    return { item: item({ summary: summaryText(result.output) }), usage: result.usage };
+    return { item: item({ summary: summaryText(result) }), usage: result.usage };
   }
   const native = await withCaptureLabel("native", () => collect({
     ...context, compacting: true, request: { ...context.request, stream: true },
   }, backend));
+  if (native.endTurn === false) throw new BridgeError("Compaction did not finish its response.");
   const { prefix } = splitCompactionPrefix(input);
   return {
     item: item({

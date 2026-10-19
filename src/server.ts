@@ -12,20 +12,19 @@ import { compact, isCompactionRequest } from "./compaction.ts";
 import { CompactionHandoffStore } from "./compaction-handoff.ts";
 import { Inspector, type Exchange } from "./inspect/capture.ts";
 import { isInspectorPath, serveInspector } from "./inspect/http.ts";
+import { forwardResponseHeaders, incomingHeaders, type HeaderRecord } from "./headers.ts";
 import type { AdapterId, Backend, BridgeConfig, ResponsesRequest } from "./types.ts";
 
 const BACKENDS: Record<AdapterId, Backend> = { "gpt-responses": runResponses, "claude-messages": runAnthropic, "deepseek-chat": runDeepSeek };
 const MAX_BODY_BYTES = 64 * 1024 * 1024;
-function json(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
-  res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store", ...headers });
+function json(res: ServerResponse, status: number, body: unknown, headers: HeaderRecord = {}): void {
+  for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
+  if (!res.hasHeader("cache-control")) res.setHeader("cache-control", "no-store");
+  res.writeHead(status, { "content-type": "application/json" });
   res.end(JSON.stringify(body));
 }
 function upstreamHttpFailure(res: ServerResponse, error: UpstreamHttpError): void {
-  const headers = new Headers(error.headers);
-  const connectionHeaders = (headers.get("connection") ?? "").split(",").map(name => name.trim()).filter(Boolean);
-  // fetch decodes the body; hop-by-hop and encoded-length headers no longer apply.
-  for (const name of [...connectionHeaders, "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade", "content-encoding", "content-length"]) headers.delete(name);
-  res.writeHead(error.status, Object.fromEntries(headers));
+  res.writeHead(error.status, forwardResponseHeaders(error.headers, false));
   res.end(error.body);
 }
 async function readRequest(req: IncomingMessage, exchange?: Exchange): Promise<ResponsesRequest> {
@@ -111,17 +110,16 @@ export function createBridgeServer(value: BridgeConfig): Server {
       writer = new ResponseWriter(streaming ? res : { write() {} }, { model: request.model, showSummary: reasoningSummaryRequested(request) });
       if (streaming) startStream = () => {
         if (res.headersSent || controller.signal.aborted) return;
-        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", "x-accel-buffering": "no" });
+        if (!res.hasHeader("cache-control")) res.setHeader("cache-control", "no-cache");
+        if (!res.hasHeader("x-accel-buffering")) res.setHeader("x-accel-buffering", "no");
+        res.writeHead(200, { "content-type": "text/event-stream" });
         res.flushHeaders();
         writer!.start();
         keepalive = setInterval(() => writer?.keepalive(), 15_000).unref();
       };
       else writer.start();
-      const context = { request, route, signal: controller.signal, responsesLite, onAccepted: (headers?: Headers) => {
-        for (const name of ["x-request-id", "request-id"]) {
-          const value = headers?.get(name);
-          if (value) res.setHeader(name, value);
-        }
+      const context = { request, route, signal: controller.signal, requestHeaders: incomingHeaders(req.headers), responsesLite, onAccepted: (headers?: Headers) => {
+        for (const [name, value] of Object.entries(headers ? forwardResponseHeaders(headers) : {})) res.setHeader(name, value);
         startStream?.();
       } };
       context.request = await compactions.materialize(context);
@@ -153,6 +151,9 @@ export function createBridgeServer(value: BridgeConfig): Server {
       if (cause instanceof ResponsesStreamError) {
         // Auxiliary compaction can fail before the target request starts.
         // Preserve the upstream error code even while HTTP headers are withheld.
+        if (!res.headersSent && cause.headers) {
+          for (const [name, value] of Object.entries(forwardResponseHeaders(cause.headers))) res.setHeader(name, value);
+        }
         startStream?.();
         if (res.headersSent && writer) {
           if (cause.response) writer.nativeFailed(cause.response, cause.event);

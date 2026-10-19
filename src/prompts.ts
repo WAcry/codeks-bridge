@@ -115,4 +115,6 @@ Include:
 - What remains to be done (clear next steps)
 - Any critical data, examples, or references needed to continue
 
-Be concise, structured, and focused on helping the next LLM seamlessly continue the work.`;
+Be concise, structured, and focused on helping the next LLM seamlessly continue the work.
+
+Respond with text only. Do not call any tools.`;

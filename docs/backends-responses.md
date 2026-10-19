@@ -4,7 +4,7 @@
 
 ## 请求与参数
 
-普通 Responses 参数、namespace 和 custom grammar 工具保留原始格式。模型名替换为配置的实际名称，reasoning effort 使用 profile 默认值和配置映射。`max_output_tokens` 优先使用请求值，再使用模型默认值。
+普通 Responses 参数、namespace 和 custom grammar 工具保留原始格式，包括未知扩展字段；请求及响应 header 按 [HTTP 边界](responses-stream.md#header-与转发边界) 默认透传。模型名替换为配置的实际名称，reasoning effort 使用 profile 默认值和配置映射。`max_output_tokens` 优先使用请求值，再使用模型默认值。
 
 客户端默认发送 Responses Lite：工具声明保留在 `input[].additional_tools` 的原位置，不提升到顶层 `tools`。保留 `reasoning.context: "all_turns"` 和 `parallel_tool_calls: false`，并向所有 GPT 上游发送 Lite header。入口从客户端 header 或 `additional_tools` 识别 Lite；只有 header、没有工具的请求也能保持标记。后端不通过模型名称或云厂商猜测协议。
 
@@ -26,7 +26,7 @@
 
 默认 `compaction.mode: "native"` 向 `/responses` 发送保留 `compaction_trigger` 的请求，保存原生检查点及复述配方。目标需要文字表示时，原来源读取后续请求中实际保留的历史与原生检查点，使用 handoff prompt 复述，并缓存成功结果。若端点只适合文字压缩，显式设置 `mode: "summary"`，使用标准 prompt 汇总原历史。
 
-原生请求移除普通回答的 `max_output_tokens`，包括配置和 options 中的值，由上游管理压缩输出预算。摘要仍使用普通预算，固定 `tool_choice: "none"` 并移除结构化输出格式。
+原生请求移除普通回答的 `max_output_tokens`，包括配置和 options 中的值，由上游管理压缩输出预算。摘要仍使用普通预算，保留工具定义和工具选择，移除结构化输出格式；工具调用的失败语义见 [压缩](compaction.md#工具选择与缓存)。
 
 是否生成原生压缩与是否恢复原生检查点独立。配置 `native_replay` 和 `native_compaction_from` 后，格式可读且来源允许的原生状态优先发送；上游拒绝即报错。[压缩配置](compaction.md)
 

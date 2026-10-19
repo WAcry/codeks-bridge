@@ -41,7 +41,6 @@ export function responsesBody({ request, route, compacting }: BackendContext): R
     // response limit can be smaller than its provider-enforced minimum.
     delete body.max_output_tokens;
   } else if (compacting) {
-    body.tool_choice = "none";
     delete body.text;
   }
   return body;
@@ -69,7 +68,7 @@ function usageFrom(value: any): Usage {
 /** Transform only bridge-owned fields; native events keep their original shape. */
 export const runResponses: Backend = async (context, writer) => {
   writer.useNativeResponses();
-  const response = await upstreamFetch(context.route, "/responses", responsesBody(context), context.signal,
+  const response = await upstreamFetch(context.route, "/responses", responsesBody(context), context.signal, context.requestHeaders,
     context.responsesLite ? { "x-openai-internal-codex-responses-lite": "true" } : undefined);
   context.onAccepted?.(response.headers);
   const states = new Map<number, { item: Record<string, any>; added: boolean; done: boolean }>();

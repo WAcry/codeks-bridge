@@ -2,10 +2,12 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { Api, UpstreamConfig } from "./types.ts";
 import { BridgeError } from "./errors.ts";
+import { forwardRequestHeaders } from "./headers.ts";
 const execute = promisify(execFile);
 
-export async function upstreamHeaders(config: UpstreamConfig, api: Api, signal: AbortSignal): Promise<Headers> {
-  const headers = new Headers(config.headers);
+export async function upstreamHeaders(config: UpstreamConfig, api: Api, signal: AbortSignal, clientHeaders?: Headers): Promise<Headers> {
+  const headers = forwardRequestHeaders(clientHeaders, config.auth_header);
+  for (const [name, value] of Object.entries(config.headers ?? {})) headers.set(name, value);
   if (!headers.has("content-type")) headers.set("content-type", "application/json");
   if (api === "anthropic" && !headers.has("anthropic-version")) headers.set("anthropic-version", "2023-06-01");
   let credential: string | undefined;
