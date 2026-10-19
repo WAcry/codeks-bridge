@@ -47,7 +47,7 @@ const reply = (text: string) => ({
   content: [{ type: "output_text", text }],
 });
 
-async function fixture(t: TestContext, mode: "dual" | "lazy") {
+async function fixture(t: TestContext) {
   const scratch = await mkdtemp(join(tmpdir(), "bridge-native-compaction-"));
   const home = join(scratch, "home");
   const work = join(scratch, "work");
@@ -108,7 +108,7 @@ async function fixture(t: TestContext, mode: "dual" | "lazy") {
     compaction_cache_dir: join(scratch, "cache"),
     upstreams: { fake: { base_url: upstreamUrl } },
     models: {
-      source: { catalog: "gpt-6.1-sol", upstream: "fake", model: "source-deployment", context_window: 272_000, compaction: { mode } },
+      source: { catalog: "gpt-6.1-sol", upstream: "fake", model: "source-deployment", context_window: 272_000 },
       target: { catalog: "deepseek-flash", upstream: "fake", model: "target-deployment", context_window: 272_000 },
     },
   };
@@ -168,34 +168,30 @@ remote_compaction = "v2"
   return { upstreamRequests, clientRequests, invoke };
 }
 
-for (const mode of ["dual", "lazy"] as const) {
-  test(`real codeks: ${mode} native compaction, retained history, resume and model switch`, { skip: !binary, timeout: 180_000 }, async t => {
-    const f = await fixture(t, mode);
-    const exports = () => f.upstreamRequests.filter(({ body }) => body.input?.at(-1)?.content?.[0]?.text === HANDOFF_PROMPT);
-    assert.match(await f.invoke(original), /COMPACTION_DONE/);
-    assert.equal(exports().length, mode === "dual" ? 1 : 0);
-    const resumedWire = f.clientRequests.at(-1);
-    const checkpoint = resumedWire.input.find((item: any) => item.type === "compaction");
-    assert.ok(checkpoint);
-    const carrier = decodeCompaction(checkpoint.encrypted_content)!;
-    assert.equal(carrier.summary !== undefined, mode === "dual");
-    assert.match(JSON.stringify(resumedWire.input), /RETAINED_USER_TASK/);
-    assert.equal(resumedWire.input.some((item: any) => item.type === "custom_tool_call_output"), false);
-    assert.match(await f.invoke(later), /SOURCE_RESUME_DONE/);
-    assert.equal(exports().length, mode === "dual" ? 1 : 0);
-    assert.match(await f.invoke(switched, "target"), /TARGET_DONE/);
-    assert.equal(exports().length, 1);
-    if (mode === "lazy") {
-      const firstNativeContinuation = f.upstreamRequests.find(({ body }) =>
-        body.input?.at(-1)?.type === "compaction");
-      assert.ok(firstNativeContinuation);
-      assert.deepEqual(exports()[0].body.input.slice(0, -1), firstNativeContinuation.body.input,
-        "Lazy export reuses the actual original continuation prefix, including client-reinserted context");
-    }
-    assert.equal(f.clientRequests.filter(body => body.input.at(-1)?.type === "compaction_trigger").length, 1);
-    const last = f.clientRequests.at(-1);
-    assert.equal(last.model, "target");
-    const stored = decodeCompaction(last.input.find((item: any) => item.type === "compaction").encrypted_content)!;
-    assert.equal(stored.summary !== undefined, mode === "dual", "Lazy materialization must not rewrite the client's stored checkpoint");
-  });
-}
+test("real codeks: native compaction, retained history, resume and model switch", { skip: !binary, timeout: 180_000 }, async t => {
+  const f = await fixture(t);
+  const exports = () => f.upstreamRequests.filter(({ body }) => body.input?.at(-1)?.content?.[0]?.text === HANDOFF_PROMPT);
+  assert.match(await f.invoke(original), /COMPACTION_DONE/);
+  assert.equal(exports().length, 0);
+  const resumedWire = f.clientRequests.at(-1);
+  const checkpoint = resumedWire.input.find((item: any) => item.type === "compaction");
+  assert.ok(checkpoint);
+  const carrier = decodeCompaction(checkpoint.encrypted_content)!;
+  assert.equal(carrier.summary, undefined);
+  assert.match(JSON.stringify(resumedWire.input), /RETAINED_USER_TASK/);
+  assert.equal(resumedWire.input.some((item: any) => item.type === "custom_tool_call_output"), false);
+  assert.match(await f.invoke(later), /SOURCE_RESUME_DONE/);
+  assert.equal(exports().length, 0);
+  assert.match(await f.invoke(switched, "target"), /TARGET_DONE/);
+  assert.equal(exports().length, 1);
+  const firstNativeContinuation = f.upstreamRequests.find(({ body }) =>
+    body.input?.at(-1)?.type === "compaction");
+  assert.ok(firstNativeContinuation);
+  assert.deepEqual(exports()[0].body.input.slice(0, -1), firstNativeContinuation.body.input,
+    "Deferred handoff reuses the actual original continuation prefix, including client-reinserted context");
+  assert.equal(f.clientRequests.filter(body => body.input.at(-1)?.type === "compaction_trigger").length, 1);
+  const last = f.clientRequests.at(-1);
+  assert.equal(last.model, "target");
+  const stored = decodeCompaction(last.input.find((item: any) => item.type === "compaction").encrypted_content)!;
+  assert.equal(stored.summary, undefined, "Deferred materialization must not rewrite the client's stored checkpoint");
+});

@@ -24,7 +24,7 @@
 
 ## 原生压缩
 
-默认 `compaction.mode: "dual"` 先向 `/responses` 发送保留 `compaction_trigger` 的请求，再由原来源读取近期保留消息与原生检查点，使用 handoff prompt 复述。两步都成功才生成完整 carrier。`mode: "lazy"` 延迟到目标需要文字时再执行同一复述；若端点只适合文字压缩，显式设置 `mode: "summary"`，使用标准 prompt 汇总原历史。
+默认 `compaction.mode: "native"` 向 `/responses` 发送保留 `compaction_trigger` 的请求，保存原生检查点及复述配方。目标需要文字表示时，原来源读取后续请求中实际保留的历史与原生检查点，使用 handoff prompt 复述，并缓存成功结果。若端点只适合文字压缩，显式设置 `mode: "summary"`，使用标准 prompt 汇总原历史。
 
 原生请求移除普通回答的 `max_output_tokens`，包括配置和 options 中的值，由上游管理压缩输出预算。摘要仍使用普通预算，固定 `tool_choice: "none"` 并移除结构化输出格式。
 

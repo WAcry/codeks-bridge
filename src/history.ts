@@ -1,11 +1,14 @@
-import { decodeCompaction, decodeReasoning } from "./carrier.ts";
-import type { CompactionCarrier } from "./carrier.ts";
+import { decodeCompaction, decodeReasoning, type CompactionCarrier, type StatePayload } from "./carrier.ts";
 import { BridgeError } from "./errors.ts";
 import { SUMMARY_PREFIX } from "./prompts.ts";
 import { translateToolHistory } from "./tool-history.ts";
 import type { ResolvedModel, ResponsesRequest } from "./types.ts";
 
-export function isNativeReplayAllowed(carrier: CompactionCarrier, route: ResolvedModel): boolean {
+/** Replay policy for decoded state. The inspector reports the same decisions. */
+export function replaysReasoning(carrier: StatePayload, route: ResolvedModel): boolean {
+  return route.replay.reasoning.has(carrier.source.id) && carrier.format === route.profile.reasoning_format;
+}
+export function restoresNativeCompaction(carrier: CompactionCarrier, route: ResolvedModel): boolean {
   return !!carrier.native && route.compaction.native_replay &&
     route.replay.native_compaction.has(carrier.native.source.id) &&
     carrier.native.format === route.profile.native_compaction_format;
@@ -33,7 +36,7 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
     }
     if (item.type === "reasoning") {
       const carrier = decodeReasoning(item.encrypted_content);
-      if (carrier && route.replay.reasoning.has(carrier.source.id) && carrier.format === route.profile.reasoning_format) {
+      if (carrier && replaysReasoning(carrier, route)) {
         result.push({ type: "bridge_reasoning", state: carrier, summary: item.summary ?? [] });
       }
       continue;
@@ -64,7 +67,7 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
       if (!carrier) {
         throw new BridgeError("This compaction item has no portable summary or handoff recipe; use history created through this bridge");
       }
-      if (isNativeReplayAllowed(carrier, route)) {
+      if (restoresNativeCompaction(carrier, route)) {
         result.push(carrier.native!.data as Record<string, any>);
       } else {
         if (!carrier.summary) throw new BridgeError("Deferred compaction summary has not been materialized");

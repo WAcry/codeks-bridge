@@ -21,7 +21,7 @@ export interface ModelConfig {
   input_modalities?: ("text" | "image")[];
   reasoning?: { default_effort?: string; effort_map?: Record<string, string> };
   replay?: { reasoning_from?: string[]; native_compaction_from?: string[] };
-  compaction?: { mode?: "dual" | "summary" | "lazy"; native_replay?: boolean };
+  compaction?: { mode?: "summary" | "native"; native_replay?: boolean };
   options?: Record<string, unknown>;
 }
 export interface BridgeConfig {
@@ -29,6 +29,8 @@ export interface BridgeConfig {
   port?: number;
   token_env?: string;
   compaction_cache_dir?: string;
+  /** Debug capture for the /inspect/ page. */
+  inspect?: { capture?: boolean; max_mib?: number };
   upstreams: Record<string, UpstreamConfig>;
   models: Record<string, ModelConfig>;
 }
@@ -58,7 +60,7 @@ export interface ResolvedModel {
   profile: ModelProfile;
   origin: StateOrigin;
   replay: { reasoning: ReadonlySet<string>; native_compaction: ReadonlySet<string> };
-  compaction: { mode: "dual" | "summary" | "lazy"; native_replay: boolean };
+  compaction: { mode: "summary" | "native"; native_replay: boolean };
 }
 export interface ResponsesRequest {
   model: string;

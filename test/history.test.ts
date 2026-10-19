@@ -87,7 +87,7 @@ test("format checks keep incompatible payloads out even for an accepted source",
 
 test("native replay can be disabled independently from compaction generation", () => {
   const disabled = routes({ a: { compaction: { native_replay: false } } }).a;
-  assert.equal(disabled.compaction.mode, "dual");
+  assert.equal(disabled.compaction.mode, "native");
   const selected = prepareHistory([checkpoint(defaults.a)], disabled);
   assert.equal(selected[0].role, "user");
   assert.match(selected[0].content[0].text, /Keep the violet flag\.$/);

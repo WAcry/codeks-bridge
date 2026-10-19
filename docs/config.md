@@ -46,11 +46,12 @@
 | `host` | 默认 `127.0.0.1` |
 | `port` | 默认 `8787`；程序集成测试可用 `0` 分配端口 |
 | `token_env` | 保存 bridge 入口 Bearer token 的环境变量名称 |
-| `compaction_cache_dir` | 延迟复述缓存目录；默认 `$XDG_CACHE_HOME/codeks-bridge/compaction`，未设置 XDG 时为 `~/.cache/codeks-bridge/compaction` |
+| `compaction_cache_dir` | 按需复述缓存目录；默认 `$XDG_CACHE_HOME/codeks-bridge/compaction`，未设置 XDG 时为 `~/.cache/codeks-bridge/compaction` |
 | `upstreams` | 上游连接配置表 |
 | `models` | 客户端模型别名表 |
+| `inspect` | 可选；`capture` 决定启动时是否捕获，`max_mib` 是内存软上限，见[调试检查器](inspect.md) |
 
-监听非 loopback 地址时必须配置 `token_env`，客户端也要设置同一个变量。它是 bridge 入口鉴权，不是上游 API key。HTTP 请求体最多 64 MiB，包含所有图片编码；入口没有 CORS。携带 `Origin` 的请求必须使用配置好的 bridge token，即使监听 loopback 也一样，避免网页的简单 POST 在无法读取响应时仍触发上游调用。没有 `Origin` 的 codeks 请求保持原行为。`GET /health`、`GET /v1/models` 和 `POST /v1/responses` 使用同一鉴权。
+监听非 loopback 地址时必须配置 `token_env`，客户端也要设置同一个变量。它是 bridge 入口鉴权，不是上游 API key。HTTP 请求体最多 64 MiB，包含所有图片编码；入口没有 CORS。携带 `Origin` 的请求必须使用配置好的 bridge token，即使监听 loopback 也一样，避免网页的简单 POST 在无法读取响应时仍触发上游调用。没有 `Origin` 的 codeks 请求保持原行为。`GET /health`、`GET /v1/models` 和 `POST /v1/responses` 使用同一鉴权。`/inspect/` 页面与接口使用[自己的规则](inspect.md#访问与鉴权)。
 
 ## 上游连接
 
@@ -117,15 +118,15 @@ model_reasoning_summary = "auto"
 
 ## 压缩模式
 
-`models.<别名>.compaction.mode` 可选择 `summary`、`dual` 或 `lazy`。GPT 默认 `dual`：先生成原生检查点，再用 handoff prompt 复述，两步都成功才交付。Claude/DeepSeek 默认且只支持 `summary`，继续用标准 prompt 压缩原历史。
+`models.<别名>.compaction.mode` 可选择 `summary` 或 `native`。GPT 默认 `native`：先生成原生检查点，只在目标需要文字表示时用 handoff prompt 复述。Claude/DeepSeek 默认且只支持 `summary`，继续用标准 prompt 压缩原历史。
 
-若通常只使用原目标，可显式选择延迟复述：
+GPT 的默认配置等价于：
 
 ```json
-{ "compaction": { "mode": "lazy", "native_replay": true } }
+{ "compaction": { "mode": "native", "native_replay": true } }
 ```
 
-`lazy` 初始只生成原生检查点；目标无法按来源策略回放它时，先向原模型和原连接生成文字。原来源须继续在配置中可用。成功摘要及辅助 usage 存入顶层 `compaction_cache_dir`，重启后可复用；它不是上游 prompt cache。生成模式不改变下面的原生状态复用策略。详见[压缩](compaction.md)。
+`native` 初始只生成原生检查点；目标无法按来源策略回放它时，先向原模型和原连接生成文字。原来源须继续在配置中可用。成功摘要及辅助 usage 存入顶层 `compaction_cache_dir`，重启后可复用；它不是上游 prompt cache。生成模式不改变下面的原生状态复用策略。详见[压缩](compaction.md)。
 
 ## 状态复用
 

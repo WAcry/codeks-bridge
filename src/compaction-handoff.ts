@@ -7,7 +7,7 @@ import { collectHandoff, handoffRequest } from "./compaction.ts";
 import { splitCompactionPrefix } from "./compaction-history.ts";
 import { resolveModel } from "./config.ts";
 import { BridgeError } from "./errors.ts";
-import { isNativeReplayAllowed } from "./history.ts";
+import { restoresNativeCompaction } from "./history.ts";
 import type { AdapterId, Backend, BackendContext, BridgeConfig, ResolvedModel, ResponsesRequest } from "./types.ts";
 
 function waitForTurn(previous: Promise<void>, signal: AbortSignal): Promise<void> {
@@ -24,7 +24,7 @@ function waitForTurn(previous: Promise<void>, signal: AbortSignal): Promise<void
 }
 
 /** Successful exports survive restarts; each caller owns only its own cancellation. */
-export class LazyCompactionStore {
+export class CompactionHandoffStore {
   readonly directory: string;
   private readonly config: BridgeConfig;
   private readonly backends: Record<AdapterId, Backend>;
@@ -103,7 +103,7 @@ export class LazyCompactionStore {
       const item = input[i];
       if (item.type !== "compaction" && item.type !== "compaction_summary") continue;
       const carrier = decodeCompaction(item.encrypted_content);
-      if (!carrier || carrier.summary !== undefined || isNativeReplayAllowed(carrier, context.route)) continue;
+      if (!carrier || carrier.summary !== undefined || restoresNativeCompaction(carrier, context.route)) continue;
       if (!carrier.native || !carrier.handoff) throw new BridgeError("This compaction checkpoint has no handoff recipe.");
       const { history } = splitCompactionPrefix(input.slice(0, i));
       const request = handoffRequest(carrier.handoff, history, item);

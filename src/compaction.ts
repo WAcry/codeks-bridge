@@ -1,8 +1,9 @@
 import { encodeCompaction } from "./carrier.ts";
 import type { CompactionCarrier, HandoffRecipe } from "./carrier.ts";
-import { retainedCompactionHistory, splitCompactionPrefix } from "./compaction-history.ts";
+import { splitCompactionPrefix } from "./compaction-history.ts";
 import { BridgeError, ResponsesIncompleteError, ResponsesStreamError } from "./errors.ts";
 import { newId } from "./ids.ts";
+import { withCaptureLabel } from "./inspect/capture.ts";
 import { HANDOFF_PROMPT, SUMMARIZATION_PROMPT } from "./prompts.ts";
 import type { Backend, BackendContext, ResponsesRequest } from "./types.ts";
 import { ResponseWriter } from "./writer.ts";
@@ -56,7 +57,7 @@ function handoffRecipe(context: BackendContext, prefix: Item[]): HandoffRecipe {
   return structuredClone({ prefix, parameters, responsesLite: context.responsesLite === true }) as HandoffRecipe;
 }
 
-/** The same checkpoint-to-text request is used by eager and deferred handoffs. */
+/** Rephrase the checkpoint using the exact history retained by the client. */
 export function handoffRequest(recipe: HandoffRecipe, retained: Item[], checkpoint: Item): ResponsesRequest {
   const parameters = Object.fromEntries(HANDOFF_PARAMETERS
     .filter(key => recipe.parameters[key] !== undefined).map(key => [key, recipe.parameters[key]]));
@@ -113,7 +114,7 @@ export async function collectHandoff(context: BackendContext, backend: Backend):
   // Generating text from the source's own native state is independent of whether
   // that route normally chooses to replay native checkpoints in ordinary turns.
   const route = { ...context.route, compaction: { ...context.route.compaction, native_replay: true } };
-  const result = await collect({ ...context, route, compacting: true }, backend);
+  const result = await withCaptureLabel("handoff", () => collect({ ...context, route, compacting: true }, backend));
   return { summary: summaryText(result.output), usage: result.usage };
 }
 
@@ -128,19 +129,7 @@ function nativeItem(output: readonly unknown[]): Record<string, unknown> {
   return items[0];
 }
 
-function combinedUsage(first: Usage, second?: Usage): Usage {
-  if (!second) return first;
-  const result: Usage = {
-    input_tokens: first.input_tokens + second.input_tokens,
-    output_tokens: first.output_tokens + second.output_tokens,
-  };
-  for (const field of ["cached_tokens", "cache_write_tokens", "reasoning_tokens"] as const) {
-    if (first[field] !== undefined || second[field] !== undefined) result[field] = (first[field] ?? 0) + (second[field] ?? 0);
-  }
-  return result;
-}
-
-/** Publish one checkpoint only when every required representation is complete. */
+/** Publish a complete native checkpoint or portable text summary. */
 export async function compact(context: BackendContext, backend: Backend): Promise<CompactionResult> {
   const input = compactionInput(context.request);
   context.signal.throwIfAborted();
@@ -148,24 +137,20 @@ export async function compact(context: BackendContext, backend: Backend): Promis
     type: "compaction", id: newId("cmp"), encrypted_content: encodeCompaction(carrier),
   });
   if (context.route.compaction.mode === "summary") {
-    const result = await collect({ ...context, compacting: true, request: summaryRequest(context.request) }, backend);
+    const result = await withCaptureLabel("summary", () => collect({
+      ...context, compacting: true, request: summaryRequest(context.request),
+    }, backend));
     return { item: item({ summary: summaryText(result.output) }), usage: result.usage };
   }
-  const native = await collect({
+  const native = await withCaptureLabel("native", () => collect({
     ...context, compacting: true, request: { ...context.request, stream: true },
-    // A later handoff may still return an HTTP error. Do not commit HTTP 200 yet.
-    onAccepted: context.route.compaction.mode === "lazy" ? context.onAccepted : undefined,
-  }, backend);
-  const { prefix, history } = splitCompactionPrefix(input);
-  const recipe = handoffRecipe(context, prefix);
-  const carrier: CompactionCarrier = {
-    native: { source: context.route.origin, format: context.route.profile.native_compaction_format!, data: nativeItem(native.output) },
-    handoff: recipe,
+  }, backend));
+  const { prefix } = splitCompactionPrefix(input);
+  return {
+    item: item({
+      native: { source: context.route.origin, format: context.route.profile.native_compaction_format!, data: nativeItem(native.output) },
+      handoff: handoffRecipe(context, prefix),
+    }),
+    usage: native.usage,
   };
-  const checkpoint = item(carrier);
-  if (context.route.compaction.mode === "lazy") return { item: checkpoint, usage: native.usage };
-  const summary = await collectHandoff({
-    ...context, request: handoffRequest(recipe, retainedCompactionHistory(history), checkpoint),
-  }, backend);
-  return { item: item({ summary: summary.summary, native: carrier.native }), usage: combinedUsage(native.usage, summary.usage) };
 }

@@ -6,7 +6,7 @@ import test, { type TestContext } from "node:test";
 import { decodeCompaction, encodeCompaction, type CompactionCarrier } from "../src/carrier.ts";
 import { resolveModel, validateConfig } from "../src/config.ts";
 import { UpstreamHttpError } from "../src/errors.ts";
-import { LazyCompactionStore } from "../src/lazy-compaction.ts";
+import { CompactionHandoffStore } from "../src/compaction-handoff.ts";
 import type { AdapterId, Backend, BackendContext, BridgeConfig } from "../src/types.ts";
 
 const message = (role: string, text: string) => ({ type: "message", role, content: [{ type: "input_text", text }] });
@@ -21,7 +21,7 @@ async function setup(t: TestContext, sourceBackend: Backend = succeed) {
     compaction_cache_dir: directory,
     upstreams: { native: { base_url: "https://source.example/v1" }, alternate: { base_url: "https://target.example/v1" } },
     models: {
-      source: { catalog: "gpt-6.1-sol", upstream: "native", model: "source-deployment", compaction: { mode: "lazy" } },
+      source: { catalog: "gpt-6.1-sol", upstream: "native", model: "source-deployment", compaction: { mode: "native" } },
       target: { catalog: "deepseek-flash", upstream: "alternate", model: "target-deployment" },
     },
   });
@@ -41,7 +41,7 @@ async function setup(t: TestContext, sourceBackend: Backend = succeed) {
     route: resolveModel(config, "target"), signal: new AbortController().signal, responsesLite: true,
     onAccepted: () => assert.fail("Export must not accept the downstream response"),
   };
-  return { config, carrier, checkpoint, backends, context, directory, store: new LazyCompactionStore(config, backends) };
+  return { config, carrier, checkpoint, backends, context, directory, store: new CompactionHandoffStore(config, backends) };
 }
 
 function gate() {
@@ -50,7 +50,7 @@ function gate() {
   return { promise, resolve };
 }
 
-test("lazy exports persist privately with separate usage and do not mutate input", async t => {
+test("handoff exports persist privately with separate usage and do not mutate input", async t => {
   let calls = 0;
   const f = await setup(t, async (ctx, writer) => { calls++; return succeed(ctx, writer); });
   const original = structuredClone(f.context.request);
@@ -64,7 +64,7 @@ test("lazy exports persist privately with separate usage and do not mutate input
   const path = join(f.directory, files[0]);
   assert.equal((await stat(path)).mode & 0o777, 0o600);
   assert.deepEqual(JSON.parse(await readFile(path, "utf8")), { summary: "Synthetic detailed handoff.", usage });
-  const restarted = new LazyCompactionStore(f.config, f.backends);
+  const restarted = new CompactionHandoffStore(f.config, f.backends);
   await restarted.materialize(f.context);
   assert.equal(calls, 1);
 });
@@ -111,7 +111,7 @@ test("cached summaries remain available without resolving their original source 
   const f = await setup(t);
   await f.store.materialize(f.context);
   delete f.config.models.source;
-  await new LazyCompactionStore(f.config, f.backends).materialize(f.context);
+  await new CompactionHandoffStore(f.config, f.backends).materialize(f.context);
   const request = structuredClone(f.context.request);
   (request.input as any[])[1] = message("user", "Uncached history");
   await assert.rejects(f.store.materialize({ ...f.context, request }), /original compaction source is not configured/);

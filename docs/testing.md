@@ -13,16 +13,17 @@ npm run check
 ## 测试覆盖什么
 
 - 工具：普通函数、namespace、自定义工具的原始字符串、Lark/regex 描述、名称冲突与超长名称、加密 schema 关键字的清理。
-- Lite：工具声明原位传给 GPT；Claude/DeepSeek 提取增量 schema，保留原历史与默认 namespace 身份；header、all-turns 和双压缩前缀保持。
+- Lite：工具声明原位传给 GPT；Claude/DeepSeek 提取增量 schema，保留原历史与默认 namespace 身份；header、all-turns 和原生压缩前缀保持。
 - 流：跨字节分块的 UTF-8、CR/LF、SSE 多行数据、结束标记、非法 JSON。
 - Responses 输出：先 added 后 delta/done、完整历史项、usage、reasoning carrier、原生消息 phase（含 `partial_answer`）、缺省 phase 与 `end_turn` 的关系、摘要分段索引和最终数组一致、明文多代理参数、失败时不执行尚未提交的工具。
 - 配置与目录：有限 key、原始 GPT 条目保留、第三方精调、别名与部署名分离、窗口覆盖、effort 映射及默认值、catalog 与出站参数一致、options 覆盖顺序。
 - 目录发现：Codex 专用 `/models` 响应、入口鉴权、ETag 与响应版本标记、连接及凭据配置不进入目录。
 - 状态：reasoning 与原生压缩的独立允许来源、定向非传递关系、配置改变后恢复已有 carrier、身份与显示别名分离、输入历史不变。
-- 压缩：生成模式与 native replay 独立；summary 保留标准 prompt；dual 先原生再复述，复述使用保留历史与新检查点；最后阶段接受后才建立流，所有必需步骤成功才交付；失败、截断与取消保持原路径。
-- 延迟复述：兼容目标不导出，其他目标向原来源导出；不包含检查点后的新工作；来源别名恢复、缓存及重启复用、同键排队与独立取消；辅助 usage 不进入目标上下文统计。
-- 保留历史：近期用户与代理消息、上下文通知筛选、64k 预算边界、UTF-8 首尾截断及图片通知；lazy 使用客户端实际保留的历史而不再裁剪。
+- 压缩：生成模式与 native replay 独立；summary 保留标准 prompt；GPT 默认 native 生成原生检查点；所有必需步骤成功才交付；失败、截断与取消保持原路径。
+- 按需复述：兼容目标不导出，其他目标向原来源导出；不包含检查点后的新工作；来源别名恢复、缓存及重启复用、同键排队与独立取消；辅助 usage 不进入目标上下文统计。
+- 保留历史：按需复述使用客户端实际保留的历史而不再裁剪；源指令与工具声明恢复，检查点后的工作留给目标请求。
 - 后端与历史：各 API 的消息、工具、图片、schema、thinking、usage 与错误转换；Claude 空工具结果、上下文边界停止及不完整工具不交付。
+- 检查器：四段内容逐字节保存、只脱敏凭据 header、上游调用标签、标注与实际回放决定一致、捕获开关与结束时的软上限淘汰、清空释放数据且不打断请求、客户端断开、无 token 时的 loopback 与同源限制、token 鉴权、静态文件路径、导出格式和跨块 SSE 解析；Responses Lite 结构视图补全输出且保留原始事件。
 - 错误：等待上游响应头时不发送 200；GPT HTTP status/body、诊断 header 与原生 SSE error 字段保留；移除不适用的传输 header；Claude/DeepSeek 继续转换协议；验证没有额外请求或自动降级。
 
 这些测试检查协议和客户端行为；假上游不会验证模型是否理解提示词，也不会验证真实服务的缓存命中率、容量和区域之间的密文兼容性。
@@ -32,7 +33,7 @@ npm run check
 可选集成测试启动已经安装的 codeks，并让它通过桥接器访问本地假上游。指定要验证的二进制即可，测试不会下载或编译 codeks：
 
 ```sh
-CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/catalog-e2e.test.ts test/reasoning-e2e.test.ts test/errors-e2e.test.ts test/protocol-e2e.test.ts
+CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/catalog-e2e.test.ts test/reasoning-e2e.test.ts test/errors-e2e.test.ts test/protocol-e2e.test.ts test/compaction-e2e.test.ts
 ```
 
 未设置 `CODEKS_BIN` 时，这些测试自动跳过。它们为每个场景创建独立的 `CODEX_HOME` 和工作目录，监听随机的回环端口。临时目录路径会写入测试输出，保留会话和进程输出便于复查。退出时关闭本轮创建的服务器。
@@ -86,7 +87,7 @@ TypeScript 检查和普通测试通过，客户端场景各在两个现成二进
 - HTTP 400 的未知错误码保留原响应体，不变成流内未知错误而触发重试。
 - 未知 SSE 错误按客户端配置重试一次，bridge 收到和转发的请求均为两次，没有额外重试。
 
-当时的普通 HTTP 测试另覆盖双压缩接受协调、失败取消、错误体解压后的 header 清理、凭据失败的终止语义，以及原生错误附加字段的完整保留。这里验证客户端协议，不代表真实服务产生过上述合成错误。
+当时的普通 HTTP 测试另覆盖失败取消、错误体解压后的 header 清理、凭据失败的终止语义，以及原生错误附加字段的完整保留。这里验证客户端协议，不代表真实服务产生过上述合成错误。
 
 ### 协议细节与完整客户端回归
 
@@ -104,7 +105,7 @@ TypeScript 检查和普通测试通过，客户端场景各在两个现成二进
 
 真实端点的配置、鉴权、请求与响应只保存在仓库外。公开测试数据必须是合成内容，不能复制真实密钥、端点、签名、密文、对话或账号信息。
 
-真实验证应区分：单次请求、工具回环、图片、切换模型后 reasoning 隔离、压缩后续接。Responses 的双重压缩还需要检查原生压缩完成后才发起复述、两步都成功后才提交结果；延迟模式检查同源续聊没有辅助请求，跨目标首次导出与缓存复用行为正确。未允许的端点或模型使用可读摘要，允许来源且目标开启 native replay 时恢复原生压缩内容；分别测允许与不允许的配对。某一服务上的成功不代表另一服务也支持同样的字段。
+真实验证应区分：单次请求、工具回环、图片、切换模型后 reasoning 隔离、压缩后续接。原生压缩模式还需要检查同源续聊没有辅助请求，跨目标首次导出与缓存复用行为正确，文字准备完成后才发送目标请求。未允许的端点或模型使用可读摘要，允许来源且目标开启 native replay 时恢复原生压缩内容；分别测允许与不允许的配对。某一服务上的成功不代表另一服务也支持同样的字段。
 
 ### Responses Lite 验证
 
@@ -113,7 +114,7 @@ TypeScript 检查和普通测试通过，客户端场景各在两个现成二进
 - AWS GPT-6.1 Sol、Azure GPT-5.6 Sol、Claude Sonnet 5.5、DeepSeek Flash 均通过 Lite 工具往返与 reasoning 载荷回放。
 - GPT 出站请求实际保留 Lite header、原位 `additional_tools`、`reasoning.context: "all_turns"` 和 `parallel_tool_calls: false`，没有增加顶层 `tools` 或改用其他协议重试。
 - Claude/DeepSeek 提取完整工具声明，返回调用的身份可供客户端继续执行。
-- AWS GPT 双压缩及同目标原生检查点续聊成功。
+- AWS GPT 原生压缩及同目标原生检查点续聊成功。
 
 上述场景包含 11 次成功上游请求。该轮未实测原生 OpenAI 订阅端点；官方 Codex 二进制与假上游的协议测试不能替代该端点验证。
 
@@ -122,7 +123,7 @@ TypeScript 检查和普通测试通过，客户端场景各在两个现成二进
 2026-10-18（America/Los_Angeles）通过实际 bridge HTTP 入口发送了 10 次真实上游请求：
 
 - GPT-6.1 Sol、Claude Sonnet 5.5、DeepSeek Flash 均生成了新的 reasoning carrier，并成功完成同源 reasoning 回放。
-- GPT-6.1 Sol 双压缩成功，检查点同时包含原生压缩与文字摘要。
+- GPT-6.1 Sol 原生压缩成功，检查点的原生内容可供后续恢复。
 - 显式允许另一连接上的 GPT-5.6 恢复该原生检查点后，bridge 确实发送了原密文；目标返回 HTTP 400 解密不兼容。原始错误完整传回，没有额外重试或改用文字摘要。
 
 这验证配置能控制尝试的配对，不能让上游原本不兼容的密文变得兼容。Claude 对简单任务可以不生成 thinking；本次改用需要推理的任务验证载荷回放，没有把普通成功回答算作 reasoning 回放成功。
@@ -133,7 +134,7 @@ TypeScript 检查和普通测试通过，客户端场景各在两个现成二进
 
 | 后端 | 已通过 |
 | --- | --- |
-| GPT Responses（两个云端连接） | reasoning 回放、跨连接切换、namespace 工具及结果、自定义 Lark 工具、图片识别、双压缩、同连接 native 与跨连接 summary 回放 |
+| GPT Responses（两个云端连接） | reasoning 回放、跨连接切换、namespace 工具及结果、自定义 Lark 工具、图片识别、原生压缩、同连接 native 与跨连接 summary 回放 |
 | Claude Messages（Opus / Sonnet） | namespace 工具、工具图片、custom regex 工具、Opus → Sonnet → Opus reasoning 隔离与恢复、带签名 reasoning 的压缩及续接、Responses JSON Schema 转 Messages 结构化 JSON 输出 |
 | DeepSeek 官方 `deepseek-flash` | namespace 和 custom 工具、同模型 reasoning 工具循环、跨模型历史配空 reasoning 字段、用户/工具图片、完整文字 reasoning 重放 |
 
@@ -141,11 +142,11 @@ Claude 一次压缩输入 19,778 tokens，其中 19,541 命中缓存，约 98.8%
 
 HTTP 集成测试另外覆盖入口鉴权、响应校验、429/503/配额分类、`Retry-After`、失败时不释放工具、客户端断开取消上游，以及下游 keepalive 持续时上游依然会触发空闲超时。使用合成 checkpoint 验证过服务重启、跨后端与跨区域恢复。
 
-完整的真实 HTTP 路径也已验证：经 bridge 生成 GPT 双压缩 checkpoint，序列化后交给 Claude 和 DeepSeek 续聊，再切回原 GPT。跨模型请求实际使用文字摘要且不含原生密文；切回请求恢复原生 checkpoint 并过滤外来 reasoning。原 GPT 正确回答了只存在于 checkpoint、此前续聊明文未出现的第二个标记，原始 carrier 保持不变。
+完整的真实 HTTP 路径也已验证：将含 GPT 原生状态与文字摘要的 bridge checkpoint 序列化后交给 Claude 和 DeepSeek 续聊，再切回原 GPT。跨模型请求实际使用文字摘要且不含原生密文；切回请求恢复原生 checkpoint 并过滤外来 reasoning。原 GPT 正确回答了只存在于 checkpoint、此前续聊明文未出现的第二个标记，原始 carrier 保持不变。
 
 ## 检查点复述 prompt 的选择
 
-在 OpenAI 订阅端点的 GPT-6.1 Sol 上，以 Responses Lite、`xhigh` 对比了原历史直接压缩与 `U + K` 复述。候选包括 Codex 内置 prompt、现有标准 prompt、短复述、详细复述和最终用户给定的 handoff prompt。原始请求、会话与密文保存在仓库外；这些实测用于选择 prompt，不等同于新 lazy HTTP 流程的端到端验证。
+在 OpenAI 订阅端点的 GPT-6.1 Sol 上，以 Responses Lite、`xhigh` 对比了原历史直接压缩与 `U + K` 复述。候选包括 Codex 内置 prompt、现有标准 prompt、短复述、详细复述和最终用户给定的 handoff prompt。原始请求、会话与密文保存在仓库外；这些实测用于选择 prompt，不等同于按需复述 HTTP 流程的端到端验证。
 
 最终 prompt 的一次结果如下：
 
@@ -156,10 +157,10 @@ HTTP 集成测试另外覆盖入口鉴权、响应校验、429/503/配额分类�
 
 这些结果支持使用该版本作交接复述，但每类只有一个输入，长历史的其他候选也达到同一检查上限，不能据此证明统计优势或任意历史无损。其他候选曾误述精确字段名，说明复述需要检查事实，不能仅按输出长短排序。prompt 保留用户给定措辞及 Codex 的交接主题，没有额外要求逐字还原密文，也没有强制标准文字压缩的格式。
 
-独立的短请求验证曾观察到原生检查点前缀的高 cache hit，也观察到相同前缀、变化后缀时的低命中。`U + K` 给缓存复用提供机会；是否命中不是 lazy 正确性的前提，也不作为节省用量的保证。
+独立的短请求验证曾观察到原生检查点前缀的高 cache hit，也观察到相同前缀、变化后缀时的低命中。`U + K` 给缓存复用提供机会；是否命中不是按需复述正确性的前提，也不作为节省用量的保证。
 
-## 顺序与延迟复述的客户端验证
+## 按需复述的客户端验证
 
-`test/compaction-e2e.test.ts` 使用真实 codeks `0.162.1` 与 Codex `0.163.0` 二进制，各自验证 `dual` 和 `lazy` 两种模式。上游是合成 Responses/Chat 服务，凭据与用户配置隔离，不调用真实模型端点。
+`test/compaction-e2e.test.ts` 使用真实 codeks `0.162.1` 与 Codex `0.163.0` 二进制，验证 `native` 模式。上游是合成 Responses/Chat 服务，凭据与用户配置隔离，不调用真实模型端点。
 
-测试让客户端执行工具、触发远程压缩、恢复会话并切换到 DeepSeek 目标，验证 checkpoint 持久化、原生续聊、原来源复述和目标文字恢复。lazy 同源续聊不额外请求，首次切换才导出；导出排除检查点后的工作，物化不改写客户端存储的载荷。客户端重新注入的环境上下文也进入 lazy 的实际保留历史，dual 不假定能逐字重建该前缀。
+测试让客户端执行工具、触发远程压缩、恢复会话并切换到 DeepSeek 目标，验证 checkpoint 持久化、原生续聊、原来源复述和目标文字恢复。同源续聊不额外请求，首次切换才导出；导出排除检查点后的工作，物化不改写客户端存储的载荷。客户端重新注入的环境上下文也进入按需复述的实际保留历史。
