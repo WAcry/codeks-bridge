@@ -144,6 +144,51 @@ test("real codeks: native interrupted response continues with the delivered hist
   assert.ok(JSON.stringify(result.events).includes("CONTINUATION_DONE"));
 });
 
+test("real codeks: terminal-only incomplete SSE retains text and reasoning for continuation", { skip: !binary, timeout: 120_000 }, async (t) => {
+  const reasoning = { type: "reasoning", id: "rs_synthetic_partial", summary: [], encrypted_content: "synthetic-partial-cipher" };
+  const terminal = responseEvents("TERMINAL_ONLY_PROGRESS", "interrupted").at(-1) as any;
+  terminal.response.output.unshift(reasoning);
+  const { requests, invoke } = await fixture(t, "gpt-6.1-sol", (_body, index) => index === 1
+    ? [terminal] : responseEvents("TERMINAL_ONLY_CONTINUED"));
+  const result = await invoke();
+  assert.equal(result.code, 0);
+  assert.equal(requests.length, 2);
+  assert.ok(JSON.stringify(requests[1].input).includes("TERMINAL_ONLY_PROGRESS"));
+  assert.ok(requests[1].input.some((item: any) => item.type === "reasoning" && item.encrypted_content === reasoning.encrypted_content));
+  assert.ok(result.events.some(event => event.type === "turn.completed"));
+});
+
+test("real codeks: malformed completed usage does not execute a held tool", { skip: !binary, timeout: 120_000 }, async (t) => {
+  const call = {
+    type: "custom_tool_call", id: "ctc_synthetic_held", call_id: "call_synthetic_held", namespace: "functions", name: "exec",
+    input: 'text("SYNTHETIC_TOOL_EXECUTED");',
+  };
+  for (const validUsage of [false, true]) {
+    const { requests, invoke, records } = await fixture(t, "gpt-6.1-sol", (_body, index) => index === 1 ? [
+      { type: "response.output_item.added", output_index: 0, item: call },
+      { type: "response.output_item.done", output_index: 0, item: call },
+      { type: "response.completed", response: {
+        id: "resp_synthetic_tool", status: "completed", output: [call], end_turn: false,
+        usage: validUsage ? usage : { input_tokens: 10, output_tokens: 2 },
+      } },
+    ] : responseEvents("TOOL_CONTROL_COMPLETE"));
+    const result = await invoke();
+    const outputs = (await records()).filter(record => record.type === "response_item" &&
+      record.payload.type === "custom_tool_call_output" && record.payload.call_id === call.call_id);
+    if (validUsage) {
+      assert.equal(result.code, 0);
+      assert.equal(requests.length, 2);
+      assert.equal(outputs.length, 1, "The positive control must execute the same valid tool call");
+      assert.ok(JSON.stringify(outputs).includes("SYNTHETIC_TOOL_EXECUTED"));
+    } else {
+      assert.equal(result.code, 1);
+      assert.equal(requests.length, 1);
+      assert.equal(outputs.length, 0, "No queued tool may execute before a malformed terminal response fails");
+      assert.match(result.events.find(event => event.type === "turn.failed")?.error.message ?? "", /total_tokens/);
+    }
+  }
+});
+
 test("real codeks: native output limit retains spending and ends the turn", { skip: !binary, timeout: 120_000 }, async (t) => {
   const { requests, invoke, records } = await fixture(t, "gpt-6.1-sol", () => responseEvents("PARTIAL_LIMIT_OUTPUT", "max_output_tokens"));
   const result = await invoke();

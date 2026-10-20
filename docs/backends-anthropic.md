@@ -55,6 +55,8 @@ Opus / Sonnet 5.5 目录的默认及最大上下文窗口为 `1000000`，Message
 
 选择这种恢复方式是为了保留正常 thinking、正文的流式显示，不让每轮正文都等待整个响应成功，也不引入隐藏会话状态。工具调用仍按现有规则等完整成功后交付。失配块及依赖该前缀的后续 thinking 都可能被丢弃，造成推理上下文损失或增加重新推理成本；这不是质量不变的承诺，也不能修复损坏签名或其他所有非法输入。具体发生了什么以[检查器中的服务端报告](inspect.md#claude-服务端输入处理)为准。
 
+一次失配不会令今后生成的 thinking 永久失效。后续请求保持前缀稳定时，新生成的块仍可正常复用；原始历史里的旧失配块可能在多轮请求中被重复报告，重复报告不代表每轮都丢弃新的 thinking。实际保留与丢弃以各次上游报告为准。
+
 ## 输出格式、工具与图片
 
 Responses `text.format: {type: "json_schema", schema: ...}` 转为 `output_config.format: {type: "json_schema", schema: ...}`；name/strict 不转发。schema 内容直接交给上游，随后 options 仍可覆盖原生格式。普通 `text` 不添加约束；无法表达为 Messages 的未知格式报错。

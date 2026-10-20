@@ -99,12 +99,12 @@ export function cleanSchema(schema: unknown): unknown {
 }
 
 function objectSchema(parameters: unknown): Record<string, unknown> {
+  if (parameters == null) return { type: "object", properties: {} };
   const cleaned = cleanSchema(parameters);
   if (cleaned && typeof cleaned === "object" && !Array.isArray(cleaned)) {
-    const schema = cleaned as Record<string, unknown>;
-    if (schema.type === "object" || schema.properties) return { type: "object", ...schema };
+    return { type: "object", ...cleaned };
   }
-  return { type: "object", properties: {} };
+  throw new BridgeError("Function tool parameters must be a JSON Schema object.");
 }
 
 /** Describes a custom tool's input format in words, for function-only upstreams. */

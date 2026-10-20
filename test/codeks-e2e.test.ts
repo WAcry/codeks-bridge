@@ -234,7 +234,7 @@ test("real codeks Lite: remote compaction V2 replaces history and survives resum
   let normal = 0;
   let summaries = 0;
   const { requests, clientRequests, invoke } = await fixture(t, "direct", (body) => {
-    if (body.tool_choice === "none" && body.messages.some((message: any) => message.content === SUMMARIZATION_PROMPT)) {
+    if (body.messages.some((message: any) => message.content === SUMMARIZATION_PROMPT)) {
       summaries++;
       assert.ok(toolReply(body, "call_before_compact"));
       assert.ok(body.tools.length > 0, "Summary requests keep the tool prefix");

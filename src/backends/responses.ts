@@ -53,16 +53,38 @@ function usageFrom(value: any): Usage {
     }
     return value;
   };
-  const cached = value?.input_tokens_details?.cached_tokens;
-  const reasoning = value?.output_tokens_details?.reasoning_tokens;
+  // These fields are required by codeks when their enclosing objects exist.
+  count(value?.total_tokens, "total_tokens");
+  const cached = value?.input_tokens_details == null ? undefined
+    : count(value.input_tokens_details.cached_tokens, "input_tokens_details.cached_tokens");
+  const reasoning = value?.output_tokens_details == null ? undefined
+    : count(value.output_tokens_details.reasoning_tokens, "output_tokens_details.reasoning_tokens");
   const cacheWrite = value?.input_tokens_details?.cache_write_tokens;
+  if (value?.codex_rollout_budget_units != null && !Number.isFinite(value.codex_rollout_budget_units)) {
+    throw new BridgeError("Invalid Responses usage field: codex_rollout_budget_units", "upstream_error", 502);
+  }
   return {
     input_tokens: count(value?.input_tokens, "input_tokens"),
     output_tokens: count(value?.output_tokens, "output_tokens"),
-    ...(cached !== undefined ? { cached_tokens: count(cached, "input_tokens_details.cached_tokens") } : {}),
+    ...(cached !== undefined ? { cached_tokens: cached } : {}),
     ...(cacheWrite !== undefined ? { cache_write_tokens: count(cacheWrite, "input_tokens_details.cache_write_tokens") } : {}),
-    ...(reasoning !== undefined ? { reasoning_tokens: count(reasoning, "output_tokens_details.reasoning_tokens") } : {}),
+    ...(reasoning !== undefined ? { reasoning_tokens: reasoning } : {}),
   };
+}
+
+/** Validate the client terminal contract before any buffered tools can run. */
+function completedUsage(response: Record<string, any>): Usage {
+  const invalid = (field: string): never => {
+    throw new BridgeError(`Missing or invalid Responses completed field: ${field}`, "upstream_error", 502);
+  };
+  if (typeof response.id !== "string") invalid("id");
+  if (response.end_turn != null && typeof response.end_turn !== "boolean") invalid("end_turn");
+  const metadata = response.usage_metadata;
+  if (metadata != null) {
+    if (typeof metadata !== "object" || Array.isArray(metadata)) invalid("usage_metadata");
+    if (metadata.amount != null && typeof metadata.amount !== "string") invalid("usage_metadata.amount");
+  }
+  return usageFrom(response.usage);
 }
 
 /** Transform only bridge-owned fields; native events keep their original shape. */
@@ -141,6 +163,14 @@ export const runResponses: Backend = async (context, writer) => {
     emit({ ...event, item });
   }
 
+  function reconcileOutput(result: Record<string, any>): void {
+    // codeks persists item events, not the terminal response.output. This also
+    // applies to partial history returned only by an incomplete terminal event.
+    for (const [index, item] of (result.output ?? []).entries()) {
+      if (!states.get(index)?.done) outputEvent({ type: "response.output_item.done", output_index: index, item });
+    }
+  }
+
   function terminal(event: Record<string, any>): { usage: Usage; endTurn: boolean } {
     const result = event.response;
     if (event.type === "response.failed" || result?.status === "failed" || result?.error) {
@@ -148,18 +178,15 @@ export const runResponses: Backend = async (context, writer) => {
       throw responsesStreamError(responseFor(result), response.headers, event);
     }
     if (event.type === "response.incomplete" || result?.status === "incomplete") {
+      reconcileOutput(result);
       releasePhase();
       throw new ResponsesIncompleteError(responseFor(result), event);
     }
     if (result?.status !== "completed") {
       throw new BridgeError("The upstream did not return a completed response", "stream_error", 502);
     }
-    const usage = usageFrom(result.usage);
-    // A whole JSON response, or a terminal-only stream, still needs item events
-    // because codeks persists the history from output_item.done.
-    for (const [index, item] of (result.output ?? []).entries()) {
-      if (!states.get(index)?.done) outputEvent({ type: "response.output_item.done", output_index: index, item });
-    }
+    const usage = completedUsage(result);
+    reconcileOutput(result);
     for (const state of states.values()) {
       if (!state.done) throw new BridgeError("The upstream completed with an unfinished output item", "stream_error", 502);
     }
@@ -176,13 +203,6 @@ export const runResponses: Backend = async (context, writer) => {
     const result = await response.json() as Record<string, any>;
     if (result.status === "completed" || result.status === "incomplete") {
       writer.nativeEvent({ type: "response.created", response: { ...result, model: context.request.model, status: "in_progress", output: [] } });
-    }
-    if (result.status === "incomplete") {
-      // An interrupted whole response has no earlier item events. Publish its
-      // partial history before the terminal event, still withholding any tool suffix.
-      for (const [index, item] of (result.output ?? []).entries()) {
-        outputEvent({ type: "response.output_item.done", output_index: index, item });
-      }
     }
     return terminal({ type: result.status === "incomplete" ? "response.incomplete" : "response.completed", response: result });
   }

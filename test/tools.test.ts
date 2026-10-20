@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { buildAnthropicRequest } from "../src/backends/anthropic.ts";
+import { buildDeepSeekRequest } from "../src/backends/deepseek.ts";
+import { resolveModel, validateConfig } from "../src/config.ts";
 import { baseFlatName, buildToolSet, cleanSchema, normalizeToolDeclarations, safeCallId } from "../src/tools.ts";
 
 const fn = (name: string) => ({ type: "function", name, parameters: { type: "object", properties: {} } });
@@ -69,6 +72,59 @@ test("schema cleanup removes encrypted keywords but preserves properties and dat
   assert.deepEqual(cleaned.default, { encrypted: true });
   assert.deepEqual(cleaned.examples, [{ encrypted: true }]);
   assert.equal(schema.encrypted, true);
+});
+
+test("Messages and DeepSeek preserve root references and composition schemas", () => {
+  const config = validateConfig({
+    upstreams: { example: { base_url: "https://api.example.com/v1" } },
+    models: {
+      messages: { upstream: "example", model: "claude-sonnet-5-5", catalog: "claude-sonnet-5-5" },
+      chat: { upstream: "example", model: "deepseek-flash", catalog: "deepseek-flash" },
+    },
+  });
+  const object = {
+    type: "object",
+    properties: { path: { type: "string" } },
+    required: ["path"],
+    additionalProperties: false,
+  };
+  const cases = [
+    {
+      source: { $ref: "#/$defs/Args", $defs: { Args: { ...object, encrypted: true } } },
+      expected: { type: "object", $ref: "#/$defs/Args", $defs: { Args: object } },
+    },
+    ...["allOf", "anyOf", "oneOf"].map((keyword) => ({
+      source: { [keyword]: [{ ...object, properties: { path: { type: "string", encrypted: true } } }] },
+      expected: { type: "object", [keyword]: [object] },
+    })),
+  ];
+  for (const { source, expected } of cases) {
+    const snapshot = structuredClone(source);
+    for (const model of ["messages", "chat"]) {
+      const context = {
+        route: resolveModel(config, model),
+        request: { model, input: "Read the file.", tools: [{ ...fn("read"), parameters: source }] },
+        signal: new AbortController().signal,
+      };
+      const actual = model === "messages"
+        ? buildAnthropicRequest(context).body.tools[0].input_schema
+        : buildDeepSeekRequest(context).body.tools[0].function.parameters;
+      assert.deepEqual(actual, expected);
+    }
+    assert.deepEqual(source, snapshot);
+  }
+});
+
+test("function schemas default only missing types and reject non-schema parameters", () => {
+  const parameters = { type: "array", items: { type: "string" } };
+  assert.deepEqual(buildToolSet([{ ...fn("explicit"), parameters }]).entries[0].parameters, parameters);
+  for (const missing of [undefined, null]) {
+    assert.deepEqual(buildToolSet([{ ...fn("no_args"), parameters: missing }]).entries[0].parameters,
+      { type: "object", properties: {} });
+  }
+  for (const invalid of [true, false, 0, "object", []]) {
+    assert.throws(() => buildToolSet([{ ...fn("invalid"), parameters: invalid }]), /must be a JSON Schema object/);
+  }
 });
 
 test("call ids preserve valid ids and normalize unsupported characters and length", () => {

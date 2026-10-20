@@ -28,7 +28,7 @@ GPT 同一 reasoning item 内的摘要保留各段 `summary_index`，对应的 p
 
 末尾 `response.completed` 带 ID、完整 output 和 usage。`end_turn: false` 保留需要继续生成的语义，例如 Claude `pause_turn`。缺少终止信号或无效工具结果返回错误，不伪装成成功。
 
-GPT 的 `response.incomplete` 保留原类型、原因和 usage，不改成通用错误。已核对 Codex `0.163.0`：`interrupted` 表示继续当前 turn；`content_filter` 使用内容过滤提示；`max_output_tokens` 等其他原因结束当前生成并记录已有用量。未完成的工具后缀仍不交付。Claude/DeepSeek 没有同样的 Responses 事件时，继续按各自停止原因转换。
+GPT 的 `response.incomplete` 保留原类型、原因和 usage，不改成通用错误。已核对 Codex `0.163.0`：`interrupted` 表示继续当前 turn；`content_filter` 使用内容过滤提示；`max_output_tokens` 等其他原因结束当前生成并记录已有用量。完整 JSON 与 SSE 终止事件中的 `output` 都会补齐尚未交付的 item 事件，已有 done 不重复发送，因为客户端不会从终止事件的 `output` 重建历史。未完成的工具后缀仍不交付。Claude/DeepSeek 没有同样的 Responses 事件时，继续按各自停止原因转换。
 
 ## 上游错误
 
@@ -75,7 +75,7 @@ bridge 不重试、不替换端点，也不因错误移除 reasoning、关闭 th
 
 GPT 保留原始 usage，包括提供的 cache write 等分项；DeepSeek 使用 prompt/completion 与 cache hit；Claude 将普通 input、cache read、cache creation 相加得到完整 input。转换后的总数只计算 input + output；reasoning 作为输出分项，不重复叠加。`native` 初始只返回原生压缩用量；后续辅助复述的 usage 独立保存在本地缓存，不加入目标回答的 usage。
 
-成功响应的必需 usage 缺失或无效时返回错误，不使用零值影响客户端压缩判断。原生失败或 incomplete 保留上游提供的用量，不以 usage 校验覆盖原始终止原因。
+成功响应的必需 usage 缺失或无效时返回错误，不使用零值影响客户端压缩判断。释放工具前还会按当前客户端的终止解码要求检查 response ID、可选 `end_turn` 与 usage metadata 的类型，以及 `total_tokens` 和已提供的 usage 分项。保留原生 envelope 与未知字段，不补造缺失总数；否则工具可能已经执行，客户端才发现成功终止事件无法解码。这里核对的是 Codex `0.163.0` 的 `sse/responses.rs` 与 `protocol/src/response_usage.rs`，升级客户端时复核这些少量必需字段。原生失败或 incomplete 保留上游提供的用量，不以 usage 校验覆盖原始终止原因。
 
 ## Keepalive 与超时
 

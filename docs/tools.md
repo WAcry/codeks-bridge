@@ -47,6 +47,8 @@ Messages 对不符合端点格式的 call ID 采用确定性映射，并添加�
 
 普通 JSON Schema 清理 Responses 专用的布尔 `encrypted` 关键字，不删除名为 `encrypted` 的普通属性或数据。客户端使用明文多代理工具；返回的函数项显式携带 `encrypted_function_args: []`。
 
+根 schema 的 `$ref`、`$defs`、`allOf`、`anyOf`、`oneOf` 及其他约束均保留；缺少根 `type` 时补为 `object`，已有类型不覆盖，由上游判断是否支持。codeks 可以发送没有根 `type` 的引用或组合 schema，不能因此把参数清空。未提供参数 schema 时使用空对象定义；显式提供非对象 schema 值则报错，不在 bridge 内解析引用或删减约束。
+
 codeks V2 多代理工具的 task/message 是明文，历史中的 `agent_message` 对 Messages/Chat 转成 user 消息，保留 author、recipient 和内容顺序。它不会成为模型 reasoning。不能解密的工具或 agent message 会明确报错。
 
 ## 结果与范围

@@ -82,7 +82,10 @@ for (const scenario of cases) {
         const body = JSON.parse(Buffer.concat(chunks).toString());
         requests.push(body);
         assert.equal(chat ? body.reasoning_effort : body.output_config.effort, scenario.effort);
-        if (!chat) assert.deepEqual(body.thinking, { type: "adaptive", display: visible ? "summarized" : "omitted" });
+        if (!chat) assert.deepEqual(body.thinking, {
+          type: "adaptive", display: visible ? "summarized" : "omitted",
+          block_binding: { prefix_mismatch_behavior: "drop_block" },
+        });
         const prompt = JSON.stringify({ system: body.system, messages: body.messages });
         assert.equal(prompt.split(proactiveHint).length - 1, 1, "The adapter must preserve, not duplicate, Codex's Ultra hint");
         reply(res, chat, visible);
