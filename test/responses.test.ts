@@ -91,7 +91,7 @@ test("compaction summary preserves tool choice options and removes the answer fo
 test("SSE reasoning and text stream once; the completed carrier is replayable", async () => {
   const reasoning = { type: "reasoning", id: "rs_test", summary: [{ type: "summary_text", text: "Brief thought" }], encrypted_content: "cipher-a" };
   const message = { type: "message", id: "msg_test", role: "assistant", content: [{ type: "output_text", text: "Hello world" }] };
-  const usage = { input_tokens: 80, input_tokens_details: { cached_tokens: 40 }, output_tokens: 12, output_tokens_details: { reasoning_tokens: 7 } };
+  const usage = { total_tokens: 92, input_tokens: 80, input_tokens_details: { cached_tokens: 40 }, output_tokens: 12, output_tokens_details: { reasoning_tokens: 7 } };
   await fakeUpstream([
     { type: "response.output_item.added", output_index: 0, item: { ...reasoning, summary: [] } },
     { type: "response.reasoning_summary_text.delta", output_index: 0, item_id: "rs_test", delta: "Brief thought" },
@@ -100,7 +100,7 @@ test("SSE reasoning and text stream once; the completed carrier is replayable", 
     { type: "response.output_text.delta", output_index: 1, item_id: "msg_test", delta: "Hello " },
     { type: "response.output_text.delta", output_index: 1, item_id: "msg_test", delta: "world" },
     { type: "response.output_item.done", output_index: 1, item: message },
-    { type: "response.completed", response: { status: "completed", output: [reasoning, message], usage } },
+    { type: "response.completed", response: { id: "resp_test", status: "completed", output: [reasoning, message], usage } },
   ], async (base, requests) => {
     const { writer, events } = capture();
     const result = await runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer);
@@ -121,7 +121,7 @@ test("function and grammar tool calls keep original names and wait for completed
     { type: "function_call", id: "fc_test", namespace: "agents", name: "spawn_agent", call_id: "call_one", arguments: '{"message":"Inspect the file"}' },
     { type: "custom_tool_call", id: "ctc_test", name: "apply_patch", call_id: "call_two", input: "*** Begin Patch\n*** End Patch" },
   ];
-  await fakeUpstream({ status: "completed", output: calls, usage: { input_tokens: 5, output_tokens: 7 } }, async (base) => {
+  await fakeUpstream({ id: "resp_test", status: "completed", output: calls, usage: { input_tokens: 5, output_tokens: 7, total_tokens: 12 } }, async (base) => {
     const { writer, events } = capture();
     const result = await runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer);
     assert.equal(result.endTurn, false);
@@ -137,7 +137,7 @@ test("function and grammar tool calls keep original names and wait for completed
 
 test("native compaction keeps the trigger and returns the unwrapped native item", async () => {
   const item = { type: "compaction", id: "cmp_test", encrypted_content: "native-checkpoint" };
-  await fakeUpstream({ status: "completed", output: [item], usage: { input_tokens: 30, output_tokens: 4 } }, async (base, requests) => {
+  await fakeUpstream({ id: "resp_test", status: "completed", output: [item], usage: { input_tokens: 30, output_tokens: 4, total_tokens: 34 } }, async (base, requests) => {
     const { writer, events } = capture();
     await runResponses(context({
       compacting: true, route: { ...route, upstream: { ...route.upstream, base_url: base } },
@@ -183,20 +183,27 @@ test("HTTP 200 does not turn an error or unfinished JSON response into success",
 
 test("invalid or missing usage fails before buffered tools are released", async () => {
   const call = { type: "function_call", name: "read", call_id: "call_test", arguments: "{}" };
-  const valid = { input_tokens: 10, output_tokens: 2 };
+  const valid = { input_tokens: 10, output_tokens: 2, total_tokens: 12 };
   for (const usage of [
     undefined,
     { input_tokens: 10 },
+    { input_tokens: 10, output_tokens: 2 },
+    { ...valid, total_tokens: "12" },
+    { ...valid, total_tokens: -1 },
     { ...valid, input_tokens: "10" },
     { ...valid, output_tokens: -1 },
     { ...valid, input_tokens: 0.5 },
     { ...valid, output_tokens: Number.MAX_SAFE_INTEGER + 1 },
+    { ...valid, input_tokens_details: {} },
     { ...valid, input_tokens_details: { cached_tokens: null } },
+    { ...valid, input_tokens_details: { cached_tokens: 0, cache_write_tokens: null } },
+    { ...valid, output_tokens_details: {} },
     { ...valid, output_tokens_details: { reasoning_tokens: -1 } },
+    { ...valid, codex_rollout_budget_units: "1" },
   ]) {
     await fakeUpstream([
       { type: "response.output_item.done", output_index: 0, item: call },
-      { type: "response.completed", response: { status: "completed", output: [call], usage } },
+      { type: "response.completed", response: { id: "resp_test", status: "completed", output: [call], usage } },
     ], async (base) => {
       const { writer, events } = capture();
       await assert.rejects(runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer),
@@ -207,8 +214,39 @@ test("invalid or missing usage fails before buffered tools are released", async 
   }
 });
 
+test("malformed native completion fields fail before any tool suffix is released", async () => {
+  const call = { type: "function_call", id: "fc_held", name: "read", call_id: "call_held", arguments: "{}" };
+  const valid = {
+    id: "resp_held", status: "completed", output: [call],
+    usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 },
+  };
+  for (const fields of [
+    { id: undefined }, { id: 123 }, { end_turn: "false" },
+    { usage: { input_tokens: 10, output_tokens: 2 } },
+    { usage_metadata: [] }, { usage_metadata: "invalid" }, { usage_metadata: { amount: 1 } },
+  ]) {
+    const response = { ...valid, ...fields };
+    for (const payload of [response, [
+      { type: "response.output_item.added", output_index: 0, item: call },
+      { type: "response.output_item.done", output_index: 0, item: call },
+      { type: "response.completed", response },
+    ]]) {
+      await fakeUpstream(payload, async (base) => {
+        const { writer, events } = capture();
+        await assert.rejects(runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer),
+          { code: "upstream_error", status: 502 });
+        writer.fail({ code: "upstream_error", message: "Invalid upstream completion" });
+        assert.equal(events.some((event) => event.item?.type === "function_call" || event.type === "response.completed"), false);
+        assert.deepEqual(writer.outputItems, []);
+      });
+    }
+  }
+});
+
 test("zero token counts are valid and detail counts remain optional", async () => {
-  await fakeUpstream({ status: "completed", output: [], usage: { input_tokens: 0, output_tokens: 0 } }, async (base) => {
+  await fakeUpstream({ id: "resp_test", status: "completed", end_turn: null, usage_metadata: { amount: null, extra: "kept" },
+    output: [], usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0, input_tokens_details: null,
+      output_tokens_details: null, codex_rollout_budget_units: 0.25 } }, async (base) => {
     const { writer } = capture();
     const result = await runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer);
     assert.deepEqual(result.usage, { input_tokens: 0, output_tokens: 0 });
@@ -249,11 +287,11 @@ test("Responses stream errors preserve upstream details and retry hints", async 
 
 
 test("Responses Lite keeps native phases and an unfinished turn without tool calls", async () => {
-  const usage = { input_tokens: 4, output_tokens: 2 };
+  const usage = { input_tokens: 4, output_tokens: 2, total_tokens: 6 };
   for (const phase of ["commentary", "partial_answer", "final_answer", undefined]) {
     const message = { type: "message", id: "msg_phase", role: "assistant", phase, content: [{ type: "output_text", text: "Continuing." }] };
     for (const streaming of [true, false]) {
-      const completed = { status: "completed", end_turn: false, output: [message], usage };
+      const completed = { id: "resp_test", status: "completed", end_turn: false, output: [message], usage };
       const payload = streaming ? [
         { type: "response.output_item.added", output_index: 0, item: { ...message, content: [] } },
         { type: "response.output_text.delta", output_index: 0, item_id: message.id, delta: "Continuing." },
@@ -283,7 +321,7 @@ test("message phase provided only on item completion is retained", async () => {
     { type: "response.output_item.added", output_index: 0, item: { ...message, content: [] } },
     { type: "response.output_text.delta", output_index: 0, item_id: message.id, delta: "A partial answer." },
     { type: "response.output_item.done", output_index: 0, item: { ...message, phase: "partial_answer" } },
-    { type: "response.completed", response: { status: "completed", end_turn: false, output: [], usage: { input_tokens: 2, output_tokens: 3 } } },
+    { type: "response.completed", response: { id: "resp_test", status: "completed", end_turn: false, output: [], usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 } } },
   ], async (base) => {
     const { writer, events } = capture();
     const result = await runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer);
@@ -295,7 +333,7 @@ test("message phase provided only on item completion is retained", async () => {
 test("GPT summary parts retain boundaries in streaming and complete JSON responses", async () => {
   const summary = [{ type: "summary_text", text: "First." }, { type: "summary_text", text: "Second." }];
   const item = { type: "reasoning", id: "rs_parts", summary, encrypted_content: "synthetic-cipher" };
-  const completed = { status: "completed", output: [item], usage: { input_tokens: 4, output_tokens: 2 } };
+  const completed = { id: "resp_test", status: "completed", output: [item], usage: { input_tokens: 4, output_tokens: 2, total_tokens: 6 } };
   const streamed = [
     { type: "response.output_item.added", output_index: 0, item: { ...item, summary: [], encrypted_content: null } },
     ...summary.flatMap((part, summary_index) => [
@@ -385,7 +423,7 @@ test("native tools hold the ordered suffix including later reasoning and unknown
     { type: "response.output_item.added", output_index, item },
     { type: "response.output_item.done", output_index, item },
   ]);
-  await fakeUpstream([...stream, { type: "response.completed", response: { id: "resp_order", status: "completed", output: items, usage: { input_tokens: 2, output_tokens: 3 } } }], async (base) => {
+  await fakeUpstream([...stream, { type: "response.completed", response: { id: "resp_order", status: "completed", output: items, usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 } } }], async (base) => {
     const { writer, events } = capture();
     const result = await runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer);
     assert.deepEqual(events.filter((event) => event.type === "response.output_item.done").map((event) => event.item.id), ["rs_a"]);
@@ -418,24 +456,40 @@ test("native incomplete reasons retain usage, response id and their SSE envelope
   }
 });
 
-test("an interrupted whole JSON response publishes partial history but no tool suffix", async () => {
+test("incomplete JSON and terminal-only SSE publish partial history once and discard tool suffixes", async () => {
   const output = [
+    { type: "reasoning", id: "rs_partial", summary: [{ type: "summary_text", text: "Partial thought." }], encrypted_content: "cipher-partial" },
     { type: "message", id: "msg_partial", role: "assistant", content: [{ type: "output_text", text: "Partial answer." }] },
     { type: "function_call", id: "fc_partial", name: "edit", call_id: "call_partial", arguments: '{"unfinished":' },
     { type: "reasoning", id: "rs_after_tool", summary: [], encrypted_content: "cipher-after" },
   ];
-  await fakeUpstream({ id: "resp_partial", status: "incomplete", output, incomplete_details: { reason: "interrupted" }, usage: { input_tokens: 10, output_tokens: 20 } }, async (base) => {
-    const { writer, events } = capture();
-    await assert.rejects(runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer), (error: any) => {
-      assert(error instanceof ResponsesIncompleteError);
-      writer.nativeIncomplete(error.response, error.event);
-      return true;
+  const response = { id: "resp_partial", status: "incomplete", output, incomplete_details: { reason: "interrupted" },
+    usage: { input_tokens: 10, output_tokens: 20, total_tokens: 30 } };
+  const terminal = { type: "response.incomplete", response };
+  for (const payload of [response, [terminal], [
+    { type: "response.output_item.done", output_index: 0, item: output[0] },
+    { type: "response.output_item.added", output_index: 1, item: { ...output[1], content: [] } },
+    { type: "response.output_text.delta", output_index: 1, item_id: "msg_partial", delta: "Partial answer." },
+    terminal,
+  ]]) {
+    await fakeUpstream(payload, async (base) => {
+      const { writer, events } = capture();
+      await assert.rejects(runResponses(context({ route: { ...route, upstream: { ...route.upstream, base_url: base } } }), writer), (error: any) => {
+        assert(error instanceof ResponsesIncompleteError);
+        writer.nativeIncomplete(error.response, error.event);
+        return true;
+      });
+      for (const type of ["response.output_item.added", "response.output_item.done"]) {
+        assert.deepEqual(events.filter((event) => event.type === type).map((event) => event.item.id), ["rs_partial", "msg_partial"]);
+      }
+      assert.deepEqual(writer.outputItems.map((item) => item.id), ["rs_partial", "msg_partial"]);
+      assert.equal(decodeReasoning(writer.outputItems[0].encrypted_content)?.data, "cipher-partial");
+      assert.equal(writer.outputItems[1].content[0].text, "Partial answer.");
+      assert.equal(events.at(-1).type, "response.incomplete");
+      assert.equal(events.at(-1).response.id, "resp_partial");
+      assert.deepEqual(events.at(-1).response.usage, response.usage);
     });
-    assert.deepEqual(events.filter((event) => event.type === "response.output_item.done").map((event) => event.item.id), ["msg_partial"]);
-    assert.deepEqual(writer.outputItems.map((item) => item.id), ["msg_partial"]);
-    assert.equal(events.at(-1).type, "response.incomplete");
-    assert.equal(events.at(-1).response.id, "resp_partial");
-  });
+  }
 });
 
 test("a bare SSE error stays an error object rather than a response envelope", async () => {

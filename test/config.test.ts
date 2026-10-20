@@ -7,6 +7,7 @@ import { reasoningEffort } from "../src/profiles.ts";
 import { getCatalogEntry } from "../src/model-catalog.ts";
 import { buildAnthropicRequest } from "../src/backends/anthropic.ts";
 import { buildDeepSeekRequest } from "../src/backends/deepseek.ts";
+import { resolveClaudeOptions } from "../src/adapter-options.ts";
 
 const config = () => validateConfig({
   upstreams: { a: { base_url: "https://example.com/v1" } },
@@ -47,6 +48,77 @@ test("configuration validates local references and formats without guessing endp
   delete c.models.first.compaction;
   c.upstreams.a.base_url = "https://key@example.com";
   assert.throws(() => validateConfig(c), /credentials/);
+});
+
+test("adapter settings resolve each leaf from model, connection, and adapter defaults", () => {
+  const c = config();
+  c.models.first.catalog = "claude-sonnet-5-5";
+  assert.deepEqual(resolveClaudeOptions(resolveModel(c, "first")), {
+    tool_updates: "inline", thinking_mismatch: "drop_block",
+  });
+  c.upstreams.a.adapters = { "claude-messages": { tool_updates: "top_level", thinking_mismatch: "error" } };
+  assert.deepEqual(resolveClaudeOptions(resolveModel(validateConfig(c), "first")), {
+    tool_updates: "top_level", thinking_mismatch: "error",
+  });
+  c.models.first.adapters = { "claude-messages": { thinking_mismatch: "upstream_default" } };
+  assert.deepEqual(resolveClaudeOptions(resolveModel(validateConfig(c), "first")), {
+    tool_updates: "top_level", thinking_mismatch: "upstream_default",
+  });
+  c.models.first.adapters["claude-messages"]!.tool_updates = "inline";
+  assert.deepEqual(resolveClaudeOptions(resolveModel(validateConfig(c), "first")), {
+    tool_updates: "inline", thinking_mismatch: "upstream_default",
+  });
+});
+
+test("adapter behavior does not alter state identity, catalog, or native request options", () => {
+  const c = config();
+  c.models.first.catalog = "claude-sonnet-5-5";
+  const beforeOrigin = resolveModel(c, "first").origin;
+  const beforeCatalog = buildCatalog(c);
+  c.upstreams.a.options = { future_parameter: { enabled: true } };
+  c.models.first.options = { another_parameter: 12 };
+  c.upstreams.a.adapters = { "claude-messages": { tool_updates: "top_level" } };
+  c.models.first.adapters = { "claude-messages": { thinking_mismatch: "upstream_default" } };
+  validateConfig(c);
+  assert.deepEqual(resolveModel(c, "first").origin, beforeOrigin);
+  assert.deepEqual(buildCatalog(c), beforeCatalog);
+  assert.deepEqual(c.upstreams.a.options, { future_parameter: { enabled: true } });
+  assert.deepEqual(c.models.first.options, { another_parameter: 12 });
+  assert(!Object.hasOwn(c.models.first.options, "adapters"));
+});
+
+test("adapter settings reject misspelled keys and invalid values at either configuration scope", () => {
+  for (const scope of ["upstreams", "models"] as const) {
+    for (const [value, expected] of [
+      [null, /adapters: must be an object/],
+      [[], /adapters: must be an object/],
+      [{ "claude-message": {} }, /unknown adapter settings claude-message/],
+      [{ "gpt-responses": {} }, /unknown adapter settings gpt-responses/],
+      [{ "claude-messages": null }, /claude-messages must be an object/],
+      [{ "claude-messages": { tool_update: "inline" } }, /unknown claude-messages setting tool_update/],
+      [{ "claude-messages": { tool_updates: "automatic" } }, /tool_updates must be inline or top_level/],
+      [{ "claude-messages": { tool_updates: false } }, /tool_updates must be inline or top_level/],
+      [{ "claude-messages": { thinking_mismatch: "ignore" } }, /thinking_mismatch must be drop_block, error, or upstream_default/],
+      [{ "claude-messages": { thinking_mismatch: null } }, /thinking_mismatch must be drop_block, error, or upstream_default/],
+    ] as const) {
+      const c = config();
+      c.models.first.catalog = "claude-sonnet-5-5";
+      const target = scope === "upstreams" ? c.upstreams.a : c.models.first;
+      Object.assign(target, { adapters: value });
+      assert.throws(() => validateConfig(c), expected);
+    }
+  }
+});
+
+test("shared connections can configure one adapter without applying it to other model protocols", () => {
+  const c = config();
+  c.upstreams.a.adapters = { "claude-messages": { tool_updates: "top_level" } };
+  c.models.claude = { upstream: "a", catalog: "claude-sonnet-5-5", model: "claude-deployment" };
+  assert.equal(validateConfig(c), c);
+  assert.equal(resolveClaudeOptions(resolveModel(c, "claude")).tool_updates, "top_level");
+  assert.equal(resolveModel(c, "first").profile.id, "deepseek-chat");
+  c.models.first.adapters = { "claude-messages": { tool_updates: "inline" } };
+  assert.throws(() => validateConfig(c), /claude-messages does not match the model adapter deepseek-chat/);
 });
 
 test("catalog and adapter share configured efforts while unknown request values reach upstream", () => {

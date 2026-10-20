@@ -22,7 +22,7 @@ flowchart LR
 
 优先匹配最新 Codex 的 GPT 默认行为，以 OpenAI 订阅、AWS 和 Azure 的使用场景为基准。当前已审阅模型目录使用 Responses Lite，保留 `use_responses_lite: true`、Code Mode Only 和多代理字段。目录固定到明确的 Codex 源码版本，不随用户本机二进制或订阅账号变化。
 
-Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于历史中的 `additional_tools` 项，普通函数和 custom 工具归入默认 `functions` namespace。GPT 路径保留这些声明的位置、顺序、schema 和 grammar，并发送 `x-openai-internal-codex-responses-lite: true`。Claude/DeepSeek 只在各自协议转换入口提取声明，组合为原生工具表；声明不会变成 user reminder。中途提醒保留所在对话位置；若插在一次完整的工具交换内，则移至该批结果之后，以满足目标协议的配对要求。
+Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于历史中的 `additional_tools` 项，普通函数和 custom 工具归入默认 `functions` namespace。GPT 路径保留这些声明的位置、顺序、schema 和 grammar，并发送 `x-openai-internal-codex-responses-lite: true`。Claude 默认将初始声明放到顶部，增量声明转换为原生中途工具更新；DeepSeek 及 Claude 的显式兼容模式将各批定义合并到顶部。声明不会变成 user reminder。中途提醒保留所在对话位置；若插在一次完整的工具交换内，则移至该批结果之后，以满足目标协议的配对要求。
 
 已核对 Codex `0.163.0`：Lite 设置 `reasoning.context: "all_turns"` 和 `parallel_tool_calls: false`。bridge 保留客户端传入值，原生 options 仍可按配置覆盖普通参数。reasoning 的来源筛选与服务端 context 语义是两件事：前者决定发送哪些载荷，后者决定 GPT 如何使用它们。原生压缩与随后的复述保留源 Lite 工具声明及 transport 标记。
 
@@ -36,7 +36,9 @@ Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于
 
 ## 配置表达策略，adapter 负责协议
 
-`models.catalog` 选择条目；`upstreams` 只包含连接与鉴权；别名和真实部署名独立。目录条目决定 adapter，实际模型名不参与方言推断。模型窗口、输入模态、effort 映射、状态复用范围、压缩模式及执行模型可由配置覆盖。
+`models.catalog` 选择条目；`upstreams` 包含连接、鉴权及共用的 adapter 设置；别名和真实部署名独立。目录条目决定 adapter，实际模型名不参与方言推断。模型窗口、输入模态、effort 映射、状态复用范围、压缩模式及执行模型可由配置覆盖。
+
+协议专用桥接行为放在 `adapters.<adapter ID>`，模型逐字段覆盖连接，再取对应 adapter 默认值；原生请求参数仍通过开放的 `options` 浅层合并。这样的边界让未来 GPT、Messages 或 Chat 方言可以添加各自确有需求的设置，而不用在连接顶层堆积特例，也不提前维护空的配置对象或通用插件框架。配置行为不改变来源身份和模型目录。当前 Claude 的工具更新方式与 thinking 失配策略分别配置，因为前者保持工具前缀，后者还影响故障续接等其他历史变化；见 [Adapter 专用行为](config.md#adapter-专用行为)。
 
 `src/profiles.ts` 将目录与配置组合为运行时 profile，同时用于客户端目录和出站请求，避免界面显示一套 effort、实际发送另一套。未覆盖字段保留原模型差异，不能用一套通用默认值改写所有 GPT。来源身份继续取连接、adapter 与实际部署，不因提示词更新或窗口预设改变。
 
@@ -61,6 +63,8 @@ Reasoning 载荷记录来源、格式和原始数据；压缩载荷保存文字�
 bridge 检查自身必须维持的不变量：配置引用存在、历史能转换、工具调用完整、usage 可用、压缩检查点完整。这些检查避免静默丢失上下文或执行半段工具调用。
 
 上游负责判定模型能力：effort、thinking、强制工具选择、schema、图片以及允许复用的密文是否可接受。bridge 不预先维护这些能力的限制列表，也不在失败后自动移除 reasoning、关闭 thinking、换端点或改压缩模式。原生参数可通过 options 显式覆盖。
+
+Claude 默认主动请求服务端对前缀失配 thinking 使用 `drop_block`，保留其余可接受的块。这是已配置的请求策略，不是在收到错误后重试或改写已存历史。它允许流式故障后的部分回答继续工作，但丢失 reasoning 仍可能影响质量或增加重新推理的开销，不能视作无损。检查器展示上游实际报告的丢弃位置和原因，区分 bridge 的来源过滤与服务端判断。协议与恢复时序见 [Claude Messages](backends-anthropic.md#失配策略与故障续接)。
 
 GPT 原生 HTTP 失败保留 status、body 和诊断 header，流内失败保留 error 对象。下游 HTTP 200 推迟到上游接受请求后，避免把 HTTP 失败变成 SSE 错误而改变 codeks 的重试判断；等待响应头期间没有 keepalive，是这一选择的明确代价。Claude/DeepSeek 只在协议转换边界映射错误分类。重试和退避由客户端控制，bridge 不叠加第二层重试。详见 [Responses 流](responses-stream.md)。
 

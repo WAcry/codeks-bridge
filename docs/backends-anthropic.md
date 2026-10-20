@@ -34,11 +34,38 @@ Opus / Sonnet 5.5 目录的默认及最大上下文窗口为 `1000000`，Message
 
 完整 `thinking`/`redacted_thinking` block，包括签名或隐藏数据，存入 `anthropic.thinking.v1` carrier。请求按 `replay.reasoning_from` 恢复允许来源，签名完整保留；其他来源只在当前请求过滤。允许配对不意味着上游一定接受其签名。[Reasoning 策略](reasoning.md)
 
+## 失配策略与故障续接
+
+默认 `adapters.claude-messages.thinking_mismatch: "drop_block"`，在 `adaptive`、`enabled` 模式的 `thinking.block_binding.prefix_mismatch_behavior` 中声明。服务端可以丢弃前缀失配的块，继续使用其余可接受的 thinking；bridge 不自行验签或删除已保存的载荷。可配置 `error` 或 `upstream_default`，原生 options 中明确的绑定策略仍优先，完整配置与优先级见 [Adapter 专用行为](config.md#adapter-专用行为)。
+
+所有 Messages 请求都附带 `thinking-binding-controls-2026-08-01` beta，与现有 beta header 合并，以取得 `input_transformations` 诊断；声明诊断 beta 本身不等于选择某种失配策略。服务端报告与实际支持取决于端点，未知能力或请求错误直接返回，不自动更换策略。[官方 preserved thinking 规则](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking)
+
+流式响应可能已交付完整 thinking 或文字项，随后才过载或断流。codeks 保存这些已完成项并负责重试，因此重试历史可能以 assistant 结束。若最后的 assistant 不含 `tool_use`，bridge 仅在本次出站请求追加 user `Continue.`，提供合法续接边界；含工具调用时不补这一句，以免掩盖缺失工具结果。
+
+若这个 assistant 后紧跟持久化的增量工具声明，同样在声明前补续接边界；后续回放时，声明的位置让 bridge 能重新构造相同边界，不需要另存隐藏会话状态。
+
+这句合成提示不写入 codeks 历史。假设失败前已保存 T1，重试生成 T2，下一轮历史会出现以下差别：
+
+```text
+重试请求：H → assistant[T1] → user[Continue.] → assistant[T2, 正文]
+下一轮：  H → assistant[T1, T2, 正文] → user[新问题]
+```
+
+因此 T2 的签名前缀可能不再匹配；默认 `drop_block` 让服务端在该轮报告并丢弃失配块。只保证 Continue 那次请求成功并不够，后续回放也需要考虑这个变化。`error` 或 `upstream_default` 下，服务端仍可能拒绝后续请求。
+
+选择这种恢复方式是为了保留正常 thinking、正文的流式显示，不让每轮正文都等待整个响应成功，也不引入隐藏会话状态。工具调用仍按现有规则等完整成功后交付。失配块及依赖该前缀的后续 thinking 都可能被丢弃，造成推理上下文损失或增加重新推理成本；这不是质量不变的承诺，也不能修复损坏签名或其他所有非法输入。具体发生了什么以[检查器中的服务端报告](inspect.md#claude-服务端输入处理)为准。
+
+一次失配不会令今后生成的 thinking 永久失效。后续请求保持前缀稳定时，新生成的块仍可正常复用；原始历史里的旧失配块可能在多轮请求中被重复报告，重复报告不代表每轮都丢弃新的 thinking。实际保留与丢弃以各次上游报告为准。
+
 ## 输出格式、工具与图片
 
 Responses `text.format: {type: "json_schema", schema: ...}` 转为 `output_config.format: {type: "json_schema", schema: ...}`；name/strict 不转发。schema 内容直接交给上游，随后 options 仍可覆盖原生格式。普通 `text` 不添加约束；无法表达为 Messages 的未知格式报错。
 
 namespace 和 custom tool 使用共享映射。自由文本工具转换成 `{input: string}`，Lark/regex 放入描述，返回时恢复原始字符串；不添加工具专属提示词。指定工具必须能在当前工具表中解析，`tool_choice: "required"` 转为原生 `any`，不会改成 `auto`。显式 `temperature`、`top_p` 也继续发送；这些参数与具体模型、thinking 的组合是否受支持由上游判断。静默删除参数或关闭 thinking 会改变用户请求，bridge 不做这类修正。
+
+工具更新默认使用完整 inline 定义，保持已有顶部工具与历史前缀稳定；仅实际包含中途工具更新的请求添加 `inline-tools-2026-09-15` beta。初始声明、更新位置与兼容模式见 [Lite 工具声明](tools.md#lite-工具声明)。端点不支持时可在连接配置中显式选择 `tool_updates: "top_level"`；不会在错误后自动探测或降级。
+
+从 `0.0.1` 的顶部合并方式切到默认 inline 时，已有增量声明历史会改变出站工具前缀，可能触发旧 thinking 丢弃或缓存重建；可显式设为 `top_level` 保持原工具策略。切换模式不改变状态来源身份，也不改写客户端保存的历史。
 
 有工具且未选择 `none` 时，显式 `parallel_tool_calls: false` 转为 `tool_choice.disable_parallel_tool_use: true`，显式 `true` 则转为 `false`；未指定 choice 时采用 `auto`，原生 options 仍可覆盖。这保留 Codex Lite 的外层工具调用限制，不限制一次 `exec` 内 JavaScript 的并发执行。[Claude 并行工具调用](https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use)
 
@@ -48,7 +75,7 @@ namespace 和 custom tool 使用共享映射。自由文本工具转换成 `{inp
 
 ## 缓存与压缩
 
-最多四个显式缓存断点：最后一个工具、最后一段顶层 system、最近两条 user 消息的末块。普通请求 TTL 为 `1h`。压缩保留公共前缀的 `1h`，只将最后的摘要请求末块设为 `5m`，使长 TTL 位于短 TTL 之前。thinking 块不直接设置缓存断点。
+最多四个显式缓存断点：最后一个顶层工具、最后一段顶层 system、最近两条 user 消息的末块。普通请求 TTL 为 `1h`。压缩保留公共前缀的 `1h`，只将最后的摘要请求末块设为 `5m`，使长 TTL 位于短 TTL 之前。thinking 块不直接设置缓存断点。inline 模式不为新增定义重写顶部 tools；兼容模式修改顶部定义可能导致缓存未命中及 thinking 前缀失配，两者最终由上游判断。
 
 压缩只生成文字摘要，保留工具定义及普通请求的工具选择，移除 `output_config.format`，其他参数保留。摘要封装为客户端 V2 compaction item，可供其他模型恢复。保留工具选择的缓存依据及意外工具调用的处理见 [压缩](compaction.md#工具选择与缓存)。
 

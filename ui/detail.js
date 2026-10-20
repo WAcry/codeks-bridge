@@ -3,9 +3,9 @@
 import { h, btn, fill, copyText, download, fmtBytes, fmtDateTime, fmtDur, fmtInt, fmtTime, kvTable, oneLine, safeName, shortId, strBlock, toast, tryJson, put } from './dom.js';
 import { jsonTree } from './tree.js';
 import { structureView, newStructState, focusPointer } from './structure.js';
-import { eventsView, newEventsState, finalObject, parseEvents, usageText } from './events.js';
+import { eventsView, newEventsState, finalObject, inputTransformationReports, parseEvents, usageText } from './events.js';
 import { diffView } from './diff.js';
-import { annChip, annDetail, annIndex, callLabel, decisionClass, decisionText, END_LABEL, KIND_LABEL, KIND_TEXT, OUTCOME_LABEL, reasonText, sourceText } from './labels.js';
+import { annChip, annDetail, annIndex, callLabel, decisionClass, decisionText, END_LABEL, INPUT_TRANSFORMATION_LABEL, KIND_LABEL, KIND_TEXT, OUTCOME_LABEL, reasonText, sourceText } from './labels.js';
 import { OUTCOME_CLASS, threadKey, byNewest } from './list.js';
 import { exportDoc } from './api.js';
 
@@ -91,6 +91,28 @@ function fieldsTable(obj, hints, skip = []) {
     rows.push([h('span', null, hints[k] ? `${hints[k]} ` : '', h('span', { class: 'mono dim' }, k)), valueCell(v)]);
   }
   return kvTable(rows, 'fields-kv');
+}
+
+/** Renders server-reported input changes separately from local replay annotations. */
+function serverTransformations(resp) {
+  const reports = inputTransformationReports(resp);
+  if (!reports.length) return null;
+  return h('section', { class: 'server-transformations' },
+    h('div', { class: 'note' },
+      '上游服务端报告 · input_transformations。与 bridge 本地回放过滤分开记录；path 指向本次上游请求。丢弃 thinking 可能损失推理上下文，允许失配不代表已丢弃。'),
+    reports.map(report => {
+      const where = `${report.event === null ? 'JSON 正文' : `SSE 事件 #${report.event}`} ${report.pointer}`;
+      const entries = Array.isArray(report.value) ? report.value : null;
+      return h('div', { class: 'transformation-report' },
+        h('div', { class: 'sub-title mono' }, where),
+        entries?.length === 0 ? h('div', { class: 'dim' }, '服务端报告为空 []') : null,
+        entries ? entries.map(entry => h('details', { class: 'transformation-entry' },
+          h('summary', null,
+            h('span', { class: `chip ${entry?.type === 'thinking_dropped' ? 'warn' : 'info'}` },
+              INPUT_TRANSFORMATION_LABEL[entry?.type] ?? entry?.type ?? '未知变换'),
+            ' ', h('span', { class: 'mono' }, [entry?.path, entry?.reason].filter(x => x != null).map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' · '))),
+          jsonTree(entry, { auto: 2 }))) : jsonTree(report.value, { auto: 2 }));
+    }));
 }
 
 const ROUTE_HINTS = {
@@ -442,7 +464,9 @@ export class DetailView {
       return structureView(r.value, { state: st, ann, annChip: chip });
     }
     const fo = finalObject(resp);
-    return structureView(fo.value, { state: st, ann, annChip: chip, note: fo.note });
+    return h('div', null,
+      stage.call ? serverTransformations(resp) : null,
+      structureView(fo.value, { state: st, ann, annChip: chip, note: fo.note }));
   }
 
   // ---------- overview ----------
@@ -474,6 +498,13 @@ export class DetailView {
     }
     if (d.annotations?.length) {
       put(box, h('h4', null, '标注'), h('div', null, h('span', { class: 'chip info' }, annSummary(d.annotations)), ' ', btn('查看全部标注', () => this.open('ann'))));
+    }
+    for (const [i, call] of (d.upstream ?? []).entries()) {
+      const reports = serverTransformations(call.response);
+      if (reports) {
+        put(box, h('h4', null, `服务端输入变换 · ${callLabel(call.label)} (${keys[i]})`),
+          btn('查看上游响应', () => this.open(`upres:${keys[i]}`)), reports);
+      }
     }
     put(box, h('h4', null, '记录字段'), fieldsTable(d, SUMMARY_HINTS, ['route', 'client', 'upstream', 'annotations']));
     return box;

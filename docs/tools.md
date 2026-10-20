@@ -4,9 +4,20 @@
 
 ## Lite 工具声明
 
-客户端默认把完整工具 schema 放在 `input[].additional_tools`。GPT 保留原始声明项；Messages/Chat 共用提取逻辑，在转换消息前消费声明，避免产生空消息或 reminder。顶层 `tools` 也可参与转换，随后按历史顺序合并各批声明。
+客户端默认把完整工具 schema 放在 `input[].additional_tools`。GPT 保留原始声明项。DeepSeek 及 Claude 的 `top_level` 模式在转换消息前提取声明，与顶层 `tools` 按历史顺序合并；Claude 默认 `inline` 模式保留增量定义生效的位置。声明不会变成普通 reminder。
 
 增量声明只包含新增或变更的成员，按 namespace 与工具名覆盖旧定义，保留未变的其他成员和已分配的上游名字。工具移除的 developer 通知保留原位置，不从提示词文字推断删工具。codeks 将默认 `functions` namespace、空 namespace 和省略 namespace 视为同一身份，因此历史调用和显式工具选择均按此规则查找；返回调用保留声明中的原 namespace。
+
+Claude 的 `adapters.claude-messages.tool_updates` 有两种明确模式：
+
+| 模式 | 初始定义 | 中途新增与同名更新 |
+| --- | --- | --- |
+| `inline`（默认） | 顶层 `tools` 及会话开始前的声明组成原生顶部工具表 | 在原生中途 system 消息中发送 `tool_addition`，携带完整 `tool_definition`；此前定义不变 |
+| `top_level` | 各批定义累积成同一顶部工具表 | 用最新定义覆盖同身份工具，适用于尚未支持完整 inline 的端点 |
+
+完整 inline 定义能同时表达新工具和同名工具更新，避免为了更新定义重写早先的工具前缀；这是选择它作为默认方式的理由。bridge 在 user 或整批工具结果之后、下一条 assistant 之前发送中途 system 工具声明；工具交换内的声明先等待结果完整，无法形成合法边界则报错。普通 system/developer 提醒仍转为原位 user reminder，不因工具使用原生中途 system 而改变角色。
+
+端点需要支持 `inline-tools-2026-09-15` beta；bridge 在请求包含中途更新时自动追加，保留已有 beta。不兼容时直接交付错误，不自动切换模式。`top_level` 可能改变缓存前缀和旧 thinking 的绑定；失配处理由独立的 [thinking 策略](backends-anthropic.md#失配策略与故障续接)决定。Code Mode Only 下多数工具位于 `exec` 内的目录，因此外层更新较少，但仍按协议完整处理。
 
 ## 工具发现与网页搜索
 
@@ -35,6 +46,8 @@ Messages/Chat 没有 Responses 的服务端语法约束能力，因此这是模�
 Messages 对不符合端点格式的 call ID 采用确定性映射，并添加短摘要以避免两个不同 ID 规范化后碰撞；调用和结果使用同一映射。正常 ID 保持不变。
 
 普通 JSON Schema 清理 Responses 专用的布尔 `encrypted` 关键字，不删除名为 `encrypted` 的普通属性或数据。客户端使用明文多代理工具；返回的函数项显式携带 `encrypted_function_args: []`。
+
+根 schema 的 `$ref`、`$defs`、`allOf`、`anyOf`、`oneOf` 及其他约束均保留；缺少根 `type` 时补为 `object`，已有类型不覆盖，由上游判断是否支持。codeks 可以发送没有根 `type` 的引用或组合 schema，不能因此把参数清空。未提供参数 schema 时使用空对象定义；显式提供非对象 schema 值则报错，不在 bridge 内解析引用或删减约束。
 
 codeks V2 多代理工具的 task/message 是明文，历史中的 `agent_message` 对 Messages/Chat 转成 user 消息，保留 author、recipient 和内容顺序。它不会成为模型 reasoning。不能解密的工具或 agent message 会明确报错。
 

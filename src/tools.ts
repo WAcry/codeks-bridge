@@ -23,6 +23,8 @@ export interface ToolEntry {
 
 export interface ToolSet {
   entries: ToolEntry[];
+  /** Applies a declaration batch and returns detached snapshots of its definitions. */
+  add(tools: unknown[]): ToolEntry[];
   /** Upstream name -> tool. */
   byFlat: Map<string, ToolEntry>;
   /** Upstream name for a call found in history. */
@@ -97,12 +99,12 @@ export function cleanSchema(schema: unknown): unknown {
 }
 
 function objectSchema(parameters: unknown): Record<string, unknown> {
+  if (parameters == null) return { type: "object", properties: {} };
   const cleaned = cleanSchema(parameters);
   if (cleaned && typeof cleaned === "object" && !Array.isArray(cleaned)) {
-    const schema = cleaned as Record<string, unknown>;
-    if (schema.type === "object" || schema.properties) return { type: "object", ...schema };
+    return { type: "object", ...cleaned };
   }
-  return { type: "object", properties: {} };
+  throw new BridgeError("Function tool parameters must be a JSON Schema object.");
 }
 
 /** Describes a custom tool's input format in words, for function-only upstreams. */
@@ -132,14 +134,14 @@ export function buildToolSet(tools: unknown[] | undefined): ToolSet {
   const byFlat = new Map<string, ToolEntry>();
   const byIdentity = new Map<string, ToolEntry>();
 
-  const add = (entry: Omit<ToolEntry, "flatName">) => {
+  const add = (entry: Omit<ToolEntry, "flatName">): ToolEntry => {
     const id = identity(entry.namespace, entry.name);
     const previous = byIdentity.get(id);
     if (previous) {
       // Lite updates contain only changed members. Replace that definition
       // without losing siblings or changing its established upstream name.
       Object.assign(previous, entry);
-      return;
+      return previous;
     }
     let flatName = baseFlatName(entry.namespace, entry.name);
     // Add a suffix only when two different tools would get the same name.
@@ -151,37 +153,49 @@ export function buildToolSet(tools: unknown[] | undefined): ToolSet {
     entries.push(full);
     byFlat.set(flatName, full);
     byIdentity.set(id, full);
+    return full;
   };
 
-  const visit = (tool: any, namespace: string | undefined) => {
-    if (!tool || typeof tool !== "object") return;
+  const visit = (tool: any, namespace: string | undefined): ToolEntry[] => {
+    if (!tool || typeof tool !== "object") return [];
     if (tool.type === "function") {
-      add({
+      return [add({
         kind: "function",
         name: String(tool.name),
         namespace,
         description: String(tool.description ?? ""),
         parameters: objectSchema(tool.parameters),
-      });
+      })];
     } else if (tool.type === "custom") {
-      add({
+      return [add({
         kind: "custom",
         name: String(tool.name),
         namespace,
         description: customToolDescription(String(tool.description ?? ""), tool.format),
         parameters: CUSTOM_PARAMETERS,
-      });
+      })];
     } else if (tool.type === "namespace" && Array.isArray(tool.tools)) {
-      for (const inner of tool.tools) visit(inner, String(tool.name));
+      return tool.tools.flatMap((inner: unknown) => visit(inner, String(tool.name)));
     }
     // Hosted tools (web_search, image_generation, tool_search, ...) have no
     // equivalent on these upstreams and are left out.
+    return [];
   };
 
-  for (const tool of tools ?? []) visit(tool, undefined);
+  const addTools = (declarations: unknown[]): ToolEntry[] => {
+    const changed = new Map<string, ToolEntry>();
+    for (const declaration of declarations) {
+      for (const entry of visit(declaration, undefined)) changed.set(entry.flatName, entry);
+    }
+    // Later updates may mutate the registry's current definition. Earlier
+    // inline definitions must retain the exact payload used at that point.
+    return structuredClone([...changed.values()]);
+  };
+  addTools(tools ?? []);
 
   return {
     entries,
+    add: addTools,
     byFlat,
     flatFor(namespace, name) {
       return byIdentity.get(identity(namespace, name))?.flatName ?? baseFlatName(namespace, name);

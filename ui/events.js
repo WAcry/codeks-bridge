@@ -22,6 +22,30 @@ export function parseEvents(resp) {
   return list;
 }
 
+/** Keeps each server report with its source; repeated SSE reports are not totals. */
+export function inputTransformationReports(resp) {
+  const reports = [];
+  const add = (value, pointer, event = null) => {
+    if (value != null && Object.hasOwn(value, 'input_transformations')) {
+      reports.push({ event, pointer: `${pointer}/input_transformations`, value: value.input_transformations });
+    }
+  };
+  const events = parseEvents(resp);
+  if (events) {
+    for (const ev of events) {
+      if (ev.json?.type === 'message_start') add(ev.json.message, '/message', ev.i);
+      else if (ev.json?.type === 'message_delta') {
+        add(ev.json, '', ev.i);
+        add(ev.json.delta, '/delta', ev.i);
+      }
+    }
+  } else {
+    const parsed = tryJson(resp?.body?.text);
+    if (parsed.ok) add(parsed.value, '');
+  }
+  return reports;
+}
+
 /** Returns {key, text, label} for streaming delta events of Responses, Messages and Chat. */
 function deltaOf(ev) {
   const j = ev.json;
@@ -311,6 +335,7 @@ function fromMessages(data) {
     } else if (j.type === 'message_delta') {
       Object.assign(msg, j.delta ?? {});
       if (j.usage) msg.usage = { ...(msg.usage ?? {}), ...j.usage };
+      if (Object.hasOwn(j, 'input_transformations')) msg.input_transformations = j.input_transformations;
     } else if (!['message_stop', 'ping'].includes(j.type)) extra.push(j);
   }
   for (const [i, s] of partial) if (blocks[i] && blocks[i].input === undefined) blocks[i].input = s;

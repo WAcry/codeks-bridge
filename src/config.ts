@@ -4,6 +4,7 @@ import { modelProfile } from "./profiles.ts";
 import { getCatalogEntry } from "./model-catalog.ts";
 import type { BridgeConfig, ModelConfig, ResolvedModel, StateOrigin } from "./types.ts";
 import { BridgeError } from "./errors.ts";
+import { validateAdapterConfig } from "./adapter-options.ts";
 
 function object(value: unknown): value is Record<string, any> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -46,6 +47,7 @@ export function validateConfig(value: unknown): BridgeConfig {
     if (up.auth_header !== undefined && (typeof up.auth_header !== "string" || !/^[\w-]+$/.test(up.auth_header))) fail(`upstream ${name}: invalid auth_header`);
     if (up.headers !== undefined && (!object(up.headers) || Object.values(up.headers).some(v => typeof v !== "string" || /[\r\n]/.test(v)))) fail(`upstream ${name}: invalid headers`);
     if (up.options !== undefined && !object(up.options)) fail(`upstream ${name}: options must be an object`);
+    validateAdapterConfig(up.adapters, `upstream ${name}`);
   }
   for (const [slug, model] of Object.entries(value.models)) {
     if (!slug || !object(model) || typeof model.model !== "string" || !model.model || typeof model.upstream !== "string" || !Object.hasOwn(value.upstreams, model.upstream)) fail(`model ${slug}: model and an existing upstream are required`);
@@ -63,6 +65,7 @@ export function validateConfig(value: unknown): BridgeConfig {
       if (r.effort_map !== undefined && (!object(r.effort_map) || !Object.keys(r.effort_map).length || Object.entries(r.effort_map).some(([key, native]) => !key || typeof native !== "string" || !native))) fail(`model ${slug}: effort_map must map effort names to upstream values`);
     }
     const profile = modelProfile(model as ModelConfig);
+    validateAdapterConfig(model.adapters, `model ${slug}`, profile.id);
     if (Object.hasOwn(profile.effort_map, "ultra") && !profile.multi_agent_effort) fail(`model ${slug}: ultra must map to the same upstream effort as an ordinary level`);
     if (!Object.hasOwn(profile.effort_map, profile.default_effort)) fail(`model ${slug}: default_effort must appear in effort_map`);
     if (model.replay !== undefined) {
