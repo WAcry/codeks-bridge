@@ -61,7 +61,12 @@ function toolChoice(value: any, tools: ToolSet): Record<string, unknown> | undef
 }
 
 /** Convert only request-owned copies; stored history remains unchanged. */
-export function buildAnthropicRequest(context: BackendContext): { body: Record<string, any>; tools: ToolSet; betas: string[] } {
+export function buildAnthropicRequest(context: BackendContext): {
+  body: Record<string, any>;
+  tools: ToolSet;
+  betas: string[];
+  continuationBefore?: string;
+} {
   const { route } = context;
   const request = context.request;
   const settings = resolveClaudeOptions(route);
@@ -73,7 +78,9 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
   const continueAssistant = () => {
     const tail = messages.at(-1);
     if (tail?.role === "assistant" && !tail.content.some(block => block.type === "tool_use")) {
-      messages.push({ role: "user", content: [{ type: "text", text: "Continue." }] });
+      const text = "Continue.";
+      messages.push({ role: "user", content: [{ type: "text", text }] });
+      return text;
     }
   };
   const flushAdditions = () => {
@@ -106,6 +113,13 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
       if (!block || !["thinking", "redacted_thinking"].includes(block.type)) {
         throw new BridgeError("Invalid Messages reasoning carrier.");
       }
+      const continuation = item.state.continuation_before;
+      if (continuation !== undefined) {
+        if (typeof continuation !== "string" || !continuation.length) {
+          throw new BridgeError("Invalid Messages reasoning continuation boundary.");
+        }
+        append("user", [{ type: "text", text: continuation }]);
+      }
       append("assistant", [block]);
     } else if (item.type === "function_call" || item.type === "custom_tool_call") {
       append("assistant", [{
@@ -131,7 +145,8 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
   }
   // A failed response can leave a complete thinking/text item in codeks history.
   // Claude requires a user boundary to resume. Do not mask a missing tool result.
-  continueAssistant();
+  // Pending declarations already persist their own continuation boundary.
+  const continuationBefore = additions.length ? undefined : continueAssistant();
   flushAdditions();
   // Keep stable prefixes at 1h. The one-off compaction suffix uses 5m.
   const cache = (block: Block | undefined, ttl: "1h" | "5m" = "1h") => {
@@ -190,7 +205,7 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
       delete body.output_config.format;
     }
   }
-  return { body, tools, betas: [THINKING_BINDING_BETA, ...(hasInlineTools ? [INLINE_TOOLS_BETA] : [])] };
+  return { body, tools, betas: [THINKING_BINDING_BETA, ...(hasInlineTools ? [INLINE_TOOLS_BETA] : [])], continuationBefore };
 }
 
 function tokenCount(value: unknown): number {
@@ -209,11 +224,12 @@ function validateUsage(value: any, required: string[]): void {
 }
 
 export const runAnthropic: Backend = async (context, writer) => {
-  const { body, tools, betas } = buildAnthropicRequest(context);
+  const { body, tools, betas, continuationBefore } = buildAnthropicRequest(context);
   const response = await upstreamFetch(context.route, "/messages", body, context.signal, context.requestHeaders, { "anthropic-beta": betas });
   context.onAccepted?.(response.headers);
   if (!response.body) throw new BridgeError("Messages returned an empty stream.", "upstream_error", 502);
-  const blocks = new Map<number, { value: Block; json: string }>();
+  const blocks = new Map<number, { value: Block; json: string; continuationBefore?: string }>();
+  let pendingContinuation = continuationBefore;
   let rawUsage: Block = {};
   let started = false;
   let finalUsage = false;
@@ -231,7 +247,9 @@ export const runAnthropic: Backend = async (context, writer) => {
       if (!["text", "thinking", "redacted_thinking", "tool_use"].includes(value.type)) {
         throw new BridgeError(`Unsupported Messages output block: ${String(value.type)}.`);
       }
-      blocks.set(event.index, { value, json: "" });
+      // Only the first native block can anchor the response's leading boundary.
+      blocks.set(event.index, { value, json: "", continuationBefore: pendingContinuation });
+      pendingContinuation = undefined;
       if (value.type === "text" && value.text) writer.textDelta(value.text);
       if (value.type === "thinking") writer.reasoningDelta(value.thinking ?? "");
     } else if (event.type === "content_block_delta") {
@@ -252,7 +270,13 @@ export const runAnthropic: Backend = async (context, writer) => {
       const block = blocks.get(event.index);
       if (!block) throw new BridgeError("Messages stopped an unknown block.", "upstream_error", 502);
       if (block.value.type === "thinking" || block.value.type === "redacted_thinking") {
-        writer.endReasoning(encodeReasoning({ source: context.route.origin, format: context.route.profile.reasoning_format, data: block.value }));
+        const state = {
+          source: context.route.origin,
+          format: context.route.profile.reasoning_format,
+          data: block.value,
+          ...(block.continuationBefore !== undefined ? { continuation_before: block.continuationBefore } : {}),
+        };
+        writer.endReasoning(encodeReasoning(state));
       } else if (block.value.type === "tool_use") {
         if (block.json) block.value.input = parseArguments(block.json);
         const call = block.value;

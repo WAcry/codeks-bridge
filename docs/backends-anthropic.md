@@ -40,20 +40,27 @@ Opus / Sonnet 5.5 目录的默认及最大上下文窗口为 `1000000`，Message
 
 所有 Messages 请求都附带 `thinking-binding-controls-2026-08-01` beta，与现有 beta header 合并，以取得 `input_transformations` 诊断；声明诊断 beta 本身不等于选择某种失配策略。服务端报告与实际支持取决于端点，未知能力或请求错误直接返回，不自动更换策略。[官方 preserved thinking 规则](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking)
 
-流式响应可能已交付完整 thinking 或文字项，随后才过载或断流。codeks 保存这些已完成项并负责重试，因此重试历史可能以 assistant 结束。若最后的 assistant 不含 `tool_use`，bridge 仅在本次出站请求追加 user `Continue.`，提供合法续接边界；含工具调用时不补这一句，以免掩盖缺失工具结果。
+流式响应可能已交付完整 thinking 或文字项，随后才过载或断流。codeks 保存这些已完成项并负责重试，因此重试历史可能以 assistant 结束。若最后的 assistant 不含 `tool_use`，bridge 在出站请求追加 user `Continue.`，提供合法续接边界；含工具调用时不补这一句，以免掩盖缺失工具结果。
 
 若这个 assistant 后紧跟持久化的增量工具声明，同样在声明前补续接边界；后续回放时，声明的位置让 bridge 能重新构造相同边界，不需要另存隐藏会话状态。
 
-这句合成提示不写入 codeks 历史。假设失败前已保存 T1，重试生成 T2，下一轮历史会出现以下差别：
+对于没有增量工具声明锚定的尾部 `Continue.`，若本次响应的第一个原生内容块是 `thinking` 或 `redacted_thinking`，bridge 在该块的 `cxbr1:` 外层记录可选字段 `continuation_before`，值为实际补入的文本。原生 thinking、签名和隐藏数据保持不变；字段随原 reasoning item 的 `output_item.done` 进入 codeks 历史，不产生独立的控制项或用户消息。
+
+以后恢复这块 reasoning 时，先在同一位置补回记录的 user 文本。假设失败前已保存 T1，重试的首块为 T2：
 
 ```text
-重试请求：H → assistant[T1] → user[Continue.] → assistant[T2, 正文]
-下一轮：  H → assistant[T1, T2, 正文] → user[新问题]
+重试请求：H → assistant[T1] → user[Continue.]
+重试输出：T2{continuation_before: "Continue."} → 正文
+下轮请求：H → assistant[T1] → user[Continue.] → assistant[T2, 正文] → user[新问题]
 ```
 
-因此 T2 的签名前缀可能不再匹配；默认 `drop_block` 让服务端在该轮报告并丢弃失配块。只保证 Continue 那次请求成功并不够，后续回放也需要考虑这个变化。`error` 或 `upstream_default` 下，服务端仍可能拒绝后续请求。
+这样 T2 不会仅因续接边界消失而失配。同一响应只标记首块，后续 thinking、正文和工具继续保持原顺序；如果 T2 完整交付后又发生故障，这个边界已随 T2 保存，下一次重试可恢复它并记录新的续接边界。首块尚未完整交付时没有新载荷，下次仍按已有历史重试。字段跟随 reasoning 的来源与格式筛选：本次不恢复该载荷时，也不恢复其中的边界；以后允许恢复时，两者一起生效。
 
-选择这种恢复方式是为了保留正常 thinking、正文的流式显示，不让每轮正文都等待整个响应成功，也不引入隐藏会话状态。工具调用仍按现有规则等完整成功后交付。失配块及依赖该前缀的后续 thinking 都可能被丢弃，造成推理上下文损失或增加重新推理成本；这不是质量不变的承诺，也不能修复损坏签名或其他所有非法输入。具体发生了什么以[检查器中的服务端报告](inspect.md#claude-服务端输入处理)为准。
+覆盖范围按实际输出顺序决定。Adaptive thinking 不保证第一个内容块就是 thinking；若先输出正文或工具，再输出 thinking，bridge 不给后来的块添加这个字段，否则会把 `Continue.` 恢复到错误的位置。这类响应及没有字段的既有历史仍沿用当前失配策略；没有 thinking 的响应则没有新签名需要通过这个字段保护。由增量工具声明锚定的边界不重复记录。[官方 thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)
+
+用户选择保留正常 thinking、正文的流式显示，并用少量自包含状态恢复边界。因此只记录位置确定的首块，不缓存整轮正文，也不引入会话索引、独立控制载荷或向前查找历史位置的规则。工具调用仍按现有规则等完整成功后交付。`continuation_before` 记录已发生的请求事实，不改变来源复用配置，也不替代 `thinking_mismatch`。
+
+工具定义等其他前缀变化仍可能导致失配，未覆盖的续接次序也可能丢失 thinking。默认 `drop_block` 让服务端报告并丢弃失配块；`error` 或 `upstream_default` 下，服务端仍可能拒绝请求。丢失推理上下文可能影响质量或增加重新推理成本，不能把边界恢复视为所有签名和输入均可接受的保证。具体发生了什么以[检查器中的服务端报告](inspect.md#claude-服务端输入处理)为准。
 
 一次失配不会令今后生成的 thinking 永久失效。后续请求保持前缀稳定时，新生成的块仍可正常复用；原始历史里的旧失配块可能在多轮请求中被重复报告，重复报告不代表每轮都丢弃新的 thinking。实际保留与丢弃以各次上游报告为准。
 

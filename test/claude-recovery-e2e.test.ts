@@ -16,10 +16,11 @@ import type { BridgeConfig } from "../src/types.ts";
 
 const run = promisify(execFile);
 const binary = process.env.CODEKS_BIN;
-const firstSignature = "synthetic-recovery-signature-1";
-const secondSignature = "synthetic-recovery-signature-2";
-const firstSummary = "SYNTHETIC_INTERRUPTED_THINKING";
-const secondSummary = "SYNTHETIC_RECOVERY_THINKING";
+const thoughts = [
+  { signature: "synthetic-recovery-signature-1", summary: "SYNTHETIC_INTERRUPTED_THINKING" },
+  { signature: "synthetic-recovery-signature-2", summary: "SYNTHETIC_RECOVERY_THINKING" },
+  { signature: "synthetic-recovery-signature-3", summary: "SYNTHETIC_SECOND_RECOVERY_THINKING" },
+];
 
 async function listen(server: Server): Promise<number> {
   await new Promise<void>((resolve, reject) => {
@@ -40,11 +41,11 @@ function event(res: ServerResponse, value: Record<string, unknown>) {
   res.write(formatSse(value, String(value.type)));
 }
 
-function start(res: ServerResponse, inputTransformations: unknown[] = []) {
+function start(res: ServerResponse) {
   res.writeHead(200, { "content-type": "text/event-stream" });
   event(res, { type: "message_start", message: {
     id: "msg_synthetic_recovery", type: "message", role: "assistant", content: [],
-    usage: { input_tokens: 100, output_tokens: 0 }, input_transformations: inputTransformations,
+    usage: { input_tokens: 100, output_tokens: 0 },
   } });
 }
 
@@ -65,16 +66,25 @@ function finish(res: ServerResponse, text: string) {
 }
 
 for (const scenario of [
-  { failure: "overload", summary: "auto" },
-  { failure: "truncated stream", summary: "none" },
+  { failure: "overload", summary: "auto", interruptions: 1 },
+  { failure: "truncated stream", summary: "none", interruptions: 1 },
+  { failure: "overload", summary: "auto", interruptions: 2 },
 ] as const) {
-  test(`real codeks: Claude recovers from ${scenario.failure} with ${scenario.summary} summary and resumes`, {
+  test(`real codeks: Claude preserves ${scenario.interruptions} ${scenario.failure} recovery boundaries with ${scenario.summary} summary across resume`, {
     skip: !binary, timeout: 120_000,
   }, async (t) => {
     const visible = scenario.summary === "auto";
     const failures: unknown[] = [];
     const requests: any[] = [];
     const clientRequests: any[] = [];
+    const expectedThoughts = thoughts.slice(0, scenario.interruptions + 1).map(thought => ({
+      type: "thinking", thinking: visible ? thought.summary : "", signature: thought.signature,
+    }));
+    const continuation = { role: "user", content: [{ type: "text", text: "Continue." }] };
+    const withoutCacheMarkers = (messages: any[]) => messages.map(message => ({
+      role: message.role,
+      content: message.content.map(({ cache_control: _cache, ...block }: any) => block),
+    }));
     const upstream = createServer(async (req, res) => {
       try {
         assert.equal(req.url, "/v1/messages");
@@ -86,47 +96,39 @@ for (const scenario of [
         assert.equal(body.thinking.display, visible ? "summarized" : "omitted");
         assert.ok(String(req.headers["anthropic-beta"]).split(",").includes("thinking-binding-controls-2026-08-01"));
 
-        if (requests.length === 1) {
-          start(res);
-          thinking(res, firstSignature, visible ? firstSummary : "");
-          if (scenario.failure === "overload") {
-            event(res, { type: "error", error: { type: "overloaded_error", message: "Synthetic interrupted response" } });
+        if (requests.length <= expectedThoughts.length) {
+          const attempt = requests.length - 1;
+          if (attempt > 0) {
+            const expected = expectedThoughts.slice(0, attempt).flatMap(block => [
+              { role: "assistant", content: [block] }, continuation,
+            ]);
+            assert.deepEqual(withoutCacheMarkers(body.messages.slice(-expected.length)), expected,
+              "Each retry restores prior continuation boundaries and adds one after the latest durable thinking");
           }
-          // EOF without message_stop is also retryable, after the same durable thinking item.
-          res.end();
-          return;
-        }
-        if (requests.length === 2) {
-          const tail = body.messages.at(-1);
-          assert.equal(tail.role, "user", "A retry cannot end in an unsupported assistant prefill");
-          assert.deepEqual(tail.content.map((block: any) => [block.type, block.text]), [["text", "Continue."]]);
-          const previous = body.messages.at(-2);
-          assert.equal(previous.role, "assistant");
-          assert.deepEqual(previous.content, [{
-            type: "thinking", thinking: visible ? firstSummary : "", signature: firstSignature,
-          }], "The first thinking block must already be durable when the client retries");
           start(res);
-          thinking(res, secondSignature, visible ? secondSummary : "");
-          finish(res, "RECOVERED_RESPONSE");
+          thinking(res, expectedThoughts[attempt].signature, expectedThoughts[attempt].thinking);
+          if (attempt < scenario.interruptions) {
+            if (scenario.failure === "overload") {
+              event(res, { type: "error", error: { type: "overloaded_error", message: "Synthetic interrupted response" } });
+            }
+            // EOF without message_stop also follows the same durable thinking item.
+            res.end();
+          } else finish(res, "RECOVERED_RESPONSE");
           return;
         }
-        assert.equal(requests.length, 3, "The resumed turn needs only one upstream call");
+        assert.equal(requests.length, expectedThoughts.length + 1, "The resumed turn needs only one upstream call");
         assert.equal(body.messages.at(-1).role, "user");
         assert.match(JSON.stringify(body.messages.at(-1).content), /NEXT_SYNTHETIC_TURN/);
-        assert.ok(!body.messages.some((message: any) =>
-          message.content.some((block: any) => block.type === "text" && block.text === "Continue.")),
-        "The synthetic boundary is request-local, not an invented entry in client history");
-        const previous = body.messages.at(-2);
-        assert.equal(previous.role, "assistant");
-        assert.deepEqual(previous.content.map((block: any) => block.type), ["thinking", "thinking", "text"]);
-        assert.deepEqual(previous.content.filter((block: any) => block.type === "thinking").map((block: any) => block.signature),
-          [firstSignature, secondSignature]);
-        // Model the provider's policy after the synthetic boundary disappears.
-        // This fixture validates transport and client recovery, not real signature checks.
-        start(res, [{
-          type: "thinking_dropped", reason: "prefix_binding_mismatch",
-          path: `messages.${body.messages.length - 2}.content.1`,
-        }]);
+        const expected = expectedThoughts.flatMap((block, index) => [
+          ...(index > 0 ? [continuation] : []),
+          { role: "assistant", content: [
+            block,
+            ...(index === expectedThoughts.length - 1 ? [{ type: "text", text: "RECOVERED_RESPONSE" }] : []),
+          ] },
+        ]);
+        assert.deepEqual(withoutCacheMarkers(body.messages.slice(-expected.length - 1, -1)), expected,
+          "Resume must restore the exact signed prefix boundaries; this fixture does not simulate signature validation");
+        start(res);
         finish(res, "RESUMED_RESPONSE");
       } catch (error) {
         failures.push(error);
@@ -160,7 +162,8 @@ for (const scenario of [
     await writeFile(join(home, "config.toml"), [
       "check_for_update_on_startup = false",
       `model_reasoning_summary = ${JSON.stringify(scenario.summary)}`,
-      configSnippet(config).replace("[model_providers.bridge.capabilities]", "request_max_retries = 0\nstream_max_retries = 1\n[model_providers.bridge.capabilities]"),
+      configSnippet(config).replace("[model_providers.bridge.capabilities]",
+        `request_max_retries = 0\nstream_max_retries = ${scenario.interruptions}\n[model_providers.bridge.capabilities]`),
     ].join("\n"));
     const env: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: home, RUST_LOG: "warn" };
     delete env.OPENAI_API_KEY;
@@ -186,14 +189,18 @@ for (const scenario of [
     };
     const stdout = await invoke(false);
     assert.match(stdout, /RECOVERED_RESPONSE/);
-    assert.equal(stdout.includes(firstSummary), visible);
-    assert.equal(stdout.includes(secondSummary), visible);
-    assert.equal(clientRequests.length, 2, "codeks performs exactly one retry");
+    for (const thought of thoughts.slice(0, expectedThoughts.length)) assert.equal(stdout.includes(thought.summary), visible);
+    assert.equal(clientRequests.length, expectedThoughts.length, "codeks performs exactly the requested retries");
     assert.equal(requests.length, clientRequests.length, "bridge never adds an upstream retry");
-    assert.equal(clientRequests[1].input.filter((item: any) => item.type === "reasoning").length, 1);
+    for (let index = 1; index < clientRequests.length; index++) {
+      assert.equal(clientRequests[index].input.filter((item: any) => item.type === "reasoning").length, index);
+    }
     assert.match(await invoke(true), /RESUMED_RESPONSE/);
-    assert.equal(clientRequests.length, 3);
-    assert.equal(requests.length, 3);
+    assert.equal(clientRequests.length, expectedThoughts.length + 1);
+    assert.equal(requests.length, clientRequests.length);
+    assert.ok(clientRequests.every(request => !request.input.some((item: any) =>
+      item.role === "user" && JSON.stringify(item.content).includes('"Continue."'))),
+    "The client replays carriers, not invented user Continue messages");
 
     const sessions = join(home, "sessions");
     const paths = (await readdir(sessions, { recursive: true })).filter(path => path.endsWith(".jsonl"));
@@ -202,12 +209,15 @@ for (const scenario of [
     const reasoning = records
       .filter(record => record.type === "response_item" && record.payload.type === "reasoning")
       .map(record => record.payload);
-    assert.equal(reasoning.length, 2);
-    assert.deepEqual(reasoning.map(item => (decodeReasoning(item.encrypted_content)?.data as any)?.signature),
-      [firstSignature, secondSignature], "Both signed carriers survive stream retry and process restart");
-    assert.deepEqual(reasoning.map(item => item.summary), visible
-      ? [[{ type: "summary_text", text: firstSummary }], [{ type: "summary_text", text: secondSummary }]]
-      : [[], []]);
+    assert.equal(reasoning.length, expectedThoughts.length);
+    const carriers = reasoning.map(item => decodeReasoning(item.encrypted_content) as
+      NonNullable<ReturnType<typeof decodeReasoning>> & { continuation_before?: string });
+    assert.deepEqual(carriers.map(carrier => carrier.data), expectedThoughts,
+      "Signed blocks survive retries and process restart without embedded bridge metadata");
+    assert.deepEqual(carriers.map(carrier => carrier.continuation_before),
+      expectedThoughts.map((_thought, index) => index > 0 ? "Continue." : undefined));
+    assert.deepEqual(reasoning.map(item => item.summary), expectedThoughts.map(block =>
+      visible ? [{ type: "summary_text", text: block.thinking }] : []));
     assert.ok(!records.some(record => record.type === "response_item" &&
       record.payload.role === "user" && JSON.stringify(record.payload.content).includes('"Continue."')));
   });
