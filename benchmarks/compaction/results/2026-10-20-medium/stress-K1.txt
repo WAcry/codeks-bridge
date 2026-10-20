@@ -1,0 +1,63 @@
+## Current progress
+
+The conversation established authoritative state for **project `3617031`**, covering **epochs 0–9** and **200 numbered entries**. No implementation or execution task has been requested beyond retaining this state.
+
+Each epoch supplied:
+
+- 20 exact `parameter-3617031-N=value-…` mappings.
+- 20 directed `route-source-3617031-N->route-target-…` mappings.
+- 20 authoritative `probe-3617031-N=probe-result-…` tool results.
+- 20 obsolete correction candidates, followed by 20 final authoritative corrections.
+- 20 work checkpoints, each associating a work item with its state, receipt, and next action.
+
+All were acknowledged. The last message supplied unrelated epoch 9 archival material; the assistant acknowledged that active-project state was unchanged.
+
+## Authority and preservation rules
+
+- Preserve every authoritative key and value **exactly**, including prefixes and leading zeros.
+- Routes are **directional**; do not reverse arrows.
+- Use `final-…` corrections. All `obsolete-…` correction candidates are superseded.
+- Keep each checkpoint’s **state, receipt, and next action associated with its original work item**.
+- All “UNRELATED ARCHIVAL MATERIAL” and archive padding are explicitly non-authoritative. Ignore them for active-project continuation.
+- Later epochs contain distinct numbered keys; they do **not** supersede earlier epochs globally.
+- Epoch `e` contains entry numbers `e + 1 + 10k`, for `k = 0…19`. Thus epoch 0 contains 1, 11, …, 191; epoch 9 contains 10, 20, …, 200.
+
+## Storage and tool context
+
+The exact authoritative ledgers and checkpoints are in the earlier user messages, and probe results are in earlier tool messages. **No external file or database write was performed to persist the supplied ledgers.** Prior acknowledgments such as “recorded” or “applied” refer to conversational state.
+
+Available tool:
+
+```text
+functions.database_query({ project: integer, probe: string })
+```
+
+It reads an authoritative project probe without modifying state. All 200 numbered probes already have results in the conversation; no rerun is currently needed.
+
+## Exact examples for continuity
+
+Entry 1, epoch 0:
+
+```text
+parameter-3617031-1=value-c1042a944bce9322646069f1
+route-source-3617031-1->route-target-25ca7411867fde69c3a52b
+probe-3617031-1=probe-result-54c2a9452db06c18f5cc6b28a2
+corrected-field-3617031-1=final-6632748da058257a09dad275
+work-item-3617031-1:BLOCKED|receipt=receipt-57e27ae2deced27f99|next=next-826a1d904338d2f996
+```
+
+Entry 200, epoch 9:
+
+```text
+parameter-3617031-200=value-b549a2a68c6d537657814753
+route-source-3617031-200->route-target-bddb1306e2ee7180e9aaf1
+probe-3617031-200=probe-result-c616247a847e016c7808b0e0cd
+corrected-field-3617031-200=final-61222b7f2df5692804498113
+work-item-3617031-200:VERIFYING|receipt=receipt-d9ddd33da54d670a34|next=next-75df25d4ee5f54fc33
+```
+
+These examples are **not the complete ledger**. Consult the original authoritative messages for all other exact values; hashes cannot be inferred from numbering.
+
+## Next steps
+
+Await the user’s next substantive instruction. When answering state queries, retrieve the matching authoritative records from the original messages and preserve them verbatim. Do not interpret opaque `next-…` identifiers as executable instructions or advance work-item states without additional information.

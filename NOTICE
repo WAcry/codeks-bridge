@@ -11,3 +11,15 @@ licensed under the Apache License, Version 2.0:
 - catalog/*.json contains model metadata and prompts copied or adapted from:
   codex-rs/models-manager/models.json
   Each catalog entry records its source tag, commit, and changes.
+- benchmarks/compaction/prompts/ contains frozen or adapted compact prompts,
+  the summary prefix, and model instructions from OpenAI Codex, together with
+  user-supplied experiment prompts. File hashes and source notes are recorded
+  in benchmarks/compaction/prompts/manifest.json.
+- benchmarks/compaction/retention.py adapts the text-only user-message retention
+  and middle-truncation logic from codex-rs/core/src/compact_remote_v2.rs and
+  codex-rs/utils/string/src/truncate.rs at rust-v0.162.1.
+
+benchmarks/compaction/fixture.py adapts the product-defaults fixture generator
+from algal/pi-openai-server-compaction, Copyright (c) 2026 Alexis Gallagher,
+licensed under the MIT License. The source commit and complete license are
+included in that file.

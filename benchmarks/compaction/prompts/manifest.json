@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "sha256 of exact UTF-8 file bytes",
+  "timezone": "America/Los_Angeles",
+  "catalog_source": {
+    "repository": "https://github.com/openai/codex",
+    "tag": "rust-v0.163.0",
+    "commit": "83086188ae0614bd882818ff1aa23f3194962012",
+    "path": "codex-rs/models-manager/models.json",
+    "model": "gpt-6.1-sol"
+  },
+  "base_instructions_role": "developer",
+  "recovery_separator": "\n\n",
+  "prompts": {
+    "builtin": {
+      "file": "builtin.txt",
+      "sha256": "ab0c334d4faca17e3afbb9b16967c1b2fdcc7242a9a0880af57949fa236d6d07",
+      "utf8_bytes": 426,
+      "characters": 426
+    },
+    "standard": {
+      "file": "standard.txt",
+      "sha256": "205d11dc8508227da7bfabd19f48981d502c92cb72e1ac2239f855eadb231782",
+      "utf8_bytes": 5985,
+      "characters": 5977
+    },
+    "minimal": {
+      "file": "minimal.txt",
+      "sha256": "4102972b0147bc552c6d0067bab6f51850ccb6678c945a33ed8ace9e1321a39d",
+      "utf8_bytes": 418,
+      "characters": 418
+    },
+    "detailed": {
+      "file": "detailed.txt",
+      "sha256": "c34dbcb8f5a02f1b8137ad732bf652cd3e600e83bfa89ae091024ef380263f3f",
+      "utf8_bytes": 654,
+      "characters": 654
+    },
+    "handoff-user-v1": {
+      "file": "handoff-user-v1.txt",
+      "sha256": "fc8d5732ee280606976c50bb4250b6a150f73e27928d9268b5eaf2ccb03ea43b",
+      "utf8_bytes": 600,
+      "characters": 600
+    },
+    "base-instructions": {
+      "file": "base-instructions.txt",
+      "sha256": "e1bdd4f8f0df4b20f4a0ffc8a861ce819df45325d8cecdfb92e80379cf8d142e",
+      "utf8_bytes": 21779,
+      "characters": 21769
+    },
+    "summary-prefix": {
+      "file": "summary-prefix.txt",
+      "sha256": "e9b088e794a6bb9082ac053fcc760bd818d7e720ee4bcdc72c6e480de7b7cb0e",
+      "utf8_bytes": 399,
+      "characters": 399
+    },
+    "claude-code": {
+      "file": "claude-code.txt",
+      "sha256": "2ce9019d2ea8ff6a70f204bf3ab731f09cc0e2f3869f4a67dea655db021ad0a7",
+      "utf8_bytes": 6369,
+      "characters": 6361,
+      "source": "用户提供的 Claude Code 式完整 prompt；按提供内容保存，不声称对应某个官方发布版本。"
+    },
+    "handoff": {
+      "file": "handoff.txt",
+      "sha256": "65816ef1d5560b85ca4f754b385888edb431d04af2ee653355f979e11f6e21cf",
+      "utf8_bytes": 648,
+      "characters": 648,
+      "source": "codeks-bridge src/prompts.ts HANDOFF_PROMPT at commit 10455e505b65eefce5cbc0024e9bc4001ed0c475。包含当前生产的 text-only 约束。"
+    }
+  },
+  "notes": [
+    "Historical snapshots and the current five-product prompt set are frozen separately; exact UTF-8 bytes, including trailing whitespace, are hashed.",
+    "handoff-user-v1 is the tested user candidate. It does not include the later production text-only suffix.",
+    "base-instructions is the historical public catalog template and is separate from the compaction prompt."
+  ],
+  "historical_date": "2026-10-18"
+}

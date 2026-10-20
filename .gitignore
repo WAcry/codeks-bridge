@@ -3,3 +3,6 @@ dist/
 artifacts/
 *.log
 .env
+benchmarks/compaction/runs/
+benchmarks/compaction/.venv/
+benchmarks/compaction/__pycache__/
