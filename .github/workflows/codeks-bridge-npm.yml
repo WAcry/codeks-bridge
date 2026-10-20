@@ -84,4 +84,4 @@ jobs:
       - name: Publish with trusted publishing
         env:
           TARBALL: ${{ needs.package.outputs.tarball }}
-        run: npm publish "$TARBALL" --access public --provenance --registry=https://registry.npmjs.org
+        run: npm publish "./$TARBALL" --access public --provenance --registry=https://registry.npmjs.org
