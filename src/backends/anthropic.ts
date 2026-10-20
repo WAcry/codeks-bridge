@@ -1,15 +1,19 @@
 import { encodeReasoning } from "../carrier.ts";
+import { resolveClaudeOptions } from "../adapter-options.ts";
 import { BridgeError, upstreamError } from "../errors.ts";
 import { prepareHistory } from "../history.ts";
 import { reasoningEffort, reasoningSummaryRequested } from "../profiles.ts";
 import { parseJsonSse } from "../sse.ts";
-import { buildToolSet, normalizeToolDeclarations, safeCallId } from "../tools.ts";
+import { safeCallId } from "../tools.ts";
 import type { ToolSet } from "../tools.ts";
 import type { Backend, BackendContext } from "../types.ts";
 import { upstreamFetch } from "../upstream.ts";
+import { buildAnthropicTools } from "./anthropic-tools.ts";
 
 type Block = Record<string, any>;
-interface Message { role: "user" | "assistant"; content: Block[] }
+interface Message { role: "user" | "assistant" | "system"; content: Block[] }
+const THINKING_BINDING_BETA = "thinking-binding-controls-2026-08-01";
+const INLINE_TOOLS_BETA = "inline-tools-2026-09-15";
 
 function contentBlocks(content: unknown): Block[] {
   if (typeof content === "string") return content ? [{ type: "text", text: content }] : [];
@@ -57,20 +61,47 @@ function toolChoice(value: any, tools: ToolSet): Record<string, unknown> | undef
 }
 
 /** Convert only request-owned copies; stored history remains unchanged. */
-export function buildAnthropicRequest(context: BackendContext): { body: Record<string, any>; tools: ToolSet } {
+export function buildAnthropicRequest(context: BackendContext): { body: Record<string, any>; tools: ToolSet; betas: string[] } {
   const { route } = context;
-  const request = normalizeToolDeclarations(context.request);
-  const tools = buildToolSet(request.tools);
+  const request = context.request;
+  const settings = resolveClaudeOptions(route);
+  const { tools, definitions, input } = buildAnthropicTools(request, settings.tool_updates);
   const system: Block[] = request.instructions ? [{ type: "text", text: request.instructions }] : [];
   const messages: Message[] = [];
+  let additions: Block[] = [];
+  let hasInlineTools = false;
+  const continueAssistant = () => {
+    const tail = messages.at(-1);
+    if (tail?.role === "assistant" && !tail.content.some(block => block.type === "tool_use")) {
+      messages.push({ role: "user", content: [{ type: "text", text: "Continue." }] });
+    }
+  };
+  const flushAdditions = () => {
+    if (!additions.length) return;
+    // A persisted declaration also anchors this boundary on later replays.
+    continueAssistant();
+    if (messages.at(-1)?.role !== "user") {
+      throw new BridgeError("Inline tool declarations require a user or completed tool-result boundary.");
+    }
+    messages.push({ role: "system", content: additions });
+    additions = [];
+    hasInlineTools = true;
+  };
   const append = (role: Message["role"], blocks: Block[]) => {
     if (!blocks.length) return;
+    // Several reminders/results may share a user turn. Tool declarations take
+    // effect after that complete boundary, before the next assistant step.
+    if (role === "assistant") flushAdditions();
     const last = messages.at(-1);
     if (last?.role === role) last.content.push(...blocks);
     else messages.push({ role, content: blocks });
   };
-  for (const item of prepareHistory(request.input, route)) {
-    if (item.type === "bridge_reasoning") {
+  for (const item of prepareHistory(input, route)) {
+    if (item.type === "additional_tools") {
+      additions.push(...item.tools.map((definition: Block) => ({
+        type: "tool_addition", tool: { type: "tool_definition", definition },
+      })));
+    } else if (item.type === "bridge_reasoning") {
       const block = item.state.data;
       if (!block || !["thinking", "redacted_thinking"].includes(block.type)) {
         throw new BridgeError("Invalid Messages reasoning carrier.");
@@ -98,9 +129,10 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
       } else throw new BridgeError(`Unsupported Messages role: ${String(item.role)}.`);
     } else throw new BridgeError(`Unsupported Messages history item: ${String(item.type)}.`);
   }
-  const definitions: Block[] = tools.entries.map((tool) => ({
-    name: tool.flatName, description: tool.description, input_schema: tool.parameters,
-  }));
+  // A failed response can leave a complete thinking/text item in codeks history.
+  // Claude requires a user boundary to resume. Do not mask a missing tool result.
+  continueAssistant();
+  flushAdditions();
   // Keep stable prefixes at 1h. The one-off compaction suffix uses 5m.
   const cache = (block: Block | undefined, ttl: "1h" | "5m" = "1h") => {
     if (block) block.cache_control = { type: "ephemeral", ttl };
@@ -136,6 +168,18 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
   Object.assign(body, route.upstream.options, route.config.options, {
     model: route.config.model, messages, stream: true,
   });
+  // Native options remain authoritative. Modes such as between_tools do not
+  // support binding controls; do not change the caller's chosen thinking mode.
+  if (["adaptive", "enabled"].includes(body.thinking?.type) &&
+      settings.thinking_mismatch !== "upstream_default") {
+    body.thinking = {
+      ...body.thinking,
+      block_binding: {
+        prefix_mismatch_behavior: settings.thinking_mismatch,
+        ...body.thinking.block_binding,
+      },
+    };
+  }
   if (system.length) body.system = system;
   else delete body.system;
   if (definitions.length) body.tools = definitions;
@@ -146,7 +190,7 @@ export function buildAnthropicRequest(context: BackendContext): { body: Record<s
       delete body.output_config.format;
     }
   }
-  return { body, tools };
+  return { body, tools, betas: [THINKING_BINDING_BETA, ...(hasInlineTools ? [INLINE_TOOLS_BETA] : [])] };
 }
 
 function tokenCount(value: unknown): number {
@@ -165,8 +209,8 @@ function validateUsage(value: any, required: string[]): void {
 }
 
 export const runAnthropic: Backend = async (context, writer) => {
-  const { body, tools } = buildAnthropicRequest(context);
-  const response = await upstreamFetch(context.route, "/messages", body, context.signal, context.requestHeaders);
+  const { body, tools, betas } = buildAnthropicRequest(context);
+  const response = await upstreamFetch(context.route, "/messages", body, context.signal, context.requestHeaders, { "anthropic-beta": betas });
   context.onAccepted?.(response.headers);
   if (!response.body) throw new BridgeError("Messages returned an empty stream.", "upstream_error", 502);
   const blocks = new Map<number, { value: Block; json: string }>();

@@ -112,6 +112,16 @@ codeks-bridge serve --config /absolute/path/bridge.json --capture
 
 每条标注附来源别名、部署名、adapter、来源指纹、载荷格式和解码后的 carrier。`cxbr1:` 与 `cxbc1:` 只是编码，解码后可以看到文字 reasoning、压缩摘要和原生载荷；GPT 原生 `encrypted_content` 本身仍是密文，只能看到原样字符串。
 
+## Claude 服务端输入处理
+
+上游响应详情单独显示服务端原始 `input_transformations` 报告。它与 bridge 根据来源策略做的本地回放过滤不同：本地决定回放的 thinking，仍可能被 Claude 拒绝或丢弃。
+
+- `thinking_dropped` 表示服务端报告已丢弃对应 thinking。
+- `thinking_mismatch_allowed` 表示允许失配并保留，不代表丢弃。
+- 每项保留原始 `path`、`reason` 与未知字段；`path` 指向该次实际发出的上游请求，不是 codeks 原始输入的位置。
+
+页面保留报告所在 SSE 事件及字段路径，可回到原始内容核对。流里重复出现的报告不会累加为“丢弃总数”；显式空列表显示“服务端报告为空”，没有报告则不展示这个区块，不能解读为零丢弃或全部验签通过。丢弃可能减少可用的推理上下文，检查器只展示上游报告，不推断模型质量或自行改写历史。策略与故障恢复见 [Claude Messages](backends-anthropic.md#失配策略与故障续接)。
+
 ## 内存、清空与导出
 
 记录只在内存里，不写磁盘，进程退出即清空。超过 `max_mib` 时淘汰最早的已结束交换；仍在传输的交换不淘汰，所以占用可能短时超过上限。页面显示已淘汰的数量。

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const { finalObject, parseEvents } = await import(new URL("../ui/events.js", import.meta.url).href);
+const { finalObject, inputTransformationReports, parseEvents } = await import(new URL("../ui/events.js", import.meta.url).href);
+const { INPUT_TRANSFORMATION_LABEL } = await import(new URL("../ui/labels.js", import.meta.url).href);
 
 const reasoning = { id: "rs_synthetic", type: "reasoning", summary: [{ type: "summary_text", text: "Plan" }] };
 const message = { id: "msg_synthetic", type: "message", role: "assistant", content: [{ type: "output_text", text: "Answer" }] };
@@ -57,4 +58,66 @@ test("failed and incomplete terminals retain their diagnostics alongside complet
 test("a terminal with no output items remains unchanged", () => {
   const terminal = { status: "failed", error: { code: "synthetic_error" } };
   assert.deepEqual(finalObject(stream([{ type: "response.failed", response: terminal }])).value, terminal);
+});
+
+const dropped = { type: "thinking_dropped", path: "messages.1.content.0", reason: "prefix_binding_mismatch", diagnostic_id: "synthetic" };
+const allowed = { type: "thinking_mismatch_allowed", path: "messages.3.content.0", reason: "prefix_binding_mismatch" };
+
+test("server input transformation reports preserve SSE sources, updated reports and unknown fields", () => {
+  const future = { type: "future_transformation", path: "messages.4", extra: { synthetic: true } };
+  const resp = stream([
+    { type: "message_start", message: { id: "msg_synthetic", input_transformations: [dropped] } },
+    { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+    { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "OK" } },
+    { type: "message_delta", delta: { stop_reason: "end_turn" }, input_transformations: [dropped, allowed, future] },
+    { type: "message_stop" },
+  ]);
+  const before = structuredClone(resp);
+  assert.deepEqual(inputTransformationReports(resp), [
+    { event: 0, pointer: "/message/input_transformations", value: [dropped] },
+    { event: 3, pointer: "/input_transformations", value: [dropped, allowed, future] },
+  ]);
+  assert.deepEqual(finalObject(resp).value.input_transformations, [dropped, allowed, future]);
+  assert.deepEqual(finalObject(resp).value.content, [{ type: "text", text: "OK" }]);
+  assert.deepEqual(resp, before);
+  assert.equal(INPUT_TRANSFORMATION_LABEL[dropped.type], "已丢弃 thinking");
+  assert.equal(INPUT_TRANSFORMATION_LABEL[allowed.type], "允许失配，保留 thinking");
+});
+
+test("message_delta nested transformation reports remain visible", () => {
+  const resp = stream([
+    { type: "message_start", message: { id: "msg_synthetic" } },
+    { type: "message_delta", delta: { stop_reason: "end_turn", input_transformations: [dropped] } },
+  ]);
+  assert.deepEqual(inputTransformationReports(resp), [
+    { event: 1, pointer: "/delta/input_transformations", value: [dropped] },
+  ]);
+  assert.deepEqual(finalObject(resp).value.input_transformations, [dropped]);
+});
+
+test("JSON input transformation reports distinguish absent, empty and unknown values", () => {
+  for (const value of [[dropped, allowed], [], null, { future_format: true }]) {
+    const resp = { body: { text: JSON.stringify({ type: "message", input_transformations: value }) } };
+    assert.deepEqual(inputTransformationReports(resp), [{ event: null, pointer: "/input_transformations", value }]);
+    assert.deepEqual(finalObject(resp).value.input_transformations, value);
+  }
+  assert.deepEqual(inputTransformationReports({ body: { text: '{"type":"message"}' } }), []);
+  assert.deepEqual(inputTransformationReports({ body: { text: "invalid JSON" } }), []);
+  assert.deepEqual(inputTransformationReports(null), []);
+});
+
+test("reports stay attached to each upstream call, including a failed auxiliary stream", () => {
+  const calls = [
+    { label: "handoff", response: stream([
+      { type: "message_start", message: { input_transformations: [dropped] } },
+      { type: "error", error: { type: "overloaded_error", message: "Synthetic error" } },
+    ]) },
+    { label: "main", response: stream([{ type: "message_start", message: { input_transformations: [] } }]) },
+    { label: "summary", response: { body: { text: JSON.stringify({ type: "message", input_transformations: [allowed] }) } } },
+  ];
+  assert.deepEqual(calls.map(call => ({ label: call.label, reports: inputTransformationReports(call.response) })), [
+    { label: "handoff", reports: [{ event: 0, pointer: "/message/input_transformations", value: [dropped] }] },
+    { label: "main", reports: [{ event: 0, pointer: "/message/input_transformations", value: [] }] },
+    { label: "summary", reports: [{ event: null, pointer: "/input_transformations", value: [allowed] }] },
+  ]);
 });

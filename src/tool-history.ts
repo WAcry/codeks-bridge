@@ -5,7 +5,8 @@ type Item = Record<string, any>;
 const isCall = (item: Item) => ["function_call", "custom_tool_call"].includes(item.type);
 const isResult = (item: Item) => ["function_call_output", "custom_tool_call_output"].includes(item.type);
 const isReminder = (item: Item) =>
-  (item.type === "message" || !item.type) && ["user", "developer", "system"].includes(item.role);
+  item.type === "additional_tools" ||
+  ((item.type === "message" || !item.type) && ["user", "developer", "system"].includes(item.role));
 
 function toolName(item: Item): string {
   return JSON.stringify({ ...(item.namespace ? { namespace: item.namespace } : {}), name: item.name });

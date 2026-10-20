@@ -4,7 +4,7 @@
 
 ## 目录、别名与连接
 
-`upstreams` 只描述连接。`models` 的键是 codeks 显示和请求的别名，每个别名由三项配置组成：
+`upstreams` 描述连接、鉴权及该连接共用的 adapter 设置。`models` 的键是 codeks 显示和请求的别名，每个别名由三项配置组成：
 
 | 字段 | 示例 | 用途 |
 | --- | --- | --- |
@@ -64,6 +64,7 @@
 | `stream_idle_timeout_ms` | 等待上游 headers 或后续字节的最长空闲时间，默认 300000 ms |
 | `headers` | 静态 header，覆盖同名客户端 header，例如 API 版本 |
 | `options` | 原生请求参数，覆盖 adapter 推导出的参数 |
+| `adapters` | 按 adapter ID 分组的桥接行为；供使用该连接的模型继承 |
 
 `api_key_command` 不经过 shell，每条上游请求执行一次，最多 30 秒，适合短期凭据。命令错误不会把 stdout/stderr 回传客户端。连接无需 key 的服务时可省略凭据设置。Claude 默认版本 header 为 `anthropic-version: 2023-06-01`。客户端 metadata 默认透传，鉴权使用上游配置；覆盖顺序及必要过滤见 [header 边界](responses-stream.md#header-与转发边界)。
 
@@ -82,6 +83,7 @@
 | `replay` | 分别允许哪些来源的 reasoning、原生压缩 |
 | `compaction` | 压缩方式、执行模型，以及本目标是否接收原生压缩 |
 | `options` | 原生请求参数，覆盖上游级 options |
+| `adapters` | 当前模型的桥接行为；逐字段覆盖上游级同名 adapter 设置 |
 
 `expose` 控制目录展示，不改变别名的路由、来源身份或访问权限。隐藏模型仍可用于压缩、handoff 和状态复用，显式按别名发送请求也仍可调用；inspector 保留其诊断记录。`config-snippet` 选择首个公开别名作为默认模型；全部隐藏时目录为空，该命令明确报错。
 
@@ -90,6 +92,38 @@
 请求先由 adapter 转换，再浅层合并 `upstream.options`、`model.options`；后者优先，嵌套对象整体替换。例如模型 `options.output_config` 会替换推导值和上游同名对象。由此可以显式调整 thinking budget、原生 effort 或端点专有字段。
 
 最终由 bridge 固定模型路由、转换后的历史、工具定义、流模式和必要协议字段。摘要请求保留普通工具选择并移除结构化输出约束；原生压缩移除普通回答的输出上限。必须重建的字段承载桥接契约，不由 options 改写。详见上表链接的后端文档，以及[摘要的工具选择](compaction.md#工具选择与缓存)。
+
+## Adapter 专用行为
+
+`adapters` 与 `options` 分工不同：前者控制 bridge 怎样转换协议，后者是发送给上游的原生请求参数。命名空间使用目录已有的 adapter ID；以后新增协议专用行为时，在对应命名空间增加字段，无需向模型目录或连接顶层添加协议特例。目前有专用设置的是 `claude-messages`：
+
+| 字段 | 值与默认行为 |
+| --- | --- |
+| `tool_updates` | 默认 `inline`，把中途工具声明转换为原生完整 `tool_addition`；兼容模式 `top_level` 将所有定义合并到顶部 |
+| `thinking_mismatch` | 默认 `drop_block`，请服务端丢弃前缀失配的 thinking；`error` 请求报错；`upstream_default` 不补充该策略 |
+
+连接级设置适合端点差异，模型级设置适合同一连接下的模型差异。每个叶字段依次取模型设置、连接设置、adapter 默认值；模型只覆盖一个字段时，仍继承连接里的其他字段。下面的连接显式使用兼容工具模式，模型再单独调整 thinking 策略：
+
+```json
+{
+  "upstreams": {
+    "compatible": {
+      "base_url": "https://example.com/v1",
+      "adapters": { "claude-messages": { "tool_updates": "top_level" } }
+    }
+  },
+  "models": {
+    "sonnet": {
+      "upstream": "compatible", "catalog": "claude-sonnet-5-5", "model": "deployment-a",
+      "adapters": { "claude-messages": { "thinking_mismatch": "error" } }
+    }
+  }
+}
+```
+
+省略 `thinking_mismatch` 表示 bridge 默认的 `drop_block`，与显式 `upstream_default` 不同。对最终 `thinking.type` 为 `adaptive` 或 `enabled` 的请求，bridge 补充 `block_binding.prefix_mismatch_behavior`；原生 `options.thinking.block_binding` 中明确设置的同名值优先。`between_tools` 等不支持该字段的模式不补充策略，不擅自换 thinking 模式。`options` 本身仍按前述浅层规则合并，不进行通用递归合并。
+
+专用设置不作为请求参数发给上游，不改变状态来源身份或客户端目录。共享连接可以配置供不同模型使用的 adapter；模型级只接受自身 adapter 的设置。未知命名空间、字段及枚举会报配置错误；尚无专用字段的 adapter 无需配置空对象。`inline` 需要上游支持相关协议，不兼容时直接返回错误，应在该连接显式选择 `top_level`。恢复代价及端点行为见 [Claude Messages](backends-anthropic.md#失配策略与故障续接)。
 
 ## Reasoning 与模型目录
 

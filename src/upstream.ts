@@ -4,10 +4,16 @@ import { captureUpstream } from "./inspect/capture.ts";
 import type { ResolvedModel } from "./types.ts";
 
 /** base_url includes any API version prefix; path is appended, never resolved from /. */
-export async function upstreamFetch(route: ResolvedModel, path: string, body: unknown, signal: AbortSignal, requestHeaders?: Headers, protocolHeaders?: Record<string, string>): Promise<Response> {
+export async function upstreamFetch(route: ResolvedModel, path: string, body: unknown, signal: AbortSignal, requestHeaders?: Headers, protocolHeaders?: Record<string, string | string[]>): Promise<Response> {
   const url = route.upstream.base_url.replace(/\/+$/, "") + "/" + path.replace(/^\/+/, "");
   const headers = await upstreamHeaders(route.upstream, route.profile.api, signal, requestHeaders);
-  for (const [name, value] of Object.entries(protocolHeaders ?? {})) headers.set(name, value);
+  for (const [name, value] of Object.entries(protocolHeaders ?? {})) {
+    // A protocol may require additional comma-separated feature flags without
+    // replacing the endpoint's configured flags. Scalar headers still replace.
+    headers.set(name, Array.isArray(value)
+      ? [...new Set([...(headers.get(name)?.split(",") ?? []), ...value].map(v => v.trim()).filter(Boolean))].join(",")
+      : value);
+  }
   const payload = JSON.stringify(body);
   const call = captureUpstream(url, headers, payload);
   const idle = new AbortController();

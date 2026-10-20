@@ -2,6 +2,14 @@ import type { ResponseWriter, Usage } from "./writer.ts";
 
 export type Api = "responses" | "anthropic" | "chat";
 export type AdapterId = "gpt-responses" | "claude-messages" | "deepseek-chat";
+export interface ClaudeMessagesOptions {
+  tool_updates: "inline" | "top_level";
+  thinking_mismatch: "drop_block" | "error" | "upstream_default";
+}
+/** Bridge behavior, distinct from native request-body options. */
+export interface AdapterConfig {
+  "claude-messages"?: Partial<ClaudeMessagesOptions>;
+}
 export interface UpstreamConfig {
   base_url: string;
   api_key_env?: string;
@@ -11,6 +19,7 @@ export interface UpstreamConfig {
   stream_idle_timeout_ms?: number;
   headers?: Record<string, string>;
   options?: Record<string, unknown>;
+  adapters?: AdapterConfig;
 }
 export interface ModelConfig {
   upstream: string;
@@ -25,6 +34,7 @@ export interface ModelConfig {
   replay?: { reasoning_from?: string[]; native_compaction_from?: string[] };
   compaction?: { mode?: "summary" | "native"; model?: string; native_replay?: boolean };
   options?: Record<string, unknown>;
+  adapters?: AdapterConfig;
 }
 export interface BridgeConfig {
   host?: string;
