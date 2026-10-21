@@ -1,0 +1,53 @@
+## Task and current progress
+
+The conversation has collected authoritative state for **project `3617031`**, across **epochs 0–9**. No implementation, deployment, or work-item execution has been requested. The assistant has acknowledged each supplied ledger and checkpoint.
+
+Each epoch contains 20 entries in each of these categories:
+
+1. Exact parameters: `parameter-3617031-N=value-…`
+2. Directed routes: `route-source-3617031-N->route-target-…`
+3. Authoritative probe results: `probe-3617031-N=probe-result-…`
+4. Final corrections: `corrected-field-3617031-N=final-…`
+5. Work checkpoints: `work-item-3617031-N:STATE|receipt=receipt-…|next=next-…`
+
+Together, the epochs cover **N = 1–200**. Epoch `e` contains indices `e+1, e+11, …, e+191`. These are distinct keys; later epochs do not replace earlier epochs wholesale.
+
+All 200 probes have already returned authoritative tool outputs in the conversation. The available read-only tool is:
+
+```text
+functions.database_query({project: 3617031, probe: "probe-3617031-N"})
+```
+
+## Authority and preservation rules
+
+- Preserve every authoritative key and value **exactly**, including prefixes, leading zeros, and associations.
+- Routes are directional; never reverse an arrow.
+- Each epoch’s **FINAL AUTHORITATIVE CORRECTIONS** replaces its **SUPERSEDED CANDIDATES** exactly. All `obsolete-…` candidates are invalid as current values.
+- Keep each work item’s state, receipt, and next token together. Do not infer completion or execute an opaque `next-…` token.
+- The large **UNRELATED ARCHIVAL MATERIAL** messages are explicitly non-authoritative and must be ignored. They change no parameter, route, probe result, correction, or checkpoint.
+- “Archived epoch …” acknowledgments refer to those unrelated archive messages; they do **not** retire the epoch’s authoritative project state.
+- Acknowledgments such as “recorded” or “applied” reflect conversational tracking. No persistent storage writes or state mutations were demonstrated.
+
+## Critical source references and examples
+
+The full exact values are in the preceding user ledger messages and tool outputs. **This concise handoff does not reproduce all 1,000 records; do not reconstruct omitted hashes from patterns.** Use the original authoritative messages when answering exact-value questions.
+
+Examples spanning the collected state:
+
+```text
+parameter-3617031-1=value-c1042a944bce9322646069f1
+route-source-3617031-1->route-target-25ca7411867fde69c3a52b
+probe-3617031-1=probe-result-54c2a9452db06c18f5cc6b28a2
+corrected-field-3617031-1=final-6632748da058257a09dad275
+work-item-3617031-1:BLOCKED|receipt=receipt-57e27ae2deced27f99|next=next-826a1d904338d2f996
+
+parameter-3617031-200=value-b549a2a68c6d537657814753
+route-source-3617031-200->route-target-bddb1306e2ee7180e9aaf1
+probe-3617031-200=probe-result-c616247a847e016c7808b0e0cd
+corrected-field-3617031-200=final-61222b7f2df5692804498113
+work-item-3617031-200:VERIFYING|receipt=receipt-d9ddd33da54d670a34|next=next-75df25d4ee5f54fc33
+```
+
+## Next steps
+
+There is **no pending operational action**. Resume by handling the user’s next request against the accumulated authoritative state. For exact retrieval, consult the relevant original ledger or probe output. If an original exact value is unavailable after compaction, state that limitation instead of inventing it; probe results can be queried through the tool if needed.

@@ -1,0 +1,11 @@
+{
+  "type": "compaction",
+  "ciphertext_characters": 142648,
+  "replayable": false,
+  "source": {
+    "experiment": "historical-holdout",
+    "seed": 3617033,
+    "repeat": 1,
+    "arm": "native_default"
+  }
+}

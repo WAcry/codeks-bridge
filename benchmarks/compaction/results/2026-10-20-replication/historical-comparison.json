@@ -1,0 +1,4774 @@
+{
+  "density_per_category": 200,
+  "seeds": [
+    3617031,
+    3617032,
+    3617033,
+    3617034
+  ],
+  "repeats_per_seed": 2,
+  "independent_seed_count": 4,
+  "batches": [
+    {
+      "batch": "historical-holdout",
+      "controls": [
+        {
+          "seed": 3617031,
+          "empty": {
+            "usage": {
+              "input_tokens": 7905,
+              "output_tokens": 1595,
+              "total_tokens": 9500,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 17,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 7903,
+              "elapsed_seconds": 24.723
+            },
+            "score": {
+              "known_correct": 0,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          },
+          "full": {
+            "usage": {
+              "input_tokens": 218339,
+              "output_tokens": 4494,
+              "total_tokens": 222833,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 218337,
+              "elapsed_seconds": 60.671
+            },
+            "score": {
+              "known_correct": 150,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          }
+        },
+        {
+          "seed": 3617032,
+          "empty": {
+            "usage": {
+              "input_tokens": 7905,
+              "output_tokens": 1595,
+              "total_tokens": 9500,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 17,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 7903,
+              "elapsed_seconds": 20.851
+            },
+            "score": {
+              "known_correct": 0,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          },
+          "full": {
+            "usage": {
+              "input_tokens": 218344,
+              "output_tokens": 4495,
+              "total_tokens": 222839,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 218342,
+              "elapsed_seconds": 69.465
+            },
+            "score": {
+              "known_correct": 150,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          }
+        },
+        {
+          "seed": 3617033,
+          "empty": {
+            "usage": {
+              "input_tokens": 7905,
+              "output_tokens": 1576,
+              "total_tokens": 9481,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 7903,
+              "elapsed_seconds": 20.322
+            },
+            "score": {
+              "known_correct": 0,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          },
+          "full": {
+            "usage": {
+              "input_tokens": 218401,
+              "output_tokens": 4472,
+              "total_tokens": 222873,
+              "cached_input_tokens": 0,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 218399,
+              "elapsed_seconds": 56.51
+            },
+            "score": {
+              "known_correct": 150,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          }
+        },
+        {
+          "seed": 3617034,
+          "empty": {
+            "usage": {
+              "input_tokens": 7905,
+              "output_tokens": 1594,
+              "total_tokens": 9499,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 16,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 7903,
+              "elapsed_seconds": 20.285
+            },
+            "score": {
+              "known_correct": 0,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          },
+          "full": {
+            "usage": {
+              "input_tokens": 218313,
+              "output_tokens": 4517,
+              "total_tokens": 222830,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 218311,
+              "elapsed_seconds": 59.347
+            },
+            "score": {
+              "known_correct": 150,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          }
+        }
+      ],
+      "rows": [
+        {
+          "product": "builtin",
+          "seed": 3617031,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 214745,
+            "output_tokens": 714,
+            "total_tokens": 215459,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 158,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214743,
+            "elapsed_seconds": 20.56,
+            "product_output_tokens": 556
+          },
+          "reader": {
+            "input_tokens": 8536,
+            "output_tokens": 1600,
+            "total_tokens": 10136,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 22,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 8534,
+            "elapsed_seconds": 20.225
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 24.723
+          },
+          "replay_input_tokens": 631,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 0,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 0,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 0,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 0,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 0,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 0,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "91e06840752f3dcc4511ae2f0bc1b1099b803788b1b257ed88f32dcfc993f7e5",
+            "reader_request_sha256": "a07acd96bec5a064db063e6886814cc7efa0107c274a8acc6acb67292ba9691f",
+            "product_sha256": "24334085d65a9aa61868ebd704933a94ca9dbb03cc0b3d119f17c1d8bf53e8fb"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617031,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 214670,
+            "output_tokens": 17834,
+            "total_tokens": 232504,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214668,
+            "elapsed_seconds": 227.232,
+            "product_output_tokens": 17834
+          },
+          "reader": {
+            "input_tokens": 25741,
+            "output_tokens": 4494,
+            "total_tokens": 30235,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25739,
+            "elapsed_seconds": 52.444
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 24.723
+          },
+          "replay_input_tokens": 17836,
+          "native_direct_input_tokens": 17836,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "09c62af0af56bb9ad0377cb8f7c9219c9a30f3a3f988152eca5f86a3d5f7a6c8",
+            "reader_request_sha256": "70c078bdebd5080df8e8248381f141f4787236407e605f00c702dccb65bfdb98",
+            "product_sha256": "c8ebd1dd0d134bbbbade3f112da56ec14c766fc31613a44346c85658b21f01fd"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "builtin",
+          "seed": 3617031,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 214745,
+            "output_tokens": 834,
+            "total_tokens": 215579,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 195,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214743,
+            "elapsed_seconds": 26.107,
+            "product_output_tokens": 639
+          },
+          "reader": {
+            "input_tokens": 8619,
+            "output_tokens": 1600,
+            "total_tokens": 10219,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 22,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 8617,
+            "elapsed_seconds": 21.037
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 24.723
+          },
+          "replay_input_tokens": 714,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 0,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 0,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 0,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 0,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 0,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 0,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "91e06840752f3dcc4511ae2f0bc1b1099b803788b1b257ed88f32dcfc993f7e5",
+            "reader_request_sha256": "18a9aeb70f8d93788c6bb94e14018d13ac181858c0aaf4b799a4af7d80756689",
+            "product_sha256": "5ed836821ee3387bfc0d680a2008ad9937a4f30d0dedb79cb8f0c2c88d47f617"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617031,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 214670,
+            "output_tokens": 18089,
+            "total_tokens": 232759,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214668,
+            "elapsed_seconds": 260.103,
+            "product_output_tokens": 18089
+          },
+          "reader": {
+            "input_tokens": 25996,
+            "output_tokens": 4494,
+            "total_tokens": 30490,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25994,
+            "elapsed_seconds": 55.769
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 24.723
+          },
+          "replay_input_tokens": 18091,
+          "native_direct_input_tokens": 18091,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "09c62af0af56bb9ad0377cb8f7c9219c9a30f3a3f988152eca5f86a3d5f7a6c8",
+            "reader_request_sha256": "4486356733e72895a87560f82742bbb293dcccb20d18718985b8c1750d7570bf",
+            "product_sha256": "37e81acd4be06f4e0dbec3cfe46629c56bece5fae8613a3352d46f10dac4f445"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "builtin",
+          "seed": 3617032,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 214750,
+            "output_tokens": 930,
+            "total_tokens": 215680,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 75,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214748,
+            "elapsed_seconds": 20.831,
+            "product_output_tokens": 855
+          },
+          "reader": {
+            "input_tokens": 8835,
+            "output_tokens": 1599,
+            "total_tokens": 10434,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 21,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 8833,
+            "elapsed_seconds": 20.514
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.851
+          },
+          "replay_input_tokens": 930,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 0,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 0,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 0,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 0,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 0,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 0,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "0cc186be7a371e5bfff331179a00968df1a0f3fa11a153c2c371d693027e4fbe",
+            "reader_request_sha256": "3134169e6931cdddd18d2b5eafcb2721354bdf24167402b4c1effaf429f0069a",
+            "product_sha256": "c5992f16d48b5855236a09417b4dc749879b3c27a877fd827c50b753570a3a7d"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617032,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 214675,
+            "output_tokens": 17984,
+            "total_tokens": 232659,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214673,
+            "elapsed_seconds": 254.1,
+            "product_output_tokens": 17984
+          },
+          "reader": {
+            "input_tokens": 25891,
+            "output_tokens": 4495,
+            "total_tokens": 30386,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25889,
+            "elapsed_seconds": 53.623
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.851
+          },
+          "replay_input_tokens": 17986,
+          "native_direct_input_tokens": 17986,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "bcea2df791b68bfbeeeb9bd5002cff065458668a556c9fc88c127e023b0a8fb1",
+            "reader_request_sha256": "17c3d0be7d63c2b47e97c86d93dc82f408748e80703f60c6439ba4ade337868a",
+            "product_sha256": "847b9ee39ba5e139e0105ba917d50a058e3d894170e168e93ade9de157ff7c87"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "builtin",
+          "seed": 3617032,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 214750,
+            "output_tokens": 1048,
+            "total_tokens": 215798,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 173,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214748,
+            "elapsed_seconds": 24.547,
+            "product_output_tokens": 875
+          },
+          "reader": {
+            "input_tokens": 8855,
+            "output_tokens": 1597,
+            "total_tokens": 10452,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 19,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 8853,
+            "elapsed_seconds": 23.841
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.851
+          },
+          "replay_input_tokens": 950,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 0,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 0,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 0,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 0,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 0,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 0,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "0cc186be7a371e5bfff331179a00968df1a0f3fa11a153c2c371d693027e4fbe",
+            "reader_request_sha256": "1d179a8aa211fabdfb2bb03b641365b43f4bb3dd0237e164edf08c1222065766",
+            "product_sha256": "7badb9682db6ddb9c7d8e9d4db5d082383bb5f7e9f5c2b833b7b5bf4311b76a4"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617032,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 214675,
+            "output_tokens": 17301,
+            "total_tokens": 231976,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214673,
+            "elapsed_seconds": 244.896,
+            "product_output_tokens": 17301
+          },
+          "reader": {
+            "input_tokens": 25208,
+            "output_tokens": 4495,
+            "total_tokens": 29703,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25206,
+            "elapsed_seconds": 66.107
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.851
+          },
+          "replay_input_tokens": 17303,
+          "native_direct_input_tokens": 17303,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "bcea2df791b68bfbeeeb9bd5002cff065458668a556c9fc88c127e023b0a8fb1",
+            "reader_request_sha256": "592bd1e024bc3518e42611350df76f72e18c1a63c2b0d9452c6f22b4f4cd4963",
+            "product_sha256": "e09500990aa1b403fad20f95041eff81bf49add129a6936ada7b94de6f5d098c"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "builtin",
+          "seed": 3617033,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 214807,
+            "output_tokens": 1255,
+            "total_tokens": 216062,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 444,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214805,
+            "elapsed_seconds": 34.211,
+            "product_output_tokens": 811
+          },
+          "reader": {
+            "input_tokens": 8791,
+            "output_tokens": 1601,
+            "total_tokens": 10392,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 23,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 8789,
+            "elapsed_seconds": 21.316
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1576,
+            "total_tokens": 9481,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.322
+          },
+          "replay_input_tokens": 886,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 0,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 0,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 0,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 0,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 0,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 0,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "40fd736cfe4e54e3876259fe2c5465bb1f4ed25406fa116c47094f0ad3166bcd",
+            "reader_request_sha256": "99a9d6d6028bc59444980ea44d2d112bb6544e926a3080e802080a5b31e34f2f",
+            "product_sha256": "6966de6cb0bdf5013595a5b6edb2df56b4046d0af698f48f5f0e75c19ac4b2ce"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617033,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 214732,
+            "output_tokens": 17309,
+            "total_tokens": 232041,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214730,
+            "elapsed_seconds": 552.848,
+            "product_output_tokens": 17309
+          },
+          "reader": {
+            "input_tokens": 25216,
+            "output_tokens": 4472,
+            "total_tokens": 29688,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25214,
+            "elapsed_seconds": 62.14
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1576,
+            "total_tokens": 9481,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.322
+          },
+          "replay_input_tokens": 17311,
+          "native_direct_input_tokens": 17311,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "0dc35a5949f26cd2f29d5d9c963b5ffdb245b338a7ca7eff325b34e8067262e7",
+            "reader_request_sha256": "c98411a563672908bd53f72903436e4706a6294cea13b832219326058b8b3530",
+            "product_sha256": "68c96e8deb1b9c6b0194dc8c6abb930bedc374553b9e607c36e3a2d9ed13b324"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "builtin",
+          "seed": 3617033,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 214807,
+            "output_tokens": 979,
+            "total_tokens": 215786,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 329,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214805,
+            "elapsed_seconds": 23.983,
+            "product_output_tokens": 650
+          },
+          "reader": {
+            "input_tokens": 8630,
+            "output_tokens": 1596,
+            "total_tokens": 10226,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 18,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 8628,
+            "elapsed_seconds": 24.726
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1576,
+            "total_tokens": 9481,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.322
+          },
+          "replay_input_tokens": 725,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 0,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 0,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 0,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 0,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 0,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 0,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "40fd736cfe4e54e3876259fe2c5465bb1f4ed25406fa116c47094f0ad3166bcd",
+            "reader_request_sha256": "ba60a4fccac1c641ec8aba73e5572e68fcf155f1cd2c8763e8a058a16963aea7",
+            "product_sha256": "da3fdc0e247fb604061704ffe312062ee9e5e4b379c2a8ae33bf48cd435f51a8"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617033,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 214732,
+            "output_tokens": 17939,
+            "total_tokens": 232671,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214730,
+            "elapsed_seconds": 221.213,
+            "product_output_tokens": 17939
+          },
+          "reader": {
+            "input_tokens": 25846,
+            "output_tokens": 4472,
+            "total_tokens": 30318,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25844,
+            "elapsed_seconds": 58.75
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1576,
+            "total_tokens": 9481,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.322
+          },
+          "replay_input_tokens": 17941,
+          "native_direct_input_tokens": 17941,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "0dc35a5949f26cd2f29d5d9c963b5ffdb245b338a7ca7eff325b34e8067262e7",
+            "reader_request_sha256": "d057508e3a79f329f10ee2bd831676b03d9101dd7bc1cb9338df933c8a7be9ff",
+            "product_sha256": "696edce7ce5f3b03469f5c3b5cb5aeeffbb6f0eaa37b7845a79e282ac792f803"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "builtin",
+          "seed": 3617034,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 214719,
+            "output_tokens": 2882,
+            "total_tokens": 217601,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 110,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214717,
+            "elapsed_seconds": 54.229,
+            "product_output_tokens": 2772
+          },
+          "reader": {
+            "input_tokens": 10752,
+            "output_tokens": 1894,
+            "total_tokens": 12646,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 24,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 10750,
+            "elapsed_seconds": 29.893
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1594,
+            "total_tokens": 9499,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 16,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.285
+          },
+          "replay_input_tokens": 2847,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 15,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 3,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 3,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 3,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 3,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 3,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "8de2991c747f711783160d2990ddeadd12d8b60c366eca9e1188878cfff82453",
+            "reader_request_sha256": "17616c3c1444f111f2d2e15d40336cd1a888b2c4c4c8339bb24cc9dbf77a4167",
+            "product_sha256": "fe6d34b8c8dcff70559356058786e6aae1b80faa3a2dbb704ae8c67824354216"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617034,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 214644,
+            "output_tokens": 17943,
+            "total_tokens": 232587,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214642,
+            "elapsed_seconds": 259.609,
+            "product_output_tokens": 17943
+          },
+          "reader": {
+            "input_tokens": 25850,
+            "output_tokens": 4517,
+            "total_tokens": 30367,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25848,
+            "elapsed_seconds": 68.57
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1594,
+            "total_tokens": 9499,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 16,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.285
+          },
+          "replay_input_tokens": 17945,
+          "native_direct_input_tokens": 17945,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "c6396c6559572da8e0052d0896ff94fdc92a0a95ecc73a5b79dc4ba07d75ca29",
+            "reader_request_sha256": "3f58a87e679e814e3edcc3b9d15a4e6cb1d0400732a08dbcb62808dc769dc748",
+            "product_sha256": "5513cfce0bebf443d8fdac5e10783c6c022d242bd7deffba6cc0883e5f36c32f"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "builtin",
+          "seed": 3617034,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 214719,
+            "output_tokens": 889,
+            "total_tokens": 215608,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 91,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214717,
+            "elapsed_seconds": 25.0,
+            "product_output_tokens": 798
+          },
+          "reader": {
+            "input_tokens": 8778,
+            "output_tokens": 1598,
+            "total_tokens": 10376,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 20,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 8776,
+            "elapsed_seconds": 19.862
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1594,
+            "total_tokens": 9499,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 16,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.285
+          },
+          "replay_input_tokens": 873,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 0,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 0,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 0,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 0,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 0,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 0,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "8de2991c747f711783160d2990ddeadd12d8b60c366eca9e1188878cfff82453",
+            "reader_request_sha256": "1544de8694f0c46d42e7e1ff976a248263b38cc69c70c47f9927e4cf8ea1de62",
+            "product_sha256": "88828d738c74d2984b0ece84be24221c2dd3ab68d8dc0f0c15b1f03babd9950e"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617034,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 214644,
+            "output_tokens": 17372,
+            "total_tokens": 232016,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214642,
+            "elapsed_seconds": 260.549,
+            "product_output_tokens": 17372
+          },
+          "reader": {
+            "input_tokens": 25279,
+            "output_tokens": 4517,
+            "total_tokens": 29796,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25277,
+            "elapsed_seconds": 63.228
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1594,
+            "total_tokens": 9499,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 16,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.285
+          },
+          "replay_input_tokens": 17374,
+          "native_direct_input_tokens": 17374,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "c6396c6559572da8e0052d0896ff94fdc92a0a95ecc73a5b79dc4ba07d75ca29",
+            "reader_request_sha256": "72454b20c2cd318d8becb714ec6472e10977d58e4cc753e20ea51ad93ded9642",
+            "product_sha256": "fec780ce7c9e4dcb658b676e61d68cd5c68a90134c213c9c3eb0239c7f0881b9"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        }
+      ],
+      "summary": {
+        "builtin": {
+          "samples": 8,
+          "seeds": 4,
+          "perfect_known": 0,
+          "mean_known_correct": 1.875,
+          "min_known_correct": 0,
+          "max_known_correct": 15,
+          "known_total": 150,
+          "mean_known_accuracy": 0.0125,
+          "mean_unknown_accuracy": 1.0,
+          "mean_product_output_tokens": 994.5,
+          "mean_replay_input_tokens": 1069.5
+        },
+        "native": {
+          "samples": 8,
+          "seeds": 4,
+          "perfect_known": 8,
+          "mean_known_correct": 150,
+          "min_known_correct": 150,
+          "max_known_correct": 150,
+          "known_total": 150,
+          "mean_known_accuracy": 1.0,
+          "mean_unknown_accuracy": 1.0,
+          "mean_product_output_tokens": 17721.375,
+          "mean_replay_input_tokens": 17723.375
+        }
+      }
+    },
+    {
+      "batch": "historical-restatement",
+      "controls": [
+        {
+          "seed": 3617031,
+          "empty": {
+            "usage": {
+              "input_tokens": 7905,
+              "output_tokens": 1595,
+              "total_tokens": 9500,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 17,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 7903,
+              "elapsed_seconds": 22.874
+            },
+            "score": {
+              "known_correct": 0,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          },
+          "full": {
+            "usage": {
+              "input_tokens": 218339,
+              "output_tokens": 4494,
+              "total_tokens": 222833,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 218337,
+              "elapsed_seconds": 67.483
+            },
+            "score": {
+              "known_correct": 150,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          }
+        },
+        {
+          "seed": 3617032,
+          "empty": {
+            "usage": {
+              "input_tokens": 7905,
+              "output_tokens": 1588,
+              "total_tokens": 9493,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 10,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 7903,
+              "elapsed_seconds": 23.088
+            },
+            "score": {
+              "known_correct": 0,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          },
+          "full": {
+            "usage": {
+              "input_tokens": 218344,
+              "output_tokens": 4495,
+              "total_tokens": 222839,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 218342,
+              "elapsed_seconds": 61.038
+            },
+            "score": {
+              "known_correct": 150,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          }
+        },
+        {
+          "seed": 3617033,
+          "empty": {
+            "usage": {
+              "input_tokens": 7905,
+              "output_tokens": 1576,
+              "total_tokens": 9481,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 7903,
+              "elapsed_seconds": 22.663
+            },
+            "score": {
+              "known_correct": 0,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          },
+          "full": {
+            "usage": {
+              "input_tokens": 218401,
+              "output_tokens": 4472,
+              "total_tokens": 222873,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 218399,
+              "elapsed_seconds": 63.846
+            },
+            "score": {
+              "known_correct": 150,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          }
+        },
+        {
+          "seed": 3617034,
+          "empty": {
+            "usage": {
+              "input_tokens": 7905,
+              "output_tokens": 1595,
+              "total_tokens": 9500,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 17,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 7903,
+              "elapsed_seconds": 22.297
+            },
+            "score": {
+              "known_correct": 0,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          },
+          "full": {
+            "usage": {
+              "input_tokens": 218313,
+              "output_tokens": 4517,
+              "total_tokens": 222830,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 218311,
+              "elapsed_seconds": 63.087
+            },
+            "score": {
+              "known_correct": 150,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          }
+        }
+      ],
+      "rows": [
+        {
+          "product": "native",
+          "seed": 3617031,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 214670,
+            "output_tokens": 18003,
+            "total_tokens": 232673,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214668,
+            "elapsed_seconds": 244.113,
+            "product_output_tokens": 18003
+          },
+          "reader": {
+            "input_tokens": 25910,
+            "output_tokens": 4565,
+            "total_tokens": 30475,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 69,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25908,
+            "elapsed_seconds": 72.9
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 22.874
+          },
+          "replay_input_tokens": 18005,
+          "native_direct_input_tokens": 18005,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "09c62af0af56bb9ad0377cb8f7c9219c9a30f3a3f988152eca5f86a3d5f7a6c8",
+            "reader_request_sha256": "464a1cd21716e9bacd38c9917d747ec3716aad38de07339e98d496c859e31025",
+            "product_sha256": "f8c525d7336813896fff7f04890c84b0d1a2aed015a935ab07c5ea438c1a85b8"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "handoff",
+          "seed": 3617031,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 92719,
+            "output_tokens": 18378,
+            "total_tokens": 111097,
+            "cached_input_tokens": 92544,
+            "reasoning_output_tokens": 58,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 92717,
+            "elapsed_seconds": 261.239,
+            "product_output_tokens": 18320
+          },
+          "reader": {
+            "input_tokens": 26223,
+            "output_tokens": 4494,
+            "total_tokens": 30717,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 26221,
+            "elapsed_seconds": 62.138
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 22.874
+          },
+          "replay_input_tokens": 18318,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "5b3b2ed016c73bbca4de926eaf25ceadcb488a2b92f8c5bdc76a7615931773bf",
+            "reader_request_sha256": "c17652e44df5672cfd02e93dc79f1356c6a776b509c714ec712cb2a68a6b13fb",
+            "product_sha256": "99726b95322c018a2ee3e7b62fd7015db77e0355acea246b209bdeae181b32c4"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "exact_same_run_native_checkpoint": true,
+            "published_scalars_crosschecked": true
+          },
+          "matched_native": {
+            "batch": "historical-restatement",
+            "seed": 3617031,
+            "repeat": 1,
+            "product_sha256": "f8c525d7336813896fff7f04890c84b0d1a2aed015a935ab07c5ea438c1a85b8"
+          },
+          "native_prerequisite_generation": {
+            "input_tokens": 214670,
+            "output_tokens": 18003,
+            "total_tokens": 232673,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214668,
+            "elapsed_seconds": 244.113,
+            "product_output_tokens": 18003
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617031,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 214670,
+            "output_tokens": 17930,
+            "total_tokens": 232600,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214668,
+            "elapsed_seconds": 248.486,
+            "product_output_tokens": 17930
+          },
+          "reader": {
+            "input_tokens": 25837,
+            "output_tokens": 4494,
+            "total_tokens": 30331,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25835,
+            "elapsed_seconds": 58.24
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 22.874
+          },
+          "replay_input_tokens": 17932,
+          "native_direct_input_tokens": 17932,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "09c62af0af56bb9ad0377cb8f7c9219c9a30f3a3f988152eca5f86a3d5f7a6c8",
+            "reader_request_sha256": "7f9abac3519d104c428d466cfcdda7bcbab67ada03246e1ab81f586f2682756f",
+            "product_sha256": "093900e8bf2c07fc5327b69188fad9e6c620c05343286f4b5f66f45d18ea4668"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "handoff",
+          "seed": 3617031,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 92646,
+            "output_tokens": 18557,
+            "total_tokens": 111203,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 84,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 92644,
+            "elapsed_seconds": 258.945,
+            "product_output_tokens": 18473
+          },
+          "reader": {
+            "input_tokens": 26376,
+            "output_tokens": 4494,
+            "total_tokens": 30870,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 26374,
+            "elapsed_seconds": 61.743
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 22.874
+          },
+          "replay_input_tokens": 18471,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "d1f9f52aa6ed77f595431dc0c77d73f1b4b6496ff79d48b084a99dbba68e7c6b",
+            "reader_request_sha256": "18b5226e50f7e56d9f131baccdedee89d66aed814240746c809964818c65bdea",
+            "product_sha256": "e568c2387df9242896e7090b4aaebbb80f7ff21c22ac561332b69d5e283483e0"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "exact_same_run_native_checkpoint": true,
+            "published_scalars_crosschecked": true
+          },
+          "matched_native": {
+            "batch": "historical-restatement",
+            "seed": 3617031,
+            "repeat": 2,
+            "product_sha256": "093900e8bf2c07fc5327b69188fad9e6c620c05343286f4b5f66f45d18ea4668"
+          },
+          "native_prerequisite_generation": {
+            "input_tokens": 214670,
+            "output_tokens": 17930,
+            "total_tokens": 232600,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214668,
+            "elapsed_seconds": 248.486,
+            "product_output_tokens": 17930
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617032,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 214675,
+            "output_tokens": 3453,
+            "total_tokens": 218128,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214673,
+            "elapsed_seconds": 53.095,
+            "product_output_tokens": 3453
+          },
+          "reader": {
+            "input_tokens": 11360,
+            "output_tokens": 2076,
+            "total_tokens": 13436,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 29,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 11358,
+            "elapsed_seconds": 29.498
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1588,
+            "total_tokens": 9493,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 10,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 23.088
+          },
+          "replay_input_tokens": 3455,
+          "native_direct_input_tokens": 3455,
+          "score": {
+            "known_correct": 24,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 6,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 3,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 3,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 6,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 6,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "bcea2df791b68bfbeeeb9bd5002cff065458668a556c9fc88c127e023b0a8fb1",
+            "reader_request_sha256": "83c0589490a556f57ee8dbbdbd5bb598d312c2a622e58d8083ee647992364d94",
+            "product_sha256": "92c185d7b2123b922c86a6cfe4a651128645d76d64f34e85cac984802f814a70"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "handoff",
+          "seed": 3617032,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 78232,
+            "output_tokens": 6202,
+            "total_tokens": 84434,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 159,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 78230,
+            "elapsed_seconds": 89.254,
+            "product_output_tokens": 6043
+          },
+          "reader": {
+            "input_tokens": 13946,
+            "output_tokens": 2380,
+            "total_tokens": 16326,
+            "cached_input_tokens": 0,
+            "reasoning_output_tokens": 37,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 13944,
+            "elapsed_seconds": 34.79
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1588,
+            "total_tokens": 9493,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 10,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 23.088
+          },
+          "replay_input_tokens": 6041,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 39,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 9,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 9,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 3,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 9,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 9,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "01e20d88da3a2c21a33e25aa3448aa52fe7e13ca9f91a95342b8a3a772c70e7f",
+            "reader_request_sha256": "4aacc963c1dae69ccd75ca0de9f839d8b36d9e2d8e27e42dd1283adf4ca093bf",
+            "product_sha256": "85e4a8b92ea69c408f271a9cd9c009facb2759a682bc860f6b0e5b08bb0fb090"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "exact_same_run_native_checkpoint": true,
+            "published_scalars_crosschecked": true
+          },
+          "matched_native": {
+            "batch": "historical-restatement",
+            "seed": 3617032,
+            "repeat": 1,
+            "product_sha256": "92c185d7b2123b922c86a6cfe4a651128645d76d64f34e85cac984802f814a70"
+          },
+          "native_prerequisite_generation": {
+            "input_tokens": 214675,
+            "output_tokens": 3453,
+            "total_tokens": 218128,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214673,
+            "elapsed_seconds": 53.095,
+            "product_output_tokens": 3453
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617032,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 214675,
+            "output_tokens": 18025,
+            "total_tokens": 232700,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214673,
+            "elapsed_seconds": 252.102,
+            "product_output_tokens": 18025
+          },
+          "reader": {
+            "input_tokens": 25932,
+            "output_tokens": 4495,
+            "total_tokens": 30427,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25930,
+            "elapsed_seconds": 63.706
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1588,
+            "total_tokens": 9493,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 10,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 23.088
+          },
+          "replay_input_tokens": 18027,
+          "native_direct_input_tokens": 18027,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "bcea2df791b68bfbeeeb9bd5002cff065458668a556c9fc88c127e023b0a8fb1",
+            "reader_request_sha256": "09469063b5cbbc028eec65a6ae76c3d12a5e1d81347f0de4a169157f05d39705",
+            "product_sha256": "a422538bf98e691c75ae0e7b88e63d55c9ff03bbcfed98c6ff31245435570f72"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "handoff",
+          "seed": 3617032,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 92804,
+            "output_tokens": 18312,
+            "total_tokens": 111116,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 67,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 92802,
+            "elapsed_seconds": 258.453,
+            "product_output_tokens": 18245
+          },
+          "reader": {
+            "input_tokens": 26148,
+            "output_tokens": 4495,
+            "total_tokens": 30643,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 26146,
+            "elapsed_seconds": 65.478
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1588,
+            "total_tokens": 9493,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 10,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 23.088
+          },
+          "replay_input_tokens": 18243,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "aa0de817b577d68f1b768b047b6744500a5d9535e861838669dd0bc0da8b2956",
+            "reader_request_sha256": "5a4f74f43f5466834281fa000628ab684b64a09c180ef110def2a6fc9995d27a",
+            "product_sha256": "7dc0f7a97d2aded96532207b03606affadb61526144f8f74fe15528280609209"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "exact_same_run_native_checkpoint": true,
+            "published_scalars_crosschecked": true
+          },
+          "matched_native": {
+            "batch": "historical-restatement",
+            "seed": 3617032,
+            "repeat": 2,
+            "product_sha256": "a422538bf98e691c75ae0e7b88e63d55c9ff03bbcfed98c6ff31245435570f72"
+          },
+          "native_prerequisite_generation": {
+            "input_tokens": 214675,
+            "output_tokens": 18025,
+            "total_tokens": 232700,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214673,
+            "elapsed_seconds": 252.102,
+            "product_output_tokens": 18025
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617033,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 214732,
+            "output_tokens": 17957,
+            "total_tokens": 232689,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214730,
+            "elapsed_seconds": 252.018,
+            "product_output_tokens": 17957
+          },
+          "reader": {
+            "input_tokens": 25864,
+            "output_tokens": 4472,
+            "total_tokens": 30336,
+            "cached_input_tokens": 0,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25862,
+            "elapsed_seconds": 63.417
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1576,
+            "total_tokens": 9481,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 22.663
+          },
+          "replay_input_tokens": 17959,
+          "native_direct_input_tokens": 17959,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "0dc35a5949f26cd2f29d5d9c963b5ffdb245b338a7ca7eff325b34e8067262e7",
+            "reader_request_sha256": "b13625d78917716ff57409b373f2f4cc9037701d7d5a65f197bc5b3dc8348dc5",
+            "product_sha256": "60b8b9db4d3852398f5b8e9d6e995f94c5d0010fd3cb3ae58a04240a551397e9"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "handoff",
+          "seed": 3617033,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 92647,
+            "output_tokens": 18276,
+            "total_tokens": 110923,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 110,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 92645,
+            "elapsed_seconds": 259.864,
+            "product_output_tokens": 18166
+          },
+          "reader": {
+            "input_tokens": 26069,
+            "output_tokens": 4472,
+            "total_tokens": 30541,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 26067,
+            "elapsed_seconds": 62.769
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1576,
+            "total_tokens": 9481,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 22.663
+          },
+          "replay_input_tokens": 18164,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "b6b5b63fda37b7008b7ce51f9dfedcd57c925a3ccbc6e1def1fafaf4cd80acd9",
+            "reader_request_sha256": "66ead2b3359b5d1290c290d508544cd70f2f8c63e43a00de7a231fc3f41114dd",
+            "product_sha256": "7dcfdec7486c07236ade7d89e1f54a2e38b0dbe897eca3aa89f74210c9b55e60"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "exact_same_run_native_checkpoint": true,
+            "published_scalars_crosschecked": true
+          },
+          "matched_native": {
+            "batch": "historical-restatement",
+            "seed": 3617033,
+            "repeat": 1,
+            "product_sha256": "60b8b9db4d3852398f5b8e9d6e995f94c5d0010fd3cb3ae58a04240a551397e9"
+          },
+          "native_prerequisite_generation": {
+            "input_tokens": 214732,
+            "output_tokens": 17957,
+            "total_tokens": 232689,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214730,
+            "elapsed_seconds": 252.018,
+            "product_output_tokens": 17957
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617033,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 214732,
+            "output_tokens": 18731,
+            "total_tokens": 233463,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214730,
+            "elapsed_seconds": 261.246,
+            "product_output_tokens": 18731
+          },
+          "reader": {
+            "input_tokens": 26638,
+            "output_tokens": 4472,
+            "total_tokens": 31110,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 26636,
+            "elapsed_seconds": 63.36
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1576,
+            "total_tokens": 9481,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 22.663
+          },
+          "replay_input_tokens": 18733,
+          "native_direct_input_tokens": 18733,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "0dc35a5949f26cd2f29d5d9c963b5ffdb245b338a7ca7eff325b34e8067262e7",
+            "reader_request_sha256": "659336ceb8e29f2aaefd2114804a10f1a49adcf0e1ea5689263da887ec1ae1fc",
+            "product_sha256": "5eaacf5b5a0348608848895c11bcd47a35ace1d09351d317bb4413ee3600d305"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "handoff",
+          "seed": 3617033,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 93421,
+            "output_tokens": 19001,
+            "total_tokens": 112422,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 64,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 93419,
+            "elapsed_seconds": 267.311,
+            "product_output_tokens": 18937
+          },
+          "reader": {
+            "input_tokens": 26840,
+            "output_tokens": 4472,
+            "total_tokens": 31312,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 26838,
+            "elapsed_seconds": 62.672
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1576,
+            "total_tokens": 9481,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 22.663
+          },
+          "replay_input_tokens": 18935,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "44b0e6fcd5c95fb7d1592c1a158e8794abde88344bcec498b9fb2514c06b6629",
+            "reader_request_sha256": "c24a131c7e9d94334a5b9672556fd3f5168416abe93d2f49ea7ad5c16e15975c",
+            "product_sha256": "9242c1e2488da1638efd1ae1fca158b45f88725824d9ffc844f3c474596b1ced"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "exact_same_run_native_checkpoint": true,
+            "published_scalars_crosschecked": true
+          },
+          "matched_native": {
+            "batch": "historical-restatement",
+            "seed": 3617033,
+            "repeat": 2,
+            "product_sha256": "5eaacf5b5a0348608848895c11bcd47a35ace1d09351d317bb4413ee3600d305"
+          },
+          "native_prerequisite_generation": {
+            "input_tokens": 214732,
+            "output_tokens": 18731,
+            "total_tokens": 233463,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214730,
+            "elapsed_seconds": 261.246,
+            "product_output_tokens": 18731
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617034,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 214644,
+            "output_tokens": 17981,
+            "total_tokens": 232625,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214642,
+            "elapsed_seconds": 249.755,
+            "product_output_tokens": 17981
+          },
+          "reader": {
+            "input_tokens": 25888,
+            "output_tokens": 4517,
+            "total_tokens": 30405,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25886,
+            "elapsed_seconds": 61.683
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 22.297
+          },
+          "replay_input_tokens": 17983,
+          "native_direct_input_tokens": 17983,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "c6396c6559572da8e0052d0896ff94fdc92a0a95ecc73a5b79dc4ba07d75ca29",
+            "reader_request_sha256": "03c289019d703afa2bd86ea546720afca0fd6611bb4ddab42f57dd83cf2cc35a",
+            "product_sha256": "c4530f66dec1ea3ce32334bea3eb71c25e2214141f62a8457b6e1a797365a467"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "handoff",
+          "seed": 3617034,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 92626,
+            "output_tokens": 18463,
+            "total_tokens": 111089,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 69,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 92624,
+            "elapsed_seconds": 262.121,
+            "product_output_tokens": 18394
+          },
+          "reader": {
+            "input_tokens": 26297,
+            "output_tokens": 4517,
+            "total_tokens": 30814,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 26295,
+            "elapsed_seconds": 64.178
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 22.297
+          },
+          "replay_input_tokens": 18392,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "b590014c23a908a847eb7b754aefcb25023abd2185935642d6634b29a6802948",
+            "reader_request_sha256": "4436545f1d17ee5eb1669e28f6aa1c1f83786515554188e5e7ec73ae8469e207",
+            "product_sha256": "ad74ebabdf957e36919839b8ad1668ecb581dee31e2cbfefb8652fa3e94b34d2"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "exact_same_run_native_checkpoint": true,
+            "published_scalars_crosschecked": true
+          },
+          "matched_native": {
+            "batch": "historical-restatement",
+            "seed": 3617034,
+            "repeat": 1,
+            "product_sha256": "c4530f66dec1ea3ce32334bea3eb71c25e2214141f62a8457b6e1a797365a467"
+          },
+          "native_prerequisite_generation": {
+            "input_tokens": 214644,
+            "output_tokens": 17981,
+            "total_tokens": 232625,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214642,
+            "elapsed_seconds": 249.755,
+            "product_output_tokens": 17981
+          }
+        },
+        {
+          "product": "native",
+          "seed": 3617034,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 214644,
+            "output_tokens": 17959,
+            "total_tokens": 232603,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214642,
+            "elapsed_seconds": 252.652,
+            "product_output_tokens": 17959
+          },
+          "reader": {
+            "input_tokens": 25866,
+            "output_tokens": 4550,
+            "total_tokens": 30416,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 31,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 25864,
+            "elapsed_seconds": 65.589
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 22.297
+          },
+          "replay_input_tokens": 17961,
+          "native_direct_input_tokens": 17961,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "c6396c6559572da8e0052d0896ff94fdc92a0a95ecc73a5b79dc4ba07d75ca29",
+            "reader_request_sha256": "3b2d27b28be2abd4785fb6aaa2ea9f1a9dafcd128cb7a2742c3cbcf32f616e1e",
+            "product_sha256": "fe933dfffc905a6de26c640a7709bbc53f6e5e10156f8110ba2db4724ffffd53"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "handoff",
+          "seed": 3617034,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 92604,
+            "output_tokens": 19326,
+            "total_tokens": 111930,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 64,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 92602,
+            "elapsed_seconds": 270.844,
+            "product_output_tokens": 19262
+          },
+          "reader": {
+            "input_tokens": 27165,
+            "output_tokens": 4517,
+            "total_tokens": 31682,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 27163,
+            "elapsed_seconds": 63.155
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 22.297
+          },
+          "replay_input_tokens": 19260,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "6d2e75c4a8576c7fdf8e1dde2d3a926ec932ebac4206b86ef3c254b58a7095ed",
+            "reader_request_sha256": "8b7c4dc6778c1e280279d7be15a0e94cf9c2ca5b5940bbf635f386ef0639594a",
+            "product_sha256": "48b966e788955d057d924f0ff47b0d0e3a9b7a81b797878b8d73a1263267ae8f"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "exact_same_run_native_checkpoint": true,
+            "published_scalars_crosschecked": true
+          },
+          "matched_native": {
+            "batch": "historical-restatement",
+            "seed": 3617034,
+            "repeat": 2,
+            "product_sha256": "fe933dfffc905a6de26c640a7709bbc53f6e5e10156f8110ba2db4724ffffd53"
+          },
+          "native_prerequisite_generation": {
+            "input_tokens": 214644,
+            "output_tokens": 17959,
+            "total_tokens": 232603,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 214642,
+            "elapsed_seconds": 252.652,
+            "product_output_tokens": 17959
+          }
+        }
+      ],
+      "summary": {
+        "handoff": {
+          "samples": 8,
+          "seeds": 4,
+          "perfect_known": 7,
+          "mean_known_correct": 136.125,
+          "min_known_correct": 39,
+          "max_known_correct": 150,
+          "known_total": 150,
+          "mean_known_accuracy": 0.9075,
+          "mean_unknown_accuracy": 1.0,
+          "mean_product_output_tokens": 16980,
+          "mean_replay_input_tokens": 16978
+        },
+        "native": {
+          "samples": 8,
+          "seeds": 4,
+          "perfect_known": 7,
+          "mean_known_correct": 134.25,
+          "min_known_correct": 24,
+          "max_known_correct": 150,
+          "known_total": 150,
+          "mean_known_accuracy": 0.895,
+          "mean_unknown_accuracy": 1.0,
+          "mean_product_output_tokens": 16254.875,
+          "mean_replay_input_tokens": 16256.875
+        }
+      },
+      "paired_handoff_minus_native": {
+        "rows": [
+          {
+            "seed": 3617031,
+            "repeat": 1,
+            "known_correct": 0,
+            "product_output_tokens": 317,
+            "replay_input_tokens": 313
+          },
+          {
+            "seed": 3617031,
+            "repeat": 2,
+            "known_correct": 0,
+            "product_output_tokens": 543,
+            "replay_input_tokens": 539
+          },
+          {
+            "seed": 3617032,
+            "repeat": 1,
+            "known_correct": 15,
+            "product_output_tokens": 2590,
+            "replay_input_tokens": 2586
+          },
+          {
+            "seed": 3617032,
+            "repeat": 2,
+            "known_correct": 0,
+            "product_output_tokens": 220,
+            "replay_input_tokens": 216
+          },
+          {
+            "seed": 3617033,
+            "repeat": 1,
+            "known_correct": 0,
+            "product_output_tokens": 209,
+            "replay_input_tokens": 205
+          },
+          {
+            "seed": 3617033,
+            "repeat": 2,
+            "known_correct": 0,
+            "product_output_tokens": 206,
+            "replay_input_tokens": 202
+          },
+          {
+            "seed": 3617034,
+            "repeat": 1,
+            "known_correct": 0,
+            "product_output_tokens": 413,
+            "replay_input_tokens": 409
+          },
+          {
+            "seed": 3617034,
+            "repeat": 2,
+            "known_correct": 0,
+            "product_output_tokens": 1303,
+            "replay_input_tokens": 1299
+          }
+        ],
+        "means": {
+          "known_correct": 1.875,
+          "product_output_tokens": 725.125,
+          "replay_input_tokens": 721.125
+        }
+      }
+    },
+    {
+      "batch": "historical-claude-code",
+      "controls": [
+        {
+          "seed": 3617031,
+          "empty": {
+            "usage": {
+              "input_tokens": 7905,
+              "output_tokens": 1595,
+              "total_tokens": 9500,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 17,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 7903,
+              "elapsed_seconds": 24.723
+            },
+            "score": {
+              "known_correct": 0,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          },
+          "full": {
+            "usage": {
+              "input_tokens": 218339,
+              "output_tokens": 4494,
+              "total_tokens": 222833,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 218337,
+              "elapsed_seconds": 60.671
+            },
+            "score": {
+              "known_correct": 150,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          }
+        },
+        {
+          "seed": 3617032,
+          "empty": {
+            "usage": {
+              "input_tokens": 7905,
+              "output_tokens": 1595,
+              "total_tokens": 9500,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 17,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 7903,
+              "elapsed_seconds": 20.851
+            },
+            "score": {
+              "known_correct": 0,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          },
+          "full": {
+            "usage": {
+              "input_tokens": 218344,
+              "output_tokens": 4495,
+              "total_tokens": 222839,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 218342,
+              "elapsed_seconds": 69.465
+            },
+            "score": {
+              "known_correct": 150,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          }
+        },
+        {
+          "seed": 3617033,
+          "empty": {
+            "usage": {
+              "input_tokens": 7905,
+              "output_tokens": 1576,
+              "total_tokens": 9481,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 7903,
+              "elapsed_seconds": 20.322
+            },
+            "score": {
+              "known_correct": 0,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          },
+          "full": {
+            "usage": {
+              "input_tokens": 218401,
+              "output_tokens": 4472,
+              "total_tokens": 222873,
+              "cached_input_tokens": 0,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 218399,
+              "elapsed_seconds": 56.51
+            },
+            "score": {
+              "known_correct": 150,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          }
+        },
+        {
+          "seed": 3617034,
+          "empty": {
+            "usage": {
+              "input_tokens": 7905,
+              "output_tokens": 1594,
+              "total_tokens": 9499,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 16,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 7903,
+              "elapsed_seconds": 20.285
+            },
+            "score": {
+              "known_correct": 0,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 0,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          },
+          "full": {
+            "usage": {
+              "input_tokens": 218313,
+              "output_tokens": 4517,
+              "total_tokens": 222830,
+              "cached_input_tokens": 4096,
+              "reasoning_output_tokens": 0,
+              "output_item_input_framing_tokens": 2,
+              "normalized_input_tokens": 218311,
+              "elapsed_seconds": 59.347
+            },
+            "score": {
+              "known_correct": 150,
+              "known_total": 150,
+              "unknown_correct": 5,
+              "unknown_total": 5,
+              "json_valid": true,
+              "categories": {
+                "exact_recall": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "relational_state": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "tool_history": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "distractor_resolution": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "task_continuation": {
+                  "correct": 30,
+                  "total": 30
+                },
+                "unknown": {
+                  "correct": 5,
+                  "total": 5
+                }
+              }
+            }
+          }
+        }
+      ],
+      "rows": [
+        {
+          "product": "claude-code",
+          "seed": 3617031,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 215942,
+            "output_tokens": 6801,
+            "total_tokens": 222743,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 180,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 215940,
+            "elapsed_seconds": 119.226,
+            "product_output_tokens": 6621
+          },
+          "reader": {
+            "input_tokens": 14601,
+            "output_tokens": 1869,
+            "total_tokens": 16470,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 14599,
+            "elapsed_seconds": 24.407
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 24.723
+          },
+          "replay_input_tokens": 6696,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 15,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 3,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 3,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 3,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 3,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 3,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "8e231120284ec21a2146cda6be0cd1621885c28b8eded944b788a7ae826a2ebc",
+            "reader_request_sha256": "8e0e74389b6392584dec86694f5369d161f805778adff79a5c2113ffb57269da",
+            "product_sha256": "d60b8d3d5f37846312436f49489acc5b1d45c40cb5c82240277193e9eb273db9"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "claude-code",
+          "seed": 3617031,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 215942,
+            "output_tokens": 22496,
+            "total_tokens": 238438,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 280,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 215940,
+            "elapsed_seconds": 334.737,
+            "product_output_tokens": 22216
+          },
+          "reader": {
+            "input_tokens": 30196,
+            "output_tokens": 4494,
+            "total_tokens": 34690,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 30194,
+            "elapsed_seconds": 60.793
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 24.723
+          },
+          "replay_input_tokens": 22291,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "8e231120284ec21a2146cda6be0cd1621885c28b8eded944b788a7ae826a2ebc",
+            "reader_request_sha256": "08c5645c645d6c5f3a241ec321207bb6786716bce9bda94e6b0720884c337303",
+            "product_sha256": "97e97f04882b4c1c1db078844bb5ff6cdb2290c1311817e9dea5d26b1ea7cedc"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "claude-code",
+          "seed": 3617032,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 215947,
+            "output_tokens": 21297,
+            "total_tokens": 237244,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 356,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 215945,
+            "elapsed_seconds": 264.12,
+            "product_output_tokens": 20941
+          },
+          "reader": {
+            "input_tokens": 28921,
+            "output_tokens": 4522,
+            "total_tokens": 33443,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 25,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 28919,
+            "elapsed_seconds": 53.721
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.851
+          },
+          "replay_input_tokens": 21016,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "2d77457b58f1a26d840152344b8587f655eb2635bf481994d71d034bd1bf5f58",
+            "reader_request_sha256": "cd91ed6f635fd5691a7c3cca26d293e7cfa2ce6cbe1ffc4ee7e633c81d487e8a",
+            "product_sha256": "e3aa52a456e969af33e73056745f4e727aa5220292e9c202a3f98f6bb6b82735"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "claude-code",
+          "seed": 3617032,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 215947,
+            "output_tokens": 22212,
+            "total_tokens": 238159,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 380,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 215945,
+            "elapsed_seconds": 264.509,
+            "product_output_tokens": 21832
+          },
+          "reader": {
+            "input_tokens": 29812,
+            "output_tokens": 4495,
+            "total_tokens": 34307,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 29810,
+            "elapsed_seconds": 65.624
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1595,
+            "total_tokens": 9500,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 17,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.851
+          },
+          "replay_input_tokens": 21907,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "2d77457b58f1a26d840152344b8587f655eb2635bf481994d71d034bd1bf5f58",
+            "reader_request_sha256": "797dff1000c55650d3b3cf38257370f601a365e0243e966515217dbfab7d9b20",
+            "product_sha256": "35730a7cdc02b246ca81780b852424d8313960e7e8fb482179b8de9deb372fc2"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "claude-code",
+          "seed": 3617033,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 216004,
+            "output_tokens": 22303,
+            "total_tokens": 238307,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 451,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 216002,
+            "elapsed_seconds": 282.529,
+            "product_output_tokens": 21852
+          },
+          "reader": {
+            "input_tokens": 29832,
+            "output_tokens": 4472,
+            "total_tokens": 34304,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 29830,
+            "elapsed_seconds": 61.589
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1576,
+            "total_tokens": 9481,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.322
+          },
+          "replay_input_tokens": 21927,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "890c201636c4e4b508e4a29f9d7240d6628c8673e0150019ab317c2988e2f960",
+            "reader_request_sha256": "55ded1099c8b03abf4deea07afe0fd48c983e2f10c1c3404888ae474e88074b3",
+            "product_sha256": "3a7a8e571420876da537e698752486e829f0e3fe88847d70b9edf40274cc5229"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "claude-code",
+          "seed": 3617033,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 216004,
+            "output_tokens": 21928,
+            "total_tokens": 237932,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 387,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 216002,
+            "elapsed_seconds": 285.946,
+            "product_output_tokens": 21541
+          },
+          "reader": {
+            "input_tokens": 29521,
+            "output_tokens": 4472,
+            "total_tokens": 33993,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 29519,
+            "elapsed_seconds": 53.208
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1576,
+            "total_tokens": 9481,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 0,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.322
+          },
+          "replay_input_tokens": 21616,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "890c201636c4e4b508e4a29f9d7240d6628c8673e0150019ab317c2988e2f960",
+            "reader_request_sha256": "b6b73fc5a2f28973924e5909d948761c79acaf06e584b54151f08f4319cef3a0",
+            "product_sha256": "4c305bd7e5969a9527d671270ebd8d51da9728e2d89987e807bb5aaa7628ee06"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "claude-code",
+          "seed": 3617034,
+          "repeat": 1,
+          "generation": {
+            "input_tokens": 215916,
+            "output_tokens": 21484,
+            "total_tokens": 237400,
+            "cached_input_tokens": 214400,
+            "reasoning_output_tokens": 387,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 215914,
+            "elapsed_seconds": 313.874,
+            "product_output_tokens": 21097
+          },
+          "reader": {
+            "input_tokens": 29077,
+            "output_tokens": 4534,
+            "total_tokens": 33611,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 15,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 29075,
+            "elapsed_seconds": 54.31
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1594,
+            "total_tokens": 9499,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 16,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.285
+          },
+          "replay_input_tokens": 21172,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 150,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 30,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 30,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 30,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 30,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "2fed20b3d6b2f9714327523842e8bca6a90c8254da79f417b2e9645cab88f49c",
+            "reader_request_sha256": "582973d1f51a6116159d0702f8d330843438ed4547900fed006487259a02940f",
+            "product_sha256": "7101e958f9a74dfd943503fa278c3c66fa5638332d862c367e0ec76c125a9a8f"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        },
+        {
+          "product": "claude-code",
+          "seed": 3617034,
+          "repeat": 2,
+          "generation": {
+            "input_tokens": 215916,
+            "output_tokens": 14004,
+            "total_tokens": 229920,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 414,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 215914,
+            "elapsed_seconds": 212.733,
+            "product_output_tokens": 13590
+          },
+          "reader": {
+            "input_tokens": 21570,
+            "output_tokens": 2787,
+            "total_tokens": 24357,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 23,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 21568,
+            "elapsed_seconds": 34.204
+          },
+          "empty_baseline": {
+            "input_tokens": 7905,
+            "output_tokens": 1594,
+            "total_tokens": 9499,
+            "cached_input_tokens": 4096,
+            "reasoning_output_tokens": 16,
+            "output_item_input_framing_tokens": 2,
+            "normalized_input_tokens": 7903,
+            "elapsed_seconds": 20.285
+          },
+          "replay_input_tokens": 13665,
+          "native_direct_input_tokens": null,
+          "score": {
+            "known_correct": 42,
+            "known_total": 150,
+            "unknown_correct": 5,
+            "unknown_total": 5,
+            "json_valid": true,
+            "categories": {
+              "exact_recall": {
+                "correct": 3,
+                "total": 30
+              },
+              "relational_state": {
+                "correct": 3,
+                "total": 30
+              },
+              "tool_history": {
+                "correct": 3,
+                "total": 30
+              },
+              "distractor_resolution": {
+                "correct": 3,
+                "total": 30
+              },
+              "task_continuation": {
+                "correct": 30,
+                "total": 30
+              },
+              "unknown": {
+                "correct": 5,
+                "total": 5
+              }
+            }
+          },
+          "fingerprints": {
+            "generation_request_sha256": "2fed20b3d6b2f9714327523842e8bca6a90c8254da79f417b2e9645cab88f49c",
+            "reader_request_sha256": "0af1d5b2818f4fa7ba9ea54fce49052f3ac0892a3be2768332e67996619ddc85",
+            "product_sha256": "daf48ef18f048b094e289990eab741a857f7cc587300271a8aadb55bbf90da25"
+          },
+          "verification": {
+            "score_recomputed_from_raw_answer": true,
+            "same_fixture_empty_baseline": true,
+            "replay_matches_generated_product": true,
+            "published_scalars_crosschecked": true
+          }
+        }
+      ],
+      "summary": {
+        "claude-code": {
+          "samples": 8,
+          "seeds": 4,
+          "perfect_known": 6,
+          "mean_known_correct": 119.625,
+          "min_known_correct": 15,
+          "max_known_correct": 150,
+          "known_total": 150,
+          "mean_known_accuracy": 0.7975,
+          "mean_unknown_accuracy": 1.0,
+          "mean_product_output_tokens": 18711.25,
+          "mean_replay_input_tokens": 18786.25
+        }
+      }
+    }
+  ],
+  "fixture_fingerprints": [
+    {
+      "seed": 3617031,
+      "history_sha256": "db3670727524f2eff2b1cf43b7982f6d688984b83fb7d47eec4ded74c92ea4ba",
+      "base_sha256": "e1bdd4f8f0df4b20f4a0ffc8a861ce819df45325d8cecdfb92e80379cf8d142e",
+      "quiz_sha256": "09eac99689a98382ea9dbd9fc91669c3c3a868ffe9e08013fc14b420ecf10871",
+      "questions_sha256": "f33c7834edc09e1d908bd7f103cb9289002efcc7ad55a3756d97961e6dff9c31",
+      "current_history_and_quiz_identical": true
+    },
+    {
+      "seed": 3617032,
+      "history_sha256": "6952044f1a71bad7c591ac8206571e3dd79fbd8bbbf738fd24e304fd2e5e9048",
+      "base_sha256": "e1bdd4f8f0df4b20f4a0ffc8a861ce819df45325d8cecdfb92e80379cf8d142e",
+      "quiz_sha256": "ff3bf56d8f50cbd4b4af64ad399ac896ed33a8e2ca09a68a3fca8c99d0c9eca0",
+      "questions_sha256": "ccba65bbf9021edb10a2b1b4eb395130902c5d42d168d2c492ffa0fbb917b8a7",
+      "current_history_and_quiz_identical": true
+    },
+    {
+      "seed": 3617033,
+      "history_sha256": "0bd8c438b28b91c807343aad9890b19658901f073842ebc43c83fdab502a24f5",
+      "base_sha256": "e1bdd4f8f0df4b20f4a0ffc8a861ce819df45325d8cecdfb92e80379cf8d142e",
+      "quiz_sha256": "a6e0e39183e95747deed72d87bd73d3f12b54a32232def0305927115538b47d7",
+      "questions_sha256": "9546ec0df28a8f896d3847eb6ea0d853716d115c45ac2c3d83fa038c44d83d18",
+      "current_history_and_quiz_identical": true
+    },
+    {
+      "seed": 3617034,
+      "history_sha256": "200969084e6f6ab3f4d2010db7ce1cce5b69e10971cb6e4fd62b6668cd842bb0",
+      "base_sha256": "e1bdd4f8f0df4b20f4a0ffc8a861ce819df45325d8cecdfb92e80379cf8d142e",
+      "quiz_sha256": "186532e7b6102e73b76ef6e0364635b721e2ec796e1d6347000efed16d3e62f4",
+      "questions_sha256": "c1e273296ad5270a39997e8b204147e9b8b6c39a281893428fe61ea84f785cd1",
+      "current_history_and_quiz_identical": true
+    }
+  ],
+  "protocol": {
+    "reasoning_effort": "medium",
+    "reasoning_context": "all_turns",
+    "verbosity": "low",
+    "reasoning_summary_requested": false,
+    "tools_declared": false,
+    "tool_choice": "auto",
+    "reader_input": "BASE + one product + quiz",
+    "builtin_replay": "summary prefix + newline + text",
+    "handoff_generation": "BASE + retained user messages + same-run native checkpoint + prompt",
+    "handoff_replay": "literal visible text",
+    "prompt_cache_key_requested": false
+  },
+  "verification": {
+    "saved_scores_recomputed": true,
+    "raw_item_usage_attribution": true,
+    "native_replay_direct_attribution_crosschecked": true,
+    "history_and_base_identical_to_current": true
+  },
+  "limitations": [
+    "Historical batches are separate runs; do not pool them as a controlled four-product comparison.",
+    "The historical Claude Code prompt batch reuses holdout fixtures with fresh compressions; it is not a new blinded holdout.",
+    "Only the native checkpoint from the same restatement run is the paired handoff baseline.",
+    "Four seeds are reused across batches; two generations per seed are not eight independent histories.",
+    "The model alias is unchanged, but server snapshots are not pinned and may drift.",
+    "Current requests add tools, request reasoning summaries, and omit the old low verbosity setting.",
+    "Current readers use different tool choice and cache options; historical handoff replay has no summary prefix.",
+    "The historical handoff prompt and current prompt differ; fixture history and base instructions are identical.",
+    "Public scalar evidence supports arithmetic review, not independent replay of private raw artifacts."
+  ]
+}

@@ -1,0 +1,81 @@
+## Task and progress
+
+The user is supplying authoritative state for project **3617034**, organized into epochs **0–9**. All ten epochs have been received and acknowledged. There is no implementation task or request to advance work items yet; the current task is to retain the supplied state accurately for later continuation or questions.
+
+Each epoch contains 20 records. Epoch `e` covers numeric suffixes `e+1, e+11, …, e+191`; together the epochs cover suffixes **1–200**.
+
+For every suffix `n`, preserve these independent associations:
+
+- `parameter-3617034-n=value-…`
+- `route-source-3617034-n -> route-target-…` — **directional**
+- `probe-3617034-n=probe-result-…` — authoritative tool output
+- `corrected-field-3617034-n=final-…`
+- `work-item-3617034-n:STATE|receipt=receipt-…|next=next-…`
+
+All epochs’ records remain active. Later epochs introduce different keys; they do not replace earlier epochs wholesale.
+
+## Authority and constraints
+
+- Preserve every identifier and value **exactly**, including leading zeroes.
+- Every `obsolete-…` correction candidate was explicitly superseded by the corresponding `final-…` correction. Never use obsolete candidates as current values.
+- Each work item’s state, receipt, and next action must remain associated with that exact work item. Do not infer state changes or execute opaque `next-…` tokens.
+- Large messages labeled **UNRELATED ARCHIVAL MATERIAL** are explicitly non-authoritative and must be ignored for active state. They change no parameter, route, probe result, correction, or checkpoint.
+- Previous assistant replies saying “Archived epoch …” refer only to ignoring that unrelated material; the authoritative epoch records remain current.
+- All 200 probes were already queried successfully, with authoritative results in the conversation. The available read-only tool is `functions.database_query({"project":3617034,"probe":"probe-3617034-N"})`.
+- No external file or database write was performed. “Recorded” and “Applied” in acknowledgments mean conversational tracking, not persisted mutations.
+
+## Next steps
+
+Wait for the user’s next instruction. Answer later retrieval or continuation questions using the authoritative ledgers, directed routes, tool outputs, final corrections, and checkpoints. No outstanding probe calls or authorized state-changing actions remain.
+
+**Retention limitation:** The original conversation contains the exact records for all 200 suffixes. This concise handoff does not reproduce all earlier epochs’ opaque values. Consult those original authoritative messages when available; do not reconstruct hashes from patterns or invent missing values. Probe values alone can be read again through the tool.
+
+## Latest authoritative records: epoch 9
+
+The following table preserves the complete epoch 9 state. Column values include their exact prefixes. For row `n`, keys use the schemas above.
+
+| n | Parameter value | Directed route target | Probe result |
+|---|---|---|---|
+| 10 | value-d7d3ed25f19fcb992bbba057 | route-target-91749f98de1a4248bcf64f | probe-result-6afbc8e07e67ae6f6eb71b8e9f |
+| 20 | value-b2afe42ab05317f01c499097 | route-target-9061aca1720372108c90c0 | probe-result-71b3608cedde4ff48f860ca68e |
+| 30 | value-27bcecfc1dd8d20da9632e23 | route-target-3480e80de6706c49a4b9b1 | probe-result-7dc0def327ff8c99d0d4d063d5 |
+| 40 | value-e767eee611aca61c59b3e2f4 | route-target-4e8a9d509a76822abef6fc | probe-result-b383b7f6c5e84fcced4eeab413 |
+| 50 | value-f2155c32dc83c1a1693b09c8 | route-target-869594d5fce8482b458f43 | probe-result-9b8e0dc36a4fda71e414c43658 |
+| 60 | value-b22dbe2a0249d28b1ff3e897 | route-target-0aa044e13d7bf10feb0fb8 | probe-result-c36e0c23d0df77f844593009f1 |
+| 70 | value-b584ee8bf234d092bdf8388b | route-target-71fa73f4187d0bb49719c2 | probe-result-463c8680bb0a365c0a07f21c9b |
+| 80 | value-60a7c9ac8d56b5cb288545ba | route-target-f75df58d21e3574ad3db95 | probe-result-951d931cd8ef97f7a31303b4f6 |
+| 90 | value-d991cabf65f12e8fd09b0376 | route-target-07fb4b4f7f3a0dc2de407c | probe-result-7aa3455c6e5156b27d2404c4c2 |
+| 100 | value-72f26dfa3b4ed588e8b86be0 | route-target-0d7b2c0a8a2411d199fd56 | probe-result-779cbab8a6dfc13c74dd37b894 |
+| 110 | value-3d68fc1bc8d004441abab24f | route-target-206305477f9a4fe13c6abe | probe-result-d91844ded70ab0d1c052591875 |
+| 120 | value-d4e1be47f2ad4bd6d0c887f9 | route-target-39746957f4a67580aca1b0 | probe-result-750c60a7405cdce70726f36054 |
+| 130 | value-4123098ec062803c5975b150 | route-target-6078584901a3b3e4545f31 | probe-result-4a6b775a3aa66ecc92cd37256d |
+| 140 | value-a24ba57a8f1797fa8990cb4e | route-target-e5ab8e2664f4e77a6eadd8 | probe-result-eb98daebcaf9eb8cb7c81c1ea5 |
+| 150 | value-4e0c41f08c9ef0801d325629 | route-target-7890a998f3f4661d184085 | probe-result-2ec199be77c86b16dcc1fb958c |
+| 160 | value-79fa705853aebd4a8c8c7bb7 | route-target-b2ca18d81a545419ece79f | probe-result-050191979179d3bad174322a7e |
+| 170 | value-1239c2003f37f47a7f2e351b | route-target-67925994de10a6594c2f1c | probe-result-e815d9798d1ff2b1d347b8b022 |
+| 180 | value-ed7f0253434eca971cb2c2ef | route-target-225c8cf58be96bada4cc39 | probe-result-568a5915221bf3edc03061f710 |
+| 190 | value-609985aefbf3da021ee83c48 | route-target-2d26950e5dc5c137507c0f | probe-result-b2058b9cb27ddc409452dfbdc6 |
+| 200 | value-2c0f9a9086ab36cd5360048b | route-target-a4432a4274fad4b8a550f3 | probe-result-7f7eb4a6837e4f8aeb11ad6495 |
+
+| n | Final correction | Work state | Receipt | Next action |
+|---|---|---|---|---|
+| 10 | final-dfad544e4fca2ac4ba3141bf | VERIFYING | receipt-f943d2a77fef98c402 | next-c083939c9715c8f597 |
+| 20 | final-41577c7ef7f36eb2ebd9f005 | QUEUED | receipt-4b07a6a93bb0f3c162 | next-b094d0b97b53d3c09c |
+| 30 | final-6b222767a8b0bdb10034981a | DONE | receipt-0eec938e718300063b | next-c2df6bebf739b15edc |
+| 40 | final-69beb3c28be070cd118fdc33 | BLOCKED | receipt-137c2a8d79afbd3135 | next-ee4efcd90d5413eec8 |
+| 50 | final-92e72ed72f437caa81e43f9f | IN_PROGRESS | receipt-ed896bdd149bdac7d5 | next-015611055de7440bd2 |
+| 60 | final-ecf0670d2fd94ee14033cbb1 | QUEUED | receipt-bcc0cd744a4f0c2325 | next-1385fbdc842ea134a2 |
+| 70 | final-3c033c1ad87d43ceb5131cf6 | IN_PROGRESS | receipt-0bd2bb48b494c051fa | next-5de243955ef4290807 |
+| 80 | final-43694e14ae6f3c8d12f127dd | BLOCKED | receipt-e1c9a1074c1b46c814 | next-8f3922e61c565b5aca |
+| 90 | final-8d7f7441e70b5dcdca3f30c6 | IN_PROGRESS | receipt-0144dc9db975aea7c7 | next-a23423279981e8494f |
+| 100 | final-df6d0aa60ce1d77bc02c238d | VERIFYING | receipt-60a02eb810e4355950 | next-956040e3f6025582cc |
+| 110 | final-fceaa4d1f7b953bdaa65f093 | VERIFYING | receipt-bfa96df4780e71435a | next-b1699c1240b036a9be |
+| 120 | final-8c7def14171fbfdd9b63be16 | QUEUED | receipt-7197b0845c6c0db3cf | next-0a6496ed46c4eabff4 |
+| 130 | final-d4629e236d53a5ae8119809e | IN_PROGRESS | receipt-f0f242ef56f70c0d78 | next-e59a0d9bfb7c3bf39a |
+| 140 | final-0d835f11f522a56f8676d3a2 | QUEUED | receipt-278800e89ea0f1d92f | next-9b2b52b0349022c72b |
+| 150 | final-677e9fbee00a9c65b1ea7943 | BLOCKED | receipt-10488baf82c2a3b58e | next-8a6f7b17744b82120c |
+| 160 | final-ff765a95e01bf29a6506003a | DONE | receipt-ac0d52ca235e813d61 | next-2749b2ca5fb6b4770f |
+| 170 | final-736d105a1c6aaec532509b6c | VERIFYING | receipt-ac8b5d86d2a4d40515 | next-f499e46e4a843ed48f |
+| 180 | final-87de29555b10bfec6bfecd20 | VERIFYING | receipt-2339dea8bac834890c | next-fd1171455485ea270f |
+| 190 | final-41cde2eb4e822728a0bcdf8c | QUEUED | receipt-495a7b3e0957ddcd14 | next-cc312a26c0b387fb29 |
+| 200 | final-4d79587c17aff5ac29b715d8 | BLOCKED | receipt-e8b4920fe977a702b9 | next-eb6171c0b201924470 |

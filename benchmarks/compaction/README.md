@@ -2,23 +2,22 @@
 
 这是手动运行的质量实验，不进入 CI，也不影响 bridge 的运行时。材料都是合成数据；不读取本机会话、登录文件或真实项目。目标是比较压缩后可恢复的任务信息，保留可重复的方法和历史证据，供以后换模型重跑。
 
-## 固定的五条路线
+## 固定的四条路线
 
 `H` 是完整历史，`U` 是保留的用户消息，`K` 是交付给下一次请求的压缩产物。
 
 | 产物 | 生成请求 | 类型 |
 | --- | --- | --- |
 | K1 | H + [Codex 内置 prompt](prompts/builtin.txt) | 文字 |
-| K2 | H + [bridge 标准 prompt](prompts/standard.txt) | 文字 |
-| K3 | H + [用户提供的 Claude Code 式 prompt](prompts/claude-code.txt) | 文字 |
-| K4 | H + `compaction_trigger` | 原生检查点 |
-| K5 | U + **同一份 K4** + [当前 handoff prompt](prompts/handoff.txt) | 文字 |
+| K2 | H + [用户提供的 Claude Code 式 prompt](prompts/claude-code.txt) | 文字 |
+| K3 | H + `compaction_trigger` | 原生检查点 |
+| K4 | U + **同一份 K3** + [当前 handoff prompt](prompts/handoff.txt) | 文字 |
 
-K3 强调记录所有真实用户消息，按用户提供的全文冻结，不声称与某个 Claude Code 发布版本逐字相同。K5 使用当前生产 handoff 的快照，包含 text-only 约束。[manifest.json](prompts/manifest.json) 记录各份 prompt 的来源和 UTF-8 字节 hash；调整生产代码不会自动改变实验文本。
+K2 强调记录所有真实用户消息，基于用户提供的全文，不声称与某个 Claude Code 发布版本逐字相同。核对时发现冻结快照有一处示例占位措辞不同：原文 `[User feedback on the error if any]`，实际为 `[User feedback on the fix, if any]`。本批和此前五路实测均使用后者；保留实测字节，不事后替换。K4 使用当前生产 handoff 的快照，包含 text-only 约束。[manifest.json](prompts/manifest.json) 记录各份 prompt 的来源和 UTF-8 字节 hash；调整生产代码不会自动改变实验文本。
 
-**五种产物的最终问答全部只使用各自产物，不附带 U、H 或生成过程的 reasoning。** K5 生成时仍使用 U，以复现 bridge 的交接输入。因此 K5 是整个交接流程的测试，不能把它相对 K4 的变化全部归因于密文转明文。
+**四种产物的最终问答全部只使用各自产物，不附带 U、H 或生成过程的 reasoning。** K4 生成时仍使用 U，以复现 bridge 的交接输入。因此 K4 是整个交接流程的测试，不能把它相对 K3 的变化全部归因于密文转明文。
 
-所有请求使用同一份固定基础指令和工具声明；这些公共协议前缀不包含题目答案或原任务历史。文字产物通过固定的 Codex summary prefix 作为一条用户消息载入，原生 K4 作为原生 item 载入。每次问答都是独立请求，没有 `previous_response_id`，不会串联前一组回答或 reasoning。**评分请求固定 `tool_choice: none`**，确保闭卷问答无法向工具查询答案；这个设置只影响控制组和恢复测验，不改变压缩及 handoff 生成。默认另测空历史和完整 H 两个基线，分别检查猜测与题目本身的可回答性。
+所有请求使用同一份固定基础指令和工具声明；这些公共协议前缀不包含题目答案或原任务历史。文字产物通过固定的 Codex summary prefix 作为一条用户消息载入，原生 K3 作为原生 item 载入。每次问答都是独立请求，没有 `previous_response_id`，不会串联前一组回答或 reasoning。**评分请求固定 `tool_choice: none`**，确保闭卷问答无法向工具查询答案；这个设置只影响控制组和恢复测验，不改变压缩及 handoff 生成。默认另测空历史和完整 H 两个基线，分别检查猜测与题目本身的可回答性。
 
 ## 两种材料
 
@@ -28,7 +27,7 @@ K3 强调记录所有真实用户消息，按用户提供的全文冻结，不�
 
 测验固定每类 30 题，加 5 道不存在记录的题。生成压缩产物时不发送测验、标准答案或评分元数据。问答按完整 canonical string 精确匹配；缺字段不等于正确回答 `null`。这适合测量精确信息保留，但不等于编程能力评估，也不能用 150 题全部正确证明 1,000 条记录全部无损。
 
-K5 的 U 由 [retention.py](retention.py) 生成，使用历史 Codex V2 文本用户消息的 64k 近似预算：`ceil(UTF-8 bytes / 4)`，优先保留较新的消息，边界消息保留首尾。它只覆盖合成文本材料，不模拟图片、通知或完整客户端历史策略。截断标记在预算之外，近似 token 预算不能当成精确 tokenizer 上限。
+K4 的 U 由 [retention.py](retention.py) 生成，使用历史 Codex V2 文本用户消息的 64k 近似预算：`ceil(UTF-8 bytes / 4)`，优先保留较新的消息，边界消息保留首尾。它只覆盖合成文本材料，不模拟图片、通知或完整客户端历史策略。截断标记在预算之外，近似 token 预算不能当成精确 tokenizer 上限。
 
 ### 开发任务 handoff
 
@@ -66,29 +65,34 @@ node benchmarks/compaction/run.mjs \
   --model gpt-6.1-sol --out benchmarks/compaction/runs/normal-medium
 ```
 
-实际调用时，在环境中提供 `BENCHMARK_URL`（完整 `/responses` URL）和 `BENCHMARK_HEADERS`（请求 headers 的 JSON 对象），再给命令加 `--execute`。按目标服务准备鉴权；runner 不绑定某种登录机制、账号或本机目录。它发送 Responses Lite；测试其他协议的模型时可使用支持该模型的 bridge。K4/K5 要求目标支持原生压缩，仅测试文字路线可用 `--products K1,K2,K3`。
+实际调用时，在环境中提供 `BENCHMARK_URL`（完整 `/responses` URL）和 `BENCHMARK_HEADERS`（请求 headers 的 JSON 对象），再给命令加 `--execute`。按目标服务准备鉴权；runner 不绑定某种登录机制、账号或本机目录。它发送 Responses Lite；测试其他协议的模型时可使用支持该模型的 bridge。K3/K4 要求目标支持原生压缩，仅测试文字路线可用 `--products K1,K2`。
 
 默认使用 `reasoning.effort: medium`、`summary: auto`、`context: all_turns`，生成时保留 `tool_choice: auto`，不设置输出 token 上限。`--options FILE` 可覆盖请求参数，`--instructions FILE` 可替换基础指令，`--controls none` 可省略基线。更换模型时记录这些变化，不自动假定它支持相同参数。
 
 原生压缩与所有文字生成分别记 usage。若文字生成意外调用工具、流未成功结束或接口拒绝请求，该运行直接失败并保留记录；不会执行工具、自动换 prompt 或偷偷重试。失败时先调查原因，新的尝试使用新目录，报告中保留失败尝试。
 
-已有完整产物但需要重新测验时，可以给原命令加 `--reuse-products OLD_RUN_DIR`，并指定新的 `--out`。runner 核对模型、材料、prompt、参数和题目，原样复用已成功生成的产物，包括同一份 K4；不重新压缩，也不覆盖旧测验。新记录明确标记复用来源，旧生成 usage 不计入这次新增调用。这是显式操作，不是自动重试。
+已有完整产物但需要重新测验时，可以给原命令加 `--reuse-products OLD_RUN_DIR`，并指定新的 `--out`。runner 核对产物定义、模型、材料、prompt、参数和题目，原样复用已成功生成的产物，包括同一份 K3；不重新压缩，也不覆盖旧测验。新记录明确标记复用来源，旧生成 usage 不计入这次新增调用。来源必须使用当前四组定义；旧编号的运行目录会明确报错。
 
 原始产物保存在 `runs/`（已由 Git 忽略），包含请求体、事件、原生密文、文字、usage、耗时和参数快照；不会保存请求鉴权 headers。不要将运行目录直接提交。公开报告只整理合成文本、去标识化评分和必要数值，原生密文及服务端标识留在本地。
 
 ## 结果怎么读
 
 - 分开看已知事实正确率、无答案题是否返回 `null`、各类别错误，以及空历史和完整历史基线。开发题还要复核权限与工作状态，不能仅看总分。
-- native、handoff、quiz 分开计算 usage。问答基线和恢复测验是实验成本，不是产品每次压缩的必需开销。K5 的完整生成成本包含 K4 和 handoff，但共享 K4 的实验总成本只计算它一次。
-- cached input 已包含在 input tokens 中。总 output 通常包含 reasoning；文字长度、原生检查点归因 tokens 和 reasoning 分开记录。长度只是辅助信息，不能替代质量评分，也不能按密文字节数推断信息量。
+- native、handoff、quiz 分开计算 usage。问答基线和恢复测验是实验成本，不是产品每次压缩的必需开销。K4 的完整生成成本包含 K3 和 handoff，但共享 K3 的实验总成本只计算它一次。
+- 同时记录产物生成 tokens 和恢复时占用的 input tokens。前者优先取服务端 output item attribution，排除生成 reasoning；后者从测验 input 中扣除新输出 item 的 input framing，再减去同条件空历史基线。原生 item 的 input attribution 可直接交叉核对。文字的 summary prefix 和 framing 可能使两种计数不同，不能把旧报告的 replay input 与新报告的 product output 混为一列。
+- cached input 已包含在 input tokens 中。总 output 通常包含 reasoning。长度只是辅助信息，不能替代质量评分，也不能按密文字节数推断信息量。
 - 每轮只有一份检查点时，150 道答案不是 150 次独立压缩实验。比较稳定性需要固定参数后增加 seed 和独立重复，不在看到坏结果后只保留重跑成绩。
 - 这是质量实验，不模拟完整工作会话的缓存路由。缓存 usage 和耗时可记录，但不能据此断言正常客户端的缓存命中率或通用延迟。
 
 ## 历史记录与离线核验
 
+[四路扩大样本与复现实验](results/2026-10-20-replication/README.md)使用八个高密度 seeds、同一开发历史的三次独立生成，并保留工具声明对照与冻结检查点重读。它并列展示产物 output tokens 和回放 input tokens。[历史差异审计](replication-audit.md)解释哪些输入相同、哪些请求参数不同，以及为什么不能把旧批次混合成配对结论。
+
 [2026-10-20 的完整五路实测](results/2026-10-20-medium/README.md)使用 GPT-6.1 Sol / medium，保存两份输入、题目与 gold、八份文字产物、全部最终及初步回答、逐题评分和用量。开发任务与高密度状态分别报告；原生密文只保留公开元数据。
 
-[历史受控状态实验](historical-controlled.md) 和 [历史 handoff 对照](historical-handoff.md) 保留之前的测量与限制。它们使用的 effort、prompt、恢复时是否附带 U 等条件不同，不能合并成当前五条路线的统一排名。
+历史报告与冻结文件保留当时的编号。对应关系为：旧 K1 → 当前 K1（Codex），旧 K3 → 当前 K2（Claude Code 式），旧 K4 → 当前 K3（原生），旧 K5 → 当前 K4（handoff）；旧 K2 的 bridge 标准 prompt 及其结果仅属于历史记录。
+
+[历史受控状态实验](historical-controlled.md) 和 [历史 handoff 对照](historical-handoff.md) 保留之前的测量与限制。它们使用的 effort、prompt、恢复时是否附带 U 等条件不同，不能合并成当前四条路线的统一排名。
 
 本地假上游检查 runner 的实验隔离和数据处理，不消耗模型额度，也不加入 `npm test` 或发布工作流：
 
@@ -96,4 +100,43 @@ node benchmarks/compaction/run.mjs \
 node --test benchmarks/compaction/offline-test.mjs
 ```
 
+四路公开记录可用 `node benchmarks/compaction/verify-record.mjs benchmarks/compaction/results/2026-10-20-replication` 离线核验完整文件 hash，并从原始回答和题目重算分数。
+
 生成器改编自公开 MIT 项目 `algal/pi-openai-server-compaction`，完整许可在源文件内；Codex prompt 和文本保留算法的归属见仓库 [NOTICE](../../NOTICE)。
+
+## 单独核对工具声明与读取设置
+
+`native-tool-ablation.mjs` 对同一份高密度材料生成两份原生检查点：一份使用历史请求设置（没有工具声明、`medium/all_turns`、`verbosity: low`），另一份只在开头加入工具声明。两份产物都使用当前闭卷 reader 测验。请求头按环境配置统一提供，因此这是历史生成 body 的复现，不声称完全还原过去的服务端或传输状态。
+
+```sh
+node benchmarks/compaction/native-tool-ablation.mjs \
+  --fixture benchmarks/compaction/runs/fixtures/stress.json \
+  --model gpt-6.1-sol --out benchmarks/compaction/runs/tool-ablation
+```
+
+默认只查看计划；执行同样需要环境中的 URL、headers 和 `--execute`。每个 seed 四次请求，条件顺序按 seed 奇偶交替；不会执行工具或自动重试。
+
+`read-native.mjs` 只重读已有原生 item，不重新压缩。`--checkpoint` 接收原生 `{type: "compaction", id, encrypted_content}` JSON，`--reader current` 使用当前闭卷设置，`--reader historical` 使用旧版无工具声明、`auto`、`verbosity: low` 的设置。后者没有声明可执行工具，但与当前设置不是单一变量差异。
+
+```sh
+node benchmarks/compaction/read-native.mjs \
+  --fixture benchmarks/compaction/runs/fixtures/stress.json \
+  --checkpoint benchmarks/compaction/runs/native-item.json \
+  --reader current --model gpt-6.1-sol \
+  --out benchmarks/compaction/runs/native-reread
+```
+
+真实原生 item 保留在私有运行目录。公开元数据不能用于这个命令。工具声明实验的离线检查使用 `node --test benchmarks/compaction/native-tool-ablation-test.mjs`，独立于 CI。
+
+## 重绘已记录的结果
+
+绘图是可选的独立步骤，只读取公开结果，不调用模型。安装单独的固定版本依赖，再生成 SVG 或 PNG；不加入项目运行时或 CI：
+
+```sh
+benchmarks/compaction/.venv/bin/python -m pip install -r benchmarks/compaction/requirements-plot.txt
+benchmarks/compaction/.venv/bin/python benchmarks/compaction/plot-replication.py \
+  benchmarks/compaction/results/2026-10-20-replication/results.json \
+  benchmarks/compaction/runs/quality-vs-size.svg
+```
+
+横轴为实际回放 input tokens，纵轴为已知题正确率。高密度 seeds 与开发历史重复分图；箭头连接同一次生成的 K3 与其 K4，不把同一检查点的多次读取当作独立样本。

@@ -12,7 +12,7 @@ import { score } from './score.mjs';
 // Run explicitly with node; every upstream in this file is a local fake server.
 const runner = fileURLToPath(new URL('./run.mjs', import.meta.url));
 const prompt = async name => readFile(new URL(`./prompts/${name}.txt`, import.meta.url), 'utf8');
-const prompts = Object.fromEntries(await Promise.all(['builtin', 'standard', 'claude-code', 'handoff', 'summary-prefix']
+const prompts = Object.fromEntries(await Promise.all(['builtin', 'claude-code', 'handoff', 'summary-prefix']
   .map(async name => [name, await prompt(name)])));
 const message = (role, text) => ({ type: 'message', role, content: [{ type: 'input_text', text }] });
 const checkpoint = { type: 'compaction', id: 'cmp_offline', encrypted_content: 'synthetic-checkpoint' };
@@ -65,8 +65,8 @@ async function setup(t, { mode = 'json', fixtureValue = fixture, questionnaire }
       res.end(JSON.stringify({ error: { message: 'Synthetic unavailable response.' } }));
       return;
     }
-    const id = isNative(body) ? 'K4' : { [prompts.builtin]: 'K1', [prompts.standard]: 'K2',
-      [prompts['claude-code']]: 'K3', [prompts.handoff]: 'K5' }[lastText(body)];
+    const id = isNative(body) ? 'K3' : { [prompts.builtin]: 'K1',
+      [prompts['claude-code']]: 'K2', [prompts.handoff]: 'K4' }[lastText(body)];
     const text = isQuiz(body) ? JSON.stringify(Object.fromEntries(quizQuestions.map(q => [q.id, q.expected]))) : summary(id);
     let output = isNative(body) ? [generationReasoning, checkpoint] : [generationReasoning,
       { type: 'message', role: 'assistant', id: 'msg_offline', status: 'completed',
@@ -140,15 +140,15 @@ test('planning uses no credentials, network, or output directory', async t => {
   const result = await state.run([], { BENCHMARK_HEADERS: 'invalid JSON', BENCHMARK_URL: '' });
   assert.equal(result.code, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
-  assert.deepEqual(plan.products, ['K1', 'K2', 'K3', 'K4', 'K5']);
-  assert.equal(plan.request_count, 12);
-  assert.deepEqual(plan.quizzes, ['control-empty', 'control-full', 'K1', 'K2', 'K3', 'K4', 'K5']);
+  assert.deepEqual(plan.products, ['K1', 'K2', 'K3', 'K4']);
+  assert.equal(plan.request_count, 10);
+  assert.deepEqual(plan.quizzes, ['control-empty', 'control-full', 'K1', 'K2', 'K3', 'K4']);
   assert.equal(state.requests.length, 0);
   await assert.rejects(stat(state.out), { code: 'ENOENT' });
 });
 
 for (const mode of ['json', 'sse-item-done', 'sse-terminal-output']) {
-  test(`${mode}: exact K1-K5 inputs, one shared K4, and isolated recovery`, async t => {
+  test(`${mode}: exact K1-K4 inputs, one shared K3, and isolated recovery`, async t => {
     const state = await setup(t, { mode });
     const args = ['--execute'];
     if (mode === 'json') {
@@ -164,33 +164,33 @@ for (const mode of ['json', 'sse-item-done', 'sse-terminal-output']) {
     assert.equal(manifest.status, 'completed');
     assert.deepEqual(await json(join(state.out, 'snapshots/prefix.json')), prefix);
     assert.equal(results.stages.filter(stage => stage.metrics.kind === 'native').length, 1);
-    assert.equal(results.quizzes.length, 7);
+    assert.equal(results.quizzes.length, 6);
     assert.deepEqual(Object.fromEntries(Object.entries(results.completed_usage_by_kind).map(([kind, value]) => [kind, value.calls])),
-      { summary: 3, native: 1, handoff: 1, control: 2, recovery: 5 });
+      { summary: 2, native: 1, handoff: 1, control: 2, recovery: 4 });
     for (const quiz of results.quizzes) {
       assert.equal(quiz.metrics.status, 'completed');
       assert.equal(quiz.score.total.correct, 2);
       assert.equal(quiz.score.unknown.correct, 1);
     }
     const bodies = state.requests.map(request => request.body);
-    assert.equal(bodies.length, 12);
+    assert.equal(bodies.length, 10);
     const generations = bodies.filter(body => !state.isQuiz(body));
-    for (const [index, name] of ['builtin', 'standard', 'claude-code'].entries()) {
+    for (const [index, name] of ['builtin', 'claude-code'].entries()) {
       assert.deepEqual(generations[index].input, [...prefix, ...fixture.thread, message('user', prompts[name])]);
     }
-    assert.deepEqual(generations[3].input, [...prefix, ...fixture.thread, { type: 'compaction_trigger' }]);
-    assert.deepEqual(generations[4].input, [...prefix, ...fixture.retained, checkpoint, message('user', prompts.handoff)]);
+    assert.deepEqual(generations[2].input, [...prefix, ...fixture.thread, { type: 'compaction_trigger' }]);
+    assert.deepEqual(generations[3].input, [...prefix, ...fixture.retained, checkpoint, message('user', prompts.handoff)]);
     assert.equal(bodies.filter(isNative).length, 1);
     const quizzes = bodies.filter(state.isQuiz);
     assert.equal(new Set(quizzes.map(body => body.prompt_cache_key)).size, quizzes.length);
     const quiz = message('user', fixture.quiz);
     assert.deepEqual(quizzes[0].input, [...prefix, quiz]);
     assert.deepEqual(quizzes[1].input, [...prefix, ...fixture.thread, quiz]);
-    for (const [index, id] of ['K1', 'K2', 'K3', 'K4', 'K5'].entries()) {
-      const k = id === 'K4' ? checkpoint : message('user', prompts['summary-prefix'] + '\n\n' + summary(id));
+    for (const [index, id] of ['K1', 'K2', 'K3', 'K4'].entries()) {
+      const k = id === 'K3' ? checkpoint : message('user', prompts['summary-prefix'] + '\n\n' + summary(id));
       assert.deepEqual(quizzes[index + 2].input, [...prefix, k, quiz]);
       const product = await json(join(state.out, `products/${id}.json`));
-      if (id === 'K4') assert.deepEqual(product.checkpoint, checkpoint);
+      if (id === 'K3') assert.deepEqual(product.checkpoint, checkpoint);
       else assert.equal(product.text, summary(id));
     }
     for (const body of bodies) {
@@ -202,7 +202,7 @@ for (const mode of ['json', 'sse-item-done', 'sse-terminal-output']) {
         generationReasoning.encrypted_content, '"expected"', '"evidence"', 'previous_response_id']) {
         assert.ok(!serialized.includes(marker), marker);
       }
-      assert.equal(serialized.includes('RETAINED_U_MARKER'), body === generations[4]);
+      assert.equal(serialized.includes('RETAINED_U_MARKER'), body === generations[3]);
       if (!state.isQuiz(body)) assert.ok(!serialized.includes(fixture.quiz));
       assert.deepEqual(body.input.slice(0, 2), prefix);
       assert.equal(body.tool_choice, state.isQuiz(body) ? 'none' : 'auto');
@@ -234,13 +234,13 @@ for (const mode of ['json', 'sse-item-done', 'sse-terminal-output']) {
   });
 }
 
-test('K5-only runs still generate one K4, but quiz only the selected product', async t => {
+test('K4-only runs still generate one K3, but quiz only the selected product', async t => {
   const state = await setup(t);
-  const result = await state.run(['--execute', '--products', 'K5', '--controls', 'none']);
+  const result = await state.run(['--execute', '--products', 'K4', '--controls', 'none']);
   assert.equal(result.code, 0, result.stderr);
   const results = await json(join(state.out, 'results.json'));
-  assert.deepEqual(results.stages.map(stage => stage.id), ['K4', 'K5']);
-  assert.deepEqual(results.quizzes.map(quiz => quiz.id), ['K5']);
+  assert.deepEqual(results.stages.map(stage => stage.id), ['K3', 'K4']);
+  assert.deepEqual(results.quizzes.map(quiz => quiz.id), ['K4']);
   assert.equal(state.requests.length, 3);
 });
 
@@ -257,7 +257,7 @@ test('quiz scoring uses final_answer text when commentary is also present', asyn
 
 test('usage attribution reports native and text tokens without exposing item IDs', async t => {
   const state = await setup(t, { mode: 'attribution' });
-  const result = await state.run(['--execute', '--products', 'K4,K5', '--controls', 'none']);
+  const result = await state.run(['--execute', '--products', 'K3,K4', '--controls', 'none']);
   assert.equal(result.code, 0, result.stderr);
   const results = await json(join(state.out, 'results.json'));
   assert.equal(results.stages[0].metrics.product_output_kind, 'native');
@@ -300,12 +300,12 @@ for (const option of ['previous_response_id', 'conversation', 'input', 'instruct
   });
 }
 
-test('K5 requires an explicit retained U even when that U is empty', async t => {
+test('K4 requires an explicit retained U even when that U is empty', async t => {
   const { retained: _retained, ...fixtureValue } = fixture;
   const state = await setup(t, { fixtureValue });
   const result = await state.run(['--execute']);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /K5 requires fixture.retained/);
+  assert.match(result.stderr, /K4 requires fixture.retained/);
   assert.equal(state.requests.length, 0);
 });
 
@@ -313,7 +313,7 @@ for (const mode of ['http-failed', 'sse-failed', 'sse-incomplete', 'missing-usag
   'sse-unfinished', 'tool-call', 'refused', 'native-missing-ciphertext', 'native-multiple']) {
   test(`${mode}: failed calls never produce a successful product or quiz`, async t => {
     const state = await setup(t, { mode });
-    const result = await state.run(['--execute', '--products', mode.startsWith('native-') ? 'K4' : 'K1']);
+    const result = await state.run(['--execute', '--products', mode.startsWith('native-') ? 'K3' : 'K1']);
     assert.notEqual(result.code, 0);
     assert.equal((await json(join(state.out, 'manifest.json'))).status, 'failed');
     assert.equal(state.requests.length, 1, 'failure must not trigger a retry or quiz');
@@ -333,32 +333,32 @@ for (const mode of ['http-failed', 'sse-failed', 'sse-incomplete', 'missing-usag
 
 test('a later quiz failure preserves completed products and their usage', async t => {
   const state = await setup(t, { mode: 'quiz-failed' });
-  const result = await state.run(['--execute', '--products', 'K4,K5', '--controls', 'none']);
+  const result = await state.run(['--execute', '--products', 'K3,K4', '--controls', 'none']);
   assert.notEqual(result.code, 0);
   const results = await json(join(state.out, 'results.json'));
-  assert.deepEqual(results.stages.map(stage => stage.id), ['K4', 'K5']);
+  assert.deepEqual(results.stages.map(stage => stage.id), ['K3', 'K4']);
   assert.equal(results.quizzes.length, 0);
   assert.equal(results.failed_requests.length, 1);
   assert.equal(state.requests.length, 3);
-  assert.deepEqual((await json(join(state.out, 'products/K4.json'))).checkpoint, checkpoint);
-  assert.equal((await json(join(state.out, 'products/K5.json'))).text, summary('K5'));
+  assert.deepEqual((await json(join(state.out, 'products/K3.json'))).checkpoint, checkpoint);
+  assert.equal((await json(join(state.out, 'products/K4.json'))).text, summary('K4'));
 });
 
-test('manual reuse after a tool-call failure reads the same five products with seven closed-book calls', async t => {
+test('manual reuse after a tool-call failure reads the same four products with six closed-book calls', async t => {
   const state = await setup(t, { mode: 'quiz-tool-call-once' });
   const failed = await state.run(['--execute']);
   assert.notEqual(failed.code, 0);
   const original = await json(join(state.out, 'results.json'));
-  assert.equal(original.stages.length, 5);
+  assert.equal(original.stages.length, 4);
   assert.equal(original.quizzes.length, 0);
   assert.equal(original.failed_requests.length, 1);
-  assert.equal(state.requests.length, 6, 'failure does not retry');
-  assert.ok(state.requests.slice(0, 5).every(({ body }) => body.tool_choice === 'auto'));
+  assert.equal(state.requests.length, 5, 'failure does not retry');
+  assert.ok(state.requests.slice(0, 4).every(({ body }) => body.tool_choice === 'auto'));
   const out = join(state.root, 'reuse');
   const args = ['--reuse-products', state.out, '--out', out];
   const planned = await state.run(args, { BENCHMARK_URL: '', BENCHMARK_HEADERS: 'invalid JSON' });
   assert.equal(planned.code, 0, planned.stderr);
-  assert.equal(JSON.parse(planned.stdout).request_count, 7);
+  assert.equal(JSON.parse(planned.stdout).request_count, 6);
   await assert.rejects(stat(out), { code: 'ENOENT' });
   const result = await state.run([...args, '--execute']);
   assert.equal(result.code, 0, result.stderr);
@@ -369,9 +369,9 @@ test('manual reuse after a tool-call failure reads the same five products with s
   assert.match(manifest.reuse_products.manifest_sha256, /^[0-9a-f]{64}$/);
   assert.equal(manifest.request_options.tool_choice, 'auto');
   assert.equal(manifest.recovery_request_options.tool_choice, 'none');
-  assert.equal(reused.quizzes.length, 7);
+  assert.equal(reused.quizzes.length, 6);
   assert.deepEqual(Object.fromEntries(Object.entries(reused.completed_usage_by_kind).map(([kind, value]) => [kind, value.calls])),
-    { control: 2, recovery: 5 });
+    { control: 2, recovery: 4 });
   for (const [index, stage] of reused.stages.entries()) {
     assert.equal(stage.reused, true);
     assert.deepEqual(stage.metrics, original.stages[index].metrics);
@@ -380,11 +380,11 @@ test('manual reuse after a tool-call failure reads the same five products with s
     assert.match(stage.source.sha256, /^[0-9a-f]{64}$/);
     assert.equal(await readFile(join(out, stage.artifact), 'utf8'), await readFile(join(state.out, stage.artifact), 'utf8'));
   }
-  const quizzes = state.requests.slice(6).map(({ body }) => body);
-  assert.equal(quizzes.length, 7);
+  const quizzes = state.requests.slice(5).map(({ body }) => body);
+  assert.equal(quizzes.length, 6);
   assert.ok(quizzes.every(body => state.isQuiz(body) && body.tool_choice === 'none'));
-  for (const [index, id] of ['K1', 'K2', 'K3', 'K4', 'K5'].entries()) {
-    const k = id === 'K4' ? checkpoint : message('user', prompts['summary-prefix'] + '\n\n' + summary(id));
+  for (const [index, id] of ['K1', 'K2', 'K3', 'K4'].entries()) {
+    const k = id === 'K3' ? checkpoint : message('user', prompts['summary-prefix'] + '\n\n' + summary(id));
     assert.deepEqual(quizzes[index + 2].input, [...prefix, k, message('user', fixture.quiz)]);
   }
   assert.ok(!JSON.stringify(quizzes).includes(generationReasoning.encrypted_content));
@@ -394,11 +394,11 @@ test('manual reuse after a tool-call failure reads the same five products with s
   const selected = await state.run(['--execute', '--reuse-products', state.out, '--out', join(state.root, 'one'),
     '--products', 'K1', '--controls', 'none']);
   assert.equal(selected.code, 0, selected.stderr);
-  assert.equal(state.requests.length, 14, 'selected-product reuse makes only one additional quiz call');
+  assert.equal(state.requests.length, 12, 'selected-product reuse makes only one additional quiz call');
   assert.deepEqual((await json(join(state.root, 'one/results.json'))).stages.map(stage => stage.id), ['K1']);
 });
 
-for (const mismatch of ['fixture', 'model', 'prompt', 'prefix', 'options', 'empty-product']) {
+for (const mismatch of ['fixture', 'model', 'definitions', 'prompt', 'prefix', 'options', 'empty-product']) {
   test(`reuse rejects ${mismatch} mismatch before any API call`, async t => {
     const state = await setup(t);
     const initial = await state.run(['--execute', '--products', 'K1', '--controls', 'none']);
@@ -406,6 +406,11 @@ for (const mismatch of ['fixture', 'model', 'prompt', 'prefix', 'options', 'empt
     const args = ['--execute', '--reuse-products', state.out, '--out', join(state.root, 'reuse'), '--products', 'K1'];
     if (mismatch === 'fixture') await writeFile(join(state.root, 'fixture.json'), JSON.stringify({ ...fixture, id: 'other-fixture' }));
     if (mismatch === 'model') args.push('--model', 'other-model');
+    if (mismatch === 'definitions') {
+      const manifest = await json(join(state.out, 'manifest.json'));
+      manifest.definitions.K2.prompt = 'standard';
+      await writeFile(join(state.out, 'manifest.json'), JSON.stringify(manifest));
+    }
     if (mismatch === 'prefix') await writeFile(join(state.root, 'instructions.txt'), 'Different instructions.');
     if (mismatch === 'options') {
       await writeFile(join(state.root, 'options.json'), JSON.stringify({ reasoning: { effort: 'high' } }));
@@ -422,22 +427,23 @@ for (const mismatch of ['fixture', 'model', 'prompt', 'prefix', 'options', 'empt
     const result = await state.run(args, { BENCHMARK_URL: '', BENCHMARK_HEADERS: 'invalid JSON' });
     assert.notEqual(result.code, 0);
     assert.match(result.stderr, /Reuse source/);
+    if (mismatch === 'definitions') assert.match(result.stderr, /does not match current definitions/);
     assert.equal(state.requests.length, 2);
     await assert.rejects(stat(join(state.root, 'reuse')), { code: 'ENOENT' });
   });
 }
 
-test('reuse rejects K5 paired with a different native checkpoint', async t => {
+test('reuse rejects K4 paired with a different native checkpoint', async t => {
   const state = await setup(t);
-  const initial = await state.run(['--execute', '--products', 'K5', '--controls', 'none']);
+  const initial = await state.run(['--execute', '--products', 'K4', '--controls', 'none']);
   assert.equal(initial.code, 0, initial.stderr);
-  const product = await json(join(state.out, 'products/K4.json'));
+  const product = await json(join(state.out, 'products/K3.json'));
   product.checkpoint.encrypted_content = 'different-synthetic-checkpoint';
-  await writeFile(join(state.out, 'products/K4.json'), JSON.stringify(product));
-  const result = await state.run(['--execute', '--products', 'K5', '--controls', 'none',
+  await writeFile(join(state.out, 'products/K3.json'), JSON.stringify(product));
+  const result = await state.run(['--execute', '--products', 'K4', '--controls', 'none',
     '--reuse-products', state.out, '--out', join(state.root, 'reuse')]);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /K5 does not depend on the same K4/);
+  assert.match(result.stderr, /K4 does not depend on the same K3/);
   assert.equal(state.requests.length, 3);
 });
 

@@ -1,0 +1,10 @@
+{
+  "type": "compaction",
+  "ciphertext_characters": 32268,
+  "replayable": false,
+  "source": {
+    "experiment": "replication",
+    "case": "normal-r2",
+    "arm": "K3"
+  }
+}

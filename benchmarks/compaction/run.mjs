@@ -10,12 +10,11 @@ import { score } from './score.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const definitions = {
   K1: { kind: 'summary', source: 'full history', prompt: 'builtin' },
-  K2: { kind: 'summary', source: 'full history', prompt: 'standard' },
-  K3: { kind: 'summary', source: 'full history', prompt: 'claude-code' },
-  K4: { kind: 'native', source: 'full history', trigger: 'compaction_trigger' },
-  K5: { kind: 'handoff', source: 'retained U + the same K4', prompt: 'handoff', dependency: 'K4' },
+  K2: { kind: 'summary', source: 'full history', prompt: 'claude-code' },
+  K3: { kind: 'native', source: 'full history', trigger: 'compaction_trigger' },
+  K4: { kind: 'handoff', source: 'retained U + the same K3', prompt: 'handoff', dependency: 'K3' },
 };
-const promptNames = ['builtin', 'standard', 'claude-code', 'handoff', 'summary-prefix'];
+const promptNames = ['builtin', 'claude-code', 'handoff', 'summary-prefix'];
 const defaultOptions = {
   reasoning: { effort: 'medium', summary: 'auto', context: 'all_turns' },
   tool_choice: 'auto', parallel_tool_calls: false, include: ['reasoning.encrypted_content'],
@@ -46,16 +45,16 @@ function argumentsFor(argv) {
   } });
   if (values.help) {
     console.log('node benchmarks/compaction/run.mjs --fixture FILE --out NEW_DIR --model NAME\n'
-      + '  [--questions FILE] [--products K1,K2,K3,K4,K5] [--controls empty,full|none]\n'
+      + '  [--questions FILE] [--products K1,K2,K3,K4] [--controls empty,full|none]\n'
       + '  [--instructions FILE] [--options JSON_FILE] [--reuse-products RUN_DIR]\n'
       + '  [--url-env BENCHMARK_URL] [--headers-env BENCHMARK_HEADERS] [--execute]\n'
       + 'Without --execute: offline plan only. All products and both controls are selected by default.\n'
-      + 'Product quizzes use only their K plus the recorded constant prefix. K5 requires fixture.retained.\n'
+      + 'Product quizzes use only their K plus the recorded constant prefix. K4 requires fixture.retained.\n'
       + 'The URL must be a full Responses Lite /responses endpoint.');
     return null;
   }
   for (const name of ['fixture', 'out', 'model']) if (!values[name]) throw new Error(`Missing --${name}`);
-  values.products = select(values.products ?? 'K1,K2,K3,K4,K5', Object.keys(definitions), 'products');
+  values.products = select(values.products ?? 'K1,K2,K3,K4', Object.keys(definitions), 'products');
   values.controls = values.controls === 'none' ? [] : select(values.controls ?? 'empty,full', ['empty', 'full'], 'controls');
   values['url-env'] ??= 'BENCHMARK_URL';
   values['headers-env'] ??= 'BENCHMARK_HEADERS';
@@ -86,8 +85,8 @@ async function reuseProducts(directory, plan, hashes) {
     const artifact = `products/${id}.json`;
     const bytes = await readFile(join(run, artifact));
     const product = JSON.parse(bytes);
-    if (!object(product) || product.id !== id || product.kind !== (id === 'K4' ? 'native' : 'text')
-        || (id === 'K4' ? !object(product.checkpoint)
+    if (!object(product) || product.id !== id || product.kind !== (id === 'K3' ? 'native' : 'text')
+        || (id === 'K3' ? !object(product.checkpoint)
           || !['compaction', 'compaction_summary'].includes(product.checkpoint.type)
           || typeof product.checkpoint.encrypted_content !== 'string' || !product.checkpoint.encrypted_content
           : typeof product.text !== 'string' || !product.text.trim())) {
@@ -96,10 +95,10 @@ async function reuseProducts(directory, plan, hashes) {
     reused.push({ product, stage: { id, artifact, metrics: stages[0].metrics, reused: true,
       source: { run, artifact, sha256: sha256(bytes) } } });
   }
-  const native = reused.find(({ product }) => product.id === 'K4')?.product;
-  const handoff = reused.find(({ product }) => product.id === 'K5')?.product;
+  const native = reused.find(({ product }) => product.id === 'K3')?.product;
+  const handoff = reused.find(({ product }) => product.id === 'K4')?.product;
   if (handoff && handoff.native_dependency_sha256 !== sha256(JSON.stringify(native.checkpoint))) {
-    throw new Error('Reuse source K5 does not depend on the same K4');
+    throw new Error('Reuse source K4 does not depend on the same K3');
   }
   plan.reuse_products = { run, manifest_sha256: sha256(manifestBytes) };
   return reused;
@@ -115,8 +114,8 @@ async function prepare(args) {
       || fixture.retained.some(item => !object(item) || item.role !== 'user'))) {
     throw new Error('retained must contain only user items');
   }
-  if (args.products.includes('K5') && !Array.isArray(fixture.retained)) {
-    throw new Error('K5 requires fixture.retained; generate the fixture with --retained-tokens');
+  if (args.products.includes('K4') && !Array.isArray(fixture.retained)) {
+    throw new Error('K4 requires fixture.retained; generate the fixture with --retained-tokens');
   }
   const questionsBytes = args.questions ? await readFile(resolve(args.questions)) : null;
   const questionnaire = questionsBytes ? JSON.parse(questionsBytes) : fixture;
@@ -148,7 +147,7 @@ async function prepare(args) {
     ...(fixture.tools.length ? [{ type: 'additional_tools', role: 'developer', tools: fixture.tools }] : []),
     { type: 'message', role: 'developer', content: [{ type: 'input_text', text: instructions }] }];
   const full = [...prefix, ...fixture.thread];
-  const stages = Object.keys(definitions).filter(id => args.products.includes(id) || (id === 'K4' && args.products.includes('K5')));
+  const stages = Object.keys(definitions).filter(id => args.products.includes(id) || (id === 'K3' && args.products.includes('K4')));
   const quizzes = [...args.controls.map(id => `control-${id}`), ...args.products];
   const hashes = { fixture: sha256(fixtureBytes), questions: sha256(JSON.stringify(questions)), quiz: sha256(quiz),
     instructions: sha256(instructions), options: sha256(JSON.stringify(effectiveOptions)),
@@ -224,7 +223,7 @@ function assistantText(output, kind) {
   return text;
 }
 
-async function request(url, headers, out, label, body, kind) {
+export async function request(url, headers, out, label, body, kind) {
   const directory = join(out, 'requests', label);
   await mkdir(directory, { mode: 0o700 });
   await save(join(directory, 'request.json'), body);
@@ -356,7 +355,7 @@ async function execute(args, data) {
     hashes };
   const results = { fixture_id: fixture.id, model: args.model, products: args.products,
     stages: [], quizzes: [], failed_requests: [], completed_usage_by_kind: {},
-    cost_note: 'Usage is reported per call and by kind. No token-to-dollar conversion is assumed; native K4 is generated once and shared with K5.' };
+    cost_note: 'Usage is reported per call and by kind. No token-to-dollar conversion is assumed; native K3 is generated once and shared with K4.' };
   await save(join(out, 'manifest.json'), manifest);
   const persist = async () => {
     results.completed_usage_by_kind = usageTotals(results);
@@ -378,17 +377,17 @@ async function execute(args, data) {
     await persist();
     for (const id of reused.length ? [] : plan.stages) {
       const definition = definitions[id];
-      const input = id === 'K4' ? [...full, { type: 'compaction_trigger' }]
-        : id === 'K5' ? [...prefix, ...fixture.retained, products.get('K4').checkpoint, user(prompts.handoff)]
+      const input = id === 'K3' ? [...full, { type: 'compaction_trigger' }]
+        : id === 'K4' ? [...prefix, ...fixture.retained, products.get('K3').checkpoint, user(prompts.handoff)]
           : [...full, user(prompts[definition.prompt])];
       const result = await call(`generate-${id}`, bodyFor(input), definition.kind);
       // The product excludes generation reasoning and all other response items.
-      const product = { id, kind: id === 'K4' ? 'native' : 'text',
-        ...(id === 'K4' ? { checkpoint: result.checkpoint } : { text: result.text }),
-        ...(id === 'K5' ? { native_dependency_sha256: sha256(JSON.stringify(products.get('K4').checkpoint)) } : {}) };
+      const product = { id, kind: id === 'K3' ? 'native' : 'text',
+        ...(id === 'K3' ? { checkpoint: result.checkpoint } : { text: result.text }),
+        ...(id === 'K4' ? { native_dependency_sha256: sha256(JSON.stringify(products.get('K3').checkpoint)) } : {}) };
       products.set(id, product);
       await save(join(out, `products/${id}.json`), product);
-      if (id !== 'K4') await save(join(out, `products/${id}.txt`), result.text);
+      if (id !== 'K3') await save(join(out, `products/${id}.txt`), result.text);
       results.stages.push({ id, artifact: `products/${id}.json`, metrics: result.metrics });
       await persist();
       console.log(JSON.stringify({ completed: `generate-${id}`, metrics: result.metrics }));
@@ -429,4 +428,6 @@ async function main() {
   if (args.execute) await execute(args, data);
 }
 
-main().catch(error => { console.error(error.message); process.exitCode = 1; });
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch(error => { console.error(error.message); process.exitCode = 1; });
+}

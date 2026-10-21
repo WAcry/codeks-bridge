@@ -1,0 +1,12 @@
+{
+  "type": "compaction",
+  "ciphertext_characters": 129912,
+  "replayable": false,
+  "source": {
+    "experiment": "initial-medium-five-product",
+    "case": "stress",
+    "seed": 3617031,
+    "repeat": 1,
+    "arm": "K4"
+  }
+}

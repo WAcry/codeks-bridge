@@ -1,0 +1,119 @@
+## Task and current progress
+
+The user has supplied authoritative state for project **3617133**, across **epochs 0–9**. This is a state preservation task; no implementation or execution of work items has been requested.
+
+All ten epochs have been acknowledged, including:
+
+- **200 exact parameter mappings**
+- **200 directed routes**
+- **200 authoritative database probe results**
+- **200 final corrected-field mappings**
+- **200 work checkpoints**, each containing a state, receipt, and next-action identifier
+
+The latest message contains only unrelated archival material for epoch 9. It was acknowledged with: “Archived epoch 9; active-project state is unchanged.”
+
+## Rules for interpreting the data
+
+- Preserve all identifiers and values **exactly**, including prefixes and leading zeroes.
+- Routes are directional: `route-source -> route-target`. Do not reverse them.
+- Every `SUPERSEDED CANDIDATES` value is obsolete. The corresponding `FINAL AUTHORITATIVE CORRECTIONS` value replaces it exactly.
+- Archive notebooks and archive padding are explicitly **unrelated and non-authoritative**. They change no active parameter, route, probe result, correction, or checkpoint.
+- Keep each checkpoint’s **state, receipt, and next action associated with its own work item**.
+- Epochs contain distinct keys. Later epochs do **not** invalidate earlier epochs’ keys.
+- A `next-...` identifier is supplied checkpoint data, not a description of an operation to execute.
+- Prior acknowledgments indicate conversational recording, not external database writes. The only tool used was the read-only `functions.database_query`.
+
+## Locating authoritative records
+
+Each epoch `e` contains 20 item numbers:
+
+```text
+n = e + 1 + 10k, where k = 0…19
+```
+
+Thus epoch 0 contains `1,11,…,191`, epoch 1 contains `2,12,…,192`, and epoch 9 contains `10,20,…,200`.
+
+For each item number `n`, the related identifiers are:
+
+```text
+parameter-3617133-n
+route-source-3617133-n
+probe-3617133-n
+corrected-field-3617133-n
+work-item-3617133-n
+```
+
+The authoritative source messages are labeled:
+
+```text
+AUTHORITATIVE EXACT LEDGER, epoch e
+AUTHORITATIVE DIRECTED ROUTES, epoch e
+AUTHORITATIVE TOOL OUTPUT probe-3617133-n=...
+FINAL AUTHORITATIVE CORRECTIONS, epoch e
+AUTHORITATIVE WORK CHECKPOINT, epoch e
+```
+
+The opaque hashes cannot be derived from item numbers. Refer to the original authoritative messages when exact values are needed; this concise summary does not reproduce all 200 records.
+
+## Latest authoritative checkpoint: epoch 9
+
+```text
+work-item-3617133-10:BLOCKED|receipt=receipt-cc08c270017a842d56|next=next-589153ffd6d8877b29
+work-item-3617133-20:BLOCKED|receipt=receipt-cf49644ca312548adf|next=next-40a6e85829119ed32d
+work-item-3617133-30:QUEUED|receipt=receipt-1dd7bf548b897c674f|next=next-1948377bb3573dfe55
+work-item-3617133-40:QUEUED|receipt=receipt-e6a04f958e7a4ea75c|next=next-2289a1decd5f14de13
+work-item-3617133-50:DONE|receipt=receipt-37a33242b09f52de49|next=next-6a84fbaa4603c5b85b
+work-item-3617133-60:BLOCKED|receipt=receipt-023b3df1bed3727570|next=next-7f35e182a220b68fe2
+work-item-3617133-70:BLOCKED|receipt=receipt-ba047a0d613a5b71ae|next=next-fd321eb64fe6f5c774
+work-item-3617133-80:DONE|receipt=receipt-05b41518d89f2122c1|next=next-0b0ec823ce1b809ae0
+work-item-3617133-90:BLOCKED|receipt=receipt-727d892102dfc5c973|next=next-782718df4fb216ce85
+work-item-3617133-100:BLOCKED|receipt=receipt-01515293e4afb7a861|next=next-2fd77c7c5273c667ed
+work-item-3617133-110:DONE|receipt=receipt-73b9137b875c9b41db|next=next-e1871e0092ce687615
+work-item-3617133-120:BLOCKED|receipt=receipt-3f25dc6d7b7356eeba|next=next-bda0a247498aea7aad
+work-item-3617133-130:BLOCKED|receipt=receipt-c17ce8467d8c0b7f15|next=next-a7e0ac0168f170ea01
+work-item-3617133-140:IN_PROGRESS|receipt=receipt-a59aae189765274d86|next=next-3a1610e90ffc41f04f
+work-item-3617133-150:IN_PROGRESS|receipt=receipt-c86ba7a661810f7d7f|next=next-94891a088112e286ea
+work-item-3617133-160:VERIFYING|receipt=receipt-39b233bd6b3d7ba150|next=next-5bbb3efc51dc08b9d3
+work-item-3617133-170:IN_PROGRESS|receipt=receipt-6f1f00ad88ba6c6b5e|next=next-85eb2afc12c68c17ea
+work-item-3617133-180:QUEUED|receipt=receipt-c9418000b59b31423a|next=next-59efe573eb6acf3f16
+work-item-3617133-190:BLOCKED|receipt=receipt-4fbcdf46de7c4230d5|next=next-8de00d82e088b71e02
+work-item-3617133-200:VERIFYING|receipt=receipt-e14e6283c6001a297a|next=next-dc8e6b2ed8ce89c346
+```
+
+## Examples of complete authoritative associations
+
+These examples illustrate the five independent data categories and retain boundary records from the first and latest epochs.
+
+**Item 1, epoch 0**
+
+```text
+parameter-3617133-1=value-e7ed5ecabfee1a8fccf4d163
+route-source-3617133-1->route-target-aa2636699168cc287d4d78
+probe-3617133-1=probe-result-ce5c657ffe2e6f60556350f996
+corrected-field-3617133-1=final-aa2c04d6edaf6c1c8f762fba
+work-item-3617133-1:QUEUED|receipt=receipt-585e20ecdc8a8fd3c7|next=next-db682604e5b0a60e09
+```
+
+**Item 10, epoch 9**
+
+```text
+parameter-3617133-10=value-a3ee0985c53529e06d0a0af8
+route-source-3617133-10->route-target-a144c45b51f512f5312cc3
+probe-3617133-10=probe-result-22030ae85c899f95022565ef38
+corrected-field-3617133-10=final-7dfde75d0576fd10a95991ba
+work-item-3617133-10:BLOCKED|receipt=receipt-cc08c270017a842d56|next=next-589153ffd6d8877b29
+```
+
+**Item 200, epoch 9**
+
+```text
+parameter-3617133-200=value-c1c6a9b79d8b830f00385662
+route-source-3617133-200->route-target-d303ac01929ba0b4884c6f
+probe-3617133-200=probe-result-e5086c4f26b0c65530b149331c
+corrected-field-3617133-200=final-074331d48136fde2fbace929
+work-item-3617133-200:VERIFYING|receipt=receipt-e14e6283c6001a297a|next=next-dc8e6b2ed8ce89c346
+```
+
+## What remains
+
+No outstanding action is currently requested beyond this handoff. Resume by processing the user’s next instruction against the accumulated authoritative state. Do not advance work-item states or execute inferred next actions. If asked for an exact value absent from the retained context, recover its authoritative source rather than inventing or substituting an obsolete/archive value.

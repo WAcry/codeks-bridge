@@ -59,7 +59,7 @@
       "sha256": "2ce9019d2ea8ff6a70f204bf3ab731f09cc0e2f3869f4a67dea655db021ad0a7",
       "utf8_bytes": 6369,
       "characters": 6361,
-      "source": "用户提供的 Claude Code 式完整 prompt；按提供内容保存，不声称对应某个官方发布版本。"
+      "source": "基于用户提供的 Claude Code 式完整 prompt，不声称对应某个官方发布版本。实际快照有一处示例占位措辞差异：原文 [User feedback on the error if any]，实际 [User feedback on the fix, if any]。保留实测字节。"
     },
     "handoff": {
       "file": "handoff.txt",
@@ -70,7 +70,7 @@
     }
   },
   "notes": [
-    "Historical snapshots and the current five-product prompt set are frozen separately; exact UTF-8 bytes, including trailing whitespace, are hashed.",
+    "Historical and current prompt snapshots are frozen; exact UTF-8 bytes, including trailing whitespace, are hashed.",
     "handoff-user-v1 is the tested user candidate. It does not include the later production text-only suffix.",
     "base-instructions is the historical public catalog template and is separate from the compaction prompt."
   ],

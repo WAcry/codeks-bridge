@@ -1,0 +1,1656 @@
+{
+  "schema_version": 1,
+  "id": "normal",
+  "description": "A fully synthetic TypeScript upload CLI development conversation. Project names, paths, hosts, IDs, commands, and test outputs are fictional narrative data. No model or production system was used to build this fixture.",
+  "thread": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "We are working on Driftship, a TypeScript CLI for uploading a directory to a resumable HTTP object store. Add resumable parallel uploads. Read the repository first. The checkout is /work/driftship and the branch is feature/resumable-upload. Keep zero runtime dependencies and Node 22 or later. Initially I suggest six concurrent requests, eight-mebibyte chunks, and four retries, but inspect the server constraints before deciding. The existing command is driftship push <directory> --to <url>. This round is local development and tests. Do not publish, merge, or push anything to a remote."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "I will trace enumeration, transport, and output first, then place the resume journal between scanning and upload execution. I will preserve the command shape and check the server protocol before finalizing defaults."
+        }
+      ],
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_001",
+      "arguments": "{\"command\": \"git status --short && git branch --show-current && cat package.json\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_001",
+      "output": "feature/resumable-upload\n{\"name\":\"@harbor-lab/driftship\",\"version\":\"0.8.0\",\"type\":\"module\",\"private\":true,\"engines\":{\"node\":\">=22\"},\"dependencies\":{},\"scripts\":{\"build\":\"tsc -p tsconfig.build.json\",\"typecheck\":\"tsc --noEmit\",\"test\":\"node --test test/**/*.test.ts\",\"test:integration\":\"node --test integration/**/*.test.ts\"},\"devDependencies\":{\"typescript\":\"^5.9.0\",\"@types/node\":\"^22.0.0\"}}\nWorking tree clean."
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_002",
+      "arguments": "{\"path\": \"src/scan.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_002",
+      "output": "File: src/scan.ts\nimport { opendir, lstat } from 'node:fs/promises';\nimport { join, relative, sep } from 'node:path';\nexport interface FileEntry { relativePath: string; absolutePath: string; size: number; mtimeNs: bigint; mode: number; }\nexport async function scan(root: string): Promise<FileEntry[]> {\n  const files: FileEntry[] = [];\n  async function visit(directory: string): Promise<void> {\n    for await (const entry of await opendir(directory)) {\n      if (entry.name === '.git' || entry.name === '.driftship') continue;\n      const absolutePath = join(directory, entry.name);\n      const info = await lstat(absolutePath, { bigint: true });\n      if (info.isSymbolicLink()) continue;\n      if (info.isDirectory()) { await visit(absolutePath); continue; }\n      if (!info.isFile()) continue;\n      files.push({ relativePath: relative(root, absolutePath).split(sep).join('/'), absolutePath,\n        size: Number(info.size), mtimeNs: info.mtimeNs, mode: Number(info.mode) });\n    }\n  }\n  await visit(root);\n  files.sort((a,b) => a.relativePath.localeCompare(b.relativePath, 'en'));\n  return files;\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_003",
+      "arguments": "{\"path\": \"src/push.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_003",
+      "output": "File: src/push.ts\nimport { scan } from './scan.ts';\nimport { uploadFile } from './http.ts';\nexport async function push(options: PushOptions): Promise<PushResult> {\n  const files = await scan(options.directory);\n  const receipts = [];\n  for (const file of files) {\n    options.signal.throwIfAborted();\n    if (!options.dryRun) receipts.push(await uploadFile(options.destination, file, options.token, options.signal));\n  }\n  return { files: files.length, bytes: files.reduce((sum,file) => sum+file.size,0), receipts };\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_004",
+      "arguments": "{\"path\": \"docs/server-protocol.md\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_004",
+      "output": "File: docs/server-protocol.md\n# Object store protocol revision 3\nThe base URL contains a tenant prefix, for example https://storage.example.test/tenant-blue/.\nPreserve the entire path. Object names use escaped path segments, not a single escaped slash-containing string. A percent character in a filename is literal and becomes %25. Do not normalize Unicode names.\nGET capabilities returns protocol:3, minimum_chunk_bytes:1048576, maximum_chunk_bytes:16777216, preferred_chunk_bytes:4194304, maximum_parallel_parts:4, checksums:[\"sha256\"].\nPOST uploads receives {path,size,chunk_bytes,sha256}; returns upload_id, expires_at, and committed_parts. Upload IDs are opaque, case-sensitive, and never local paths.\nPUT uploads/{id}/parts/{part} has Content-Length, X-Part-SHA256, and binary body. Numbers are one-based. Only the last part may be short. Exact replay is idempotent for the same upload ID, part number, size, and checksum. Success returns 204, including identical replay. Different checksum returns 422/checksum_mismatch. A different body for an existing part returns 409/part_conflict.\nGET uploads/{id} returns state open|complete|expired, part_size, file_size, file_sha256, and parts [{number,bytes,sha256}], potentially unordered. Complete state also has receipt. Missing session returns 404.\nPOST uploads/{id}/complete receives sorted parts and whole-file sha256. It atomically commits and returns {path,bytes,etag,sha256}. A lost success response can be reconciled by status; do not create a duplicate.\n401/403 are permanent. 408,429,500,502,503,504 may be retried for idempotent PUTs. Retry-After may be delta seconds or an HTTP date. A connection may close after persisting a part. Authenticated writes do not support redirects. Administrative delete/abort endpoints are not part of ordinary client ownership.\nEmpty files use begin/complete with zero parts, SHA-256 of empty bytes, and no zero-byte part 1.\nThe proxy idle timeout is 90 seconds. Responses can arrive incrementally; consume the entire JSON body. JSON bodies are bounded to 1 MiB by the service. Capability discovery is authenticated like writes."
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Use four workers and 4 MiB chunks, matching the server. Four retries means four extra attempts after the initial attempt. Put the journal at .driftship/resume-v1.json inside the source directory, with resume enabled by default. Add --no-resume to start fresh locally; it must not delete or abort remote sessions. Interrupted writes on removable drives matter, so make the journal durable."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "I will use five total attempts with four retries, and one global pool of four requests. The journal will use temporary-file replacement with fsync. I will keep credentials out of state and output."
+        }
+      ],
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_005",
+      "arguments": "{\"path\": \"docs/operational-constraints.md\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_005",
+      "output": "File: docs/operational-constraints.md\nThe token is read from DRIFTSHIP_TOKEN. Never serialize it into journals, progress, error output, or request snapshots. Reject redirects rather than forwarding authorization to another host.\nJSON mode writes complete JSON objects one per stdout line. Human progress goes to stderr, final completion to stdout. Existing consumers use the type discriminator.\nMedian object size in the fixture corpus is 12 KiB. Bound active requests globally across the entire push, not separately per file. Do not launch one worker for every file.\nKeep .git and .driftship excluded. Skip symlinks, FIFOs, and devices; do not follow targets or block on named pipes. Ordinary dotfiles are included. Filenames are data; a literal $(touch unexpected).txt must not run any command.\nTwo names café.csv and café.csv may be different filesystem entries. Preserve what Node reads. Do not guess normalization or deduplicate visually identical names.\nAuthentication is passed in a header, never URL userinfo. The source tree may contain shell hooks; this CLI never executes hooks from uploaded directories.\nEmpty files use no part requests. A receipt still counts as one completed file. Executable permission is recorded locally for diagnostics but not applied remotely: the service stores bytes, not Unix modes."
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_006",
+      "arguments": "{\"path\": \"src/journal.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_006",
+      "output": "File: src/journal.ts\nimport { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';\nimport { dirname, join } from 'node:path';\nimport { randomUUID } from 'node:crypto';\nexport interface JournalPart { number:number; bytes:number; sha256:string; }\nexport interface JournalFile { path:string; size:number; mtimeNs:string; sha256:string; uploadId:string; chunkBytes:number; parts:JournalPart[]; receipt?:Receipt; }\nexport interface Journal { version:1; destination:string; files:Record<string,JournalFile>; }\nexport async function readJournal(path:string):Promise<Journal|undefined> {\n  let body:string;\n  try { body=await readFile(path,'utf8'); }\n  catch(error) { if((error as NodeJS.ErrnoException).code==='ENOENT')return undefined; throw error; }\n  const data=JSON.parse(body) as Journal;\n  if(data.version!==1)throw new Error(`Unsupported journal version ${data.version}`);\n  return data;\n}\nexport async function writeJournal(path:string,state:Journal):Promise<void> {\n  await mkdir(dirname(path),{recursive:true,mode:0o700});\n  const temporary=join(dirname(path),`.resume-${randomUUID()}.tmp`);\n  const file=await open(temporary,'wx',0o600);\n  try { await file.writeFile(JSON.stringify(state)+'\\n'); await file.sync(); }\n  finally { await file.close(); }\n  try { await rename(temporary,path); }\n  catch(error) { await unlink(temporary).catch(()=>{}); throw error; }\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_007",
+      "arguments": "{\"path\": \"src/hash.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_007",
+      "output": "File: src/hash.ts\nimport { createHash } from 'node:crypto';\nimport { createReadStream } from 'node:fs';\nimport { stat } from 'node:fs/promises';\nimport { CliError } from './types.ts';\nexport async function fingerprint(path:string,signal:AbortSignal) {\n  const before=await stat(path,{bigint:true});\n  const hash=createHash('sha256');\n  for await(const chunk of createReadStream(path,{signal}))hash.update(chunk);\n  const after=await stat(path,{bigint:true});\n  if(before.size!==after.size||before.mtimeNs!==after.mtimeNs)throw new CliError('Source changed while hashing','source_changed');\n  return {size:Number(after.size),mtimeNs:String(after.mtimeNs),sha256:hash.digest('hex')};\n}\nexport async function readPart(path:string,offset:number,length:number,signal:AbortSignal) {\n  const chunks:Buffer[]=[];\n  for await(const chunk of createReadStream(path,{start:offset,end:offset+length-1,signal}))chunks.push(Buffer.from(chunk));\n  const body=Buffer.concat(chunks);\n  if(body.length!==length)throw new CliError('Source became shorter','source_changed');\n  return {body,sha256:createHash('sha256').update(body).digest('hex')};\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_008",
+      "arguments": "{\"path\": \"src/retry.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_008",
+      "output": "File: src/retry.ts\nimport { setTimeout } from 'node:timers/promises';\nexport interface RetryOptions { retries:number; signal:AbortSignal; now?:()=>number; random?:()=>number; sleep?:(ms:number,signal:AbortSignal)=>Promise<void>; onRetry?:(attempt:number,delayMs:number)=>void; }\nexport function retryDelay(header:string|null,now:number):number|undefined {\n  if(!header)return undefined;\n  const seconds=Number(header);\n  if(Number.isFinite(seconds)&&seconds>=0)return seconds*1000;\n  const date=Date.parse(header);\n  if(!Number.isNaN(date))return Math.max(0,date-now);\n  return undefined;\n}\nexport async function retry<T>(operation:(attempt:number)=>Promise<T>, classify:(e:unknown)=>{retry:boolean;after?:string},options:RetryOptions):Promise<T> {\n  const now=options.now??Date.now, random=options.random??Math.random;\n  const sleep=options.sleep??((ms,signal)=>setTimeout(ms,undefined,{signal}));\n  for(let attempt=0;;attempt++) {\n    options.signal.throwIfAborted();\n    try {return await operation(attempt);}\n    catch(error) {\n      const decision=classify(error);\n      if(!decision.retry||attempt>=options.retries)throw error;\n      const after=retryDelay(decision.after??null,now());\n      const base=Math.min(30000,500*2**attempt);\n      const delay=after??Math.floor(base*(0.5+random()*0.5));\n      options.onRetry?.(attempt+1,delay);\n      await sleep(delay,options.signal);\n    }\n  }\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_009",
+      "arguments": "{\"path\": \"src/path.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_009",
+      "output": "File: src/path.ts\nimport { CliError } from './types.ts';\nexport function destinationKey(url:URL):string {\n  const result=new URL(url);\n  result.username='';result.password='';result.search='';result.hash='';\n  if(!result.pathname.endsWith('/'))result.pathname+='/';\n  return result.toString();\n}\nexport function objectPath(relativePath:string):string {\n  const parts=relativePath.split('/');\n  if(parts.some(part=>!part||part==='.'||part==='..'))throw new CliError('Invalid source path','invalid_path');\n  return parts.map(encodeURIComponent).join('/');\n}\nexport function endpoint(base:URL,path:string):URL {return new URL(path,new URL(destinationKey(base)));}\nexport function validateDestination(url:URL):void {\n  if(!['http:','https:'].includes(url.protocol))throw new CliError('Destination must use HTTP or HTTPS','invalid_destination');\n  if(url.username||url.password)throw new CliError('Credentials in destination URL unsupported','invalid_destination');\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_010",
+      "arguments": "{\"path\": \"src/pool.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_010",
+      "output": "File: src/pool.ts\nexport async function parallel<T>(values:Iterable<T>,concurrency:number,signal:AbortSignal,work:(value:T)=>Promise<void>):Promise<void> {\n  const iterator=values[Symbol.iterator]();let firstError:unknown;\n  const workers=Array.from({length:concurrency},async()=>{\n    while(!signal.aborted&&firstError===undefined) {\n      const next=iterator.next();if(next.done)return;\n      try {await work(next.value);}catch(error){firstError??=error;}\n    }\n  });\n  await Promise.all(workers);\n  if(firstError!==undefined)throw firstError;\n  signal.throwIfAborted();\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_011",
+      "arguments": "{\"path\": \"src/resume.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_011",
+      "output": "File: src/resume.ts\nimport { CliError } from './types.ts';\nexport function matchesFile(saved:JournalFile,file:Fingerprint,chunkBytes:number):boolean {\n  return saved.size===file.size&&saved.mtimeNs===file.mtimeNs&&saved.sha256===file.sha256&&saved.chunkBytes===chunkBytes;\n}\nexport function validateParts(value:unknown,size:number,chunkBytes:number):JournalPart[] {\n  if(!Array.isArray(value))throw new CliError('Invalid parts response','invalid_response');\n  const total=Math.ceil(size/chunkBytes),seen=new Set<number>(),parts:JournalPart[]=[];\n  for(const raw of value) {\n    if(!raw||typeof raw!=='object')throw new CliError('Malformed part','invalid_response');\n    const part=raw as JournalPart;\n    const expected=part.number===total?size-(part.number-1)*chunkBytes:chunkBytes;\n    if(!Number.isInteger(part.number)||part.number<1||part.number>total||seen.has(part.number)||part.bytes!==expected||!/^[0-9a-f]{64}$/.test(part.sha256))throw new CliError('Inconsistent part list','invalid_response');\n    seen.add(part.number);parts.push(part);\n  }\n  return parts.sort((a,b)=>a.number-b.number);\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_012",
+      "arguments": "{\"path\": \"src/transport.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_012",
+      "output": "File: src/transport.ts\nimport { retry } from './retry.ts';\nimport { endpoint } from './path.ts';\nexport class HttpError extends Error {\n  status:number;code:string;retryAfter?:string;\n  constructor(status:number,code:string,after?:string){super(`HTTP ${status} while uploading`);this.status=status;this.code=code;this.retryAfter=after;}\n}\nexport class Transport {\n  private base:URL;private token?:string;private options:RetryOptions;\n  constructor(base:URL,token:string|undefined,options:RetryOptions){this.base=base;this.token=token;this.options=options;}\n  async request(path:string,method:string,body?:BodyInit,extra?:HeadersInit):Promise<Response> {\n    const headers=new Headers(extra);if(this.token)headers.set('authorization',`Bearer ${this.token}`);\n    const response=await fetch(endpoint(this.base,path),{method,body,headers,signal:this.options.signal,redirect:'error'});\n    if(!response.ok){const data=await response.json().catch(()=>undefined) as any;throw new HttpError(response.status,data?.error?.code??'http_error',response.headers.get('retry-after')??undefined);}\n    return response;\n  }\n  async uploadPart(id:string,number:number,body:Buffer,sha256:string):Promise<void> {\n    await retry(async()=>{const response=await this.request(`uploads/${encodeURIComponent(id)}/parts/${number}`,'PUT',new Uint8Array(body),{'content-length':String(body.length),'x-part-sha256':sha256});await response.body?.cancel();},\n      error=>error instanceof HttpError?{retry:[408,429,500,502,503,504].includes(error.status),after:error.retryAfter}:{retry:error instanceof TypeError},this.options);\n  }\n  async getStatus(id:string){return(await this.request(`uploads/${encodeURIComponent(id)}`,'GET')).json();}\n  async begin(data:unknown){return(await this.request('uploads','POST',JSON.stringify(data),{'content-type':'application/json'})).json();}\n  async complete(id:string,data:unknown){return(await this.request(`uploads/${encodeURIComponent(id)}/complete`,'POST',JSON.stringify(data),{'content-type':'application/json'})).json();}\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_013",
+      "arguments": "{\"command\": \"npm test\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_013",
+      "output": "41 tests, 39 passed, 2 failed.\nFAIL journal concurrent completions: expected parts [1,2], observed [2].\nFAIL destination URL query: missing expected exception.\nPASS Retry-After seconds/date, signal during sleep, filename escaping, empty-file protocol."
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Concurrent workers serialized stale journal snapshots, losing one confirmed part. I will serialize mutations through one queue. URL queries were silently discarded, so I will reject them rather than change a destination invisibly."
+        }
+      ],
+      "phase": "commentary"
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Reject query parameters, fragments, and URL userinfo. Only a trailing slash may be normalized. Authentication stays in DRIFTSHIP_TOKEN. Errors must not echo a supplied URL or token. For resume identity use full SHA-256, size, and nanosecond mtime. The read cost is acceptable. Do not add a database or dependency just to serialize writes."
+        }
+      ]
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_014",
+      "arguments": "{\"path\": \"src/journal-store.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_014",
+      "output": "File: src/journal-store.ts\nimport { writeJournal } from './journal.ts';\nexport class JournalStore {\n  private path:string;private state:Journal;private pending:Promise<void>=Promise.resolve();private failed:unknown;\n  constructor(path:string,state:Journal){this.path=path;this.state=state;}\n  update(change:(state:Journal)=>void):Promise<void> {\n    const operation=this.pending.then(async()=>{if(this.failed!==undefined)throw this.failed;change(this.state);await writeJournal(this.path,this.state);});\n    this.pending=operation.catch(error=>{this.failed=error;});return operation;\n  }\n  async settled(){await this.pending;if(this.failed!==undefined)throw this.failed;}\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_015",
+      "arguments": "{\"command\": \"git diff -- src/journal.ts src/path.ts\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_015",
+      "output": "Journal change: after rename, open parent directory with mode r, await directory.sync(), then close. Temporary file is mode0600; parent created0700. Pending mutations are serialized and fail permanently after the first write error.\nPath change: validate destination before normalization. Reject username/password/search/hash, with error text \"Destination must not contain credentials, a query, or a fragment\". Keep only trailing-slash normalization."
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Exercise lost responses: a part can persist before the socket dies, and completion can succeed before its response disappears. No duplicate objects or skipped parts. Dry-run must make zero network calls and create no .driftship directory; scanning for plan totals is fine."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "The local fake server will maintain remote state independently from response delivery, so tests can distinguish a lost response from a failed write. I will test side effects of dry-run directly."
+        }
+      ],
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_016",
+      "arguments": "{\"path\": \"integration/generated/protocol-01.test.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_016",
+      "output": "File: integration/generated/protocol-01.test.ts\nimport { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { createScenario, readJournal, waitForExit } from './harness.ts';\n\ntest(\"empty-file: zero part requests; empty SHA-256 receipt\", async () => {\n  const fixture = await createScenario({\n    seed: 1847, rootPrefix: 'driftship-empty-file-', tenant: '/tenant-blue/',\n    files: [{ path: \"empty.marker\", bytes: 0, expectedSha256: '467e4079172dd80a8ee707c22d506921c74838162cf5f05fe85917d2f2e32cfc' }],\n    fault: { kind: 'none', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"empty.marker\");\n    assert.equal(receipt.bytes, 0);\n    assert.equal(receipt.sha256, '467e4079172dd80a8ee707c22d506921c74838162cf5f05fe85917d2f2e32cfc');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 0);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 0);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"empty.marker\"].receipt.sha256, receipt.sha256);\n  } finally { await fixture.close(); }\n});\n\ntest(\"exact-boundary: exactly one full-size part\", async () => {\n  const fixture = await createScenario({\n    seed: 1944, rootPrefix: 'driftship-exact-boundary-', tenant: '/tenant-blue/',\n    files: [{ path: \"archive/full.bin\", bytes: 4194304, expectedSha256: 'c2bc39cd8963d697b0b09722285058aa931a5ff67dc26db110b431c3088c7557' }],\n    fault: { kind: 'none', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"archive/full.bin\");\n    assert.equal(receipt.bytes, 4194304);\n    assert.equal(receipt.sha256, 'c2bc39cd8963d697b0b09722285058aa931a5ff67dc26db110b431c3088c7557');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 4194304);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 4194304);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"archive/full.bin\"].receipt.sha256, receipt.sha256);\n  } finally { await fixture.close(); }\n});\n\ntest(\"one-over-boundary: second part is one byte\", async () => {\n  const fixture = await createScenario({\n    seed: 2041, rootPrefix: 'driftship-one-over-boundary-', tenant: '/tenant-blue/',\n    files: [{ path: \"archive/extra.bin\", bytes: 4194305, expectedSha256: '9aed83900a6ad9f8acb027d9981e074da345750fc592af19dc7edffdb32eb0a7' }],\n    fault: { kind: 'none', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"archive/extra.bin\");\n    assert.equal(receipt.bytes, 4194305);\n    assert.equal(receipt.sha256, '9aed83900a6ad9f8acb027d9981e074da345750fc592af19dc7edffdb32eb0a7');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 4194305);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 4194305);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"archive/extra.bin\"].receipt.sha256, receipt.sha256);\n  } finally { await fixture.close(); }\n});\n\ntest(\"tail-short: third part is 1048683 bytes\", async () => {\n  const fixture = await createScenario({\n    seed: 2138, rootPrefix: 'driftship-tail-short-', tenant: '/tenant-blue/',\n    files: [{ path: \"archive/tail.bin\", bytes: 9437291, expectedSha256: '090a082bf5edcabdb14c5b76e4427c0fc73aa9615db77b94180a37d9f22b82a8' }],\n    fault: { kind: 'none', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"archive/tail.bin\");\n    assert.equal(receipt.bytes, 9437291);\n    assert.equal(receipt.sha256, '090a082bf5edcabdb14c5b76e4427c0fc73aa9615db77b94180a37d9f22b82a8');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 9437291);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 9437291);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"archive/tail.bin\"].receipt.sha256, receipt.sha256);\n  } finally { await fixture.close(); }\n});\n\ntest(\"percent-path: percent encoded as %25\", async () => {\n  const fixture = await createScenario({\n    seed: 2235, rootPrefix: 'driftship-percent-path-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/raw%20literal.csv\", bytes: 120331, expectedSha256: '62df49d6366a3228b0e56d8d48edf2a9f619b067c6bb8f12177e6008f2574bbc' }],\n    fault: { kind: 'none', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"data/raw%20literal.csv\");\n    assert.equal(receipt.bytes, 120331);\n    assert.equal(receipt.sha256, '62df49d6366a3228b0e56d8d48edf2a9f619b067c6bb8f12177e6008f2574bbc');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 120331);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 120331);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"data/raw%20literal.csv\"].receipt.sha256, receipt.sha256);\n  } finally { await fixture.close(); }\n});\n\ntest(\"unicode-decomposed: NFD spelling retained\", async () => {\n  const fixture = await createScenario({\n    seed: 2332, rootPrefix: 'driftship-unicode-decomposed-', tenant: '/tenant-blue/',\n    files: [{ path: \"names/café.txt\", bytes: 21117, expectedSha256: '6f7869825629b728de6524ba04e113d5ee565f46b5cd5a2ac64b26581c093229' }],\n    fault: { kind: 'none', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"names/café.txt\");\n    assert.equal(receipt.bytes, 21117);\n    assert.equal(receipt.sha256, '6f7869825629b728de6524ba04e113d5ee565f46b5cd5a2ac64b26581c093229');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 21117);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 21117);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"names/café.txt\"].receipt.sha256, receipt.sha256);\n  } finally { await fixture.close(); }\n});\n\ntest(\"literal-shell: filename never executed\", async () => {\n  const fixture = await createScenario({\n    seed: 2429, rootPrefix: 'driftship-literal-shell-', tenant: '/tenant-blue/',\n    files: [{ path: \"names/$(touch unexpected).txt\", bytes: 9811, expectedSha256: 'dae8d05610af7707790981a27428de4648d04ab4ba1ba5064aa85531f0b5972b' }],\n    fault: { kind: 'none', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"names/$(touch unexpected).txt\");\n    assert.equal(receipt.bytes, 9811);\n    assert.equal(receipt.sha256, 'dae8d05610af7707790981a27428de4648d04ab4ba1ba5064aa85531f0b5972b');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 9811);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 9811);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"names/$(touch unexpected).txt\"].receipt.sha256, receipt.sha256);\n  } finally { await fixture.close(); }\n});\n\ntest(\"part-reset: same bytes retransmitted\", async () => {\n  const fixture = await createScenario({\n    seed: 2526, rootPrefix: 'driftship-part-reset-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/reset.bin\", bytes: 9511173, expectedSha256: 'c4544afc59e83639ca0f816f6fca05e225500b7b23e35ca108e3ffafe5deda56' }],\n    fault: { kind: 'part2_after_commit_reset', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"data/reset.bin\");\n    assert.equal(receipt.bytes, 9511173);\n    assert.equal(receipt.sha256, 'c4544afc59e83639ca0f816f6fca05e225500b7b23e35ca108e3ffafe5deda56');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 9511173);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 9511173);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"data/reset.bin\"].receipt.sha256, receipt.sha256);\n    assert.equal(fixture.attemptsForPart(2), 2);\n    assert.equal(fixture.uniqueBytes(), fixture.sourceBytes());\n  } finally { await fixture.close(); }\n});\n\ntest(\"part-429: delay at least 2000 ms\", async () => {\n  const fixture = await createScenario({\n    seed: 2623, rootPrefix: 'driftship-part-429-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/rate.bin\", bytes: 9511174, expectedSha256: '6049829ec76782b822198cc20a70f6c8514a61bb4734509c4a1b0ab6dfbc430b' }],\n    fault: { kind: '429_retry_after_2', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"data/rate.bin\");\n    assert.equal(receipt.bytes, 9511174);\n    assert.equal(receipt.sha256, '6049829ec76782b822198cc20a70f6c8514a61bb4734509c4a1b0ab6dfbc430b');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 9511174);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 9511174);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"data/rate.bin\"].receipt.sha256, receipt.sha256);\n    assert.ok(fixture.recordedSleeps()[0] >= 2000);\n  } finally { await fixture.close(); }\n});\n\ntest(\"part-401: no retry\", async () => {\n  const fixture = await createScenario({\n    seed: 2720, rootPrefix: 'driftship-part-401-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/unauthorized.bin\", bytes: 9511180, expectedSha256: '95634b7a7d954e5e4c8b7b07dfc842c2416478e5e5dd3e52d4aa02f68fbc4795' }],\n    fault: { kind: '401', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'auth_error');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'auth_error');\n    assert.equal(fixture.committedObjects().length, 0);\n    assert.equal(fixture.failedRequestAttempts(), 1);\n  } finally { await fixture.close(); }\n});\n\ntest(\"part-422: no retry\", async () => {\n  const fixture = await createScenario({\n    seed: 2817, rootPrefix: 'driftship-part-422-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/checksum.bin\", bytes: 9511182, expectedSha256: '490ea5d67f4cbf274e596fea04003f6e0ee55891a3e7f20ccfbe80a19e32c3ae' }],\n    fault: { kind: '422_checksum_mismatch', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'checksum_error');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'checksum_error');\n    assert.equal(fixture.committedObjects().length, 0);\n    assert.equal(fixture.failedRequestAttempts(), 1);\n  } finally { await fixture.close(); }\n});\n\ntest(\"redirect: token never forwarded\", async () => {\n  const fixture = await createScenario({\n    seed: 2914, rootPrefix: 'driftship-redirect-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/redirect.bin\", bytes: 9511184, expectedSha256: '0e88be9423bcfacd3213d7762a4b7cd9eab2510c96e10e9f44e74e39eb4cd8a0' }],\n    fault: { kind: '307_other_origin', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'redirect_error');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'redirect_error');\n    assert.equal(fixture.committedObjects().length, 0);\n  } finally { await fixture.close(); }\n});"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_017",
+      "arguments": "{\"path\": \"integration/generated/protocol-02.test.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_017",
+      "output": "File: integration/generated/protocol-02.test.ts\nimport { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { createScenario, readJournal, waitForExit } from './harness.ts';\n\ntest(\"status-unsorted: sort before completion\", async () => {\n  const fixture = await createScenario({\n    seed: 3011, rootPrefix: 'driftship-status-unsorted-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/unordered.bin\", bytes: 12582913, expectedSha256: '8feb465b09effbdea40085a25001489680fd21be4cb245161db47d589c8c4a11' }],\n    fault: { kind: 'status_parts_3_1_2', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"data/unordered.bin\");\n    assert.equal(receipt.bytes, 12582913);\n    assert.equal(receipt.sha256, '8feb465b09effbdea40085a25001489680fd21be4cb245161db47d589c8c4a11');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 12582913);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 12582913);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"data/unordered.bin\"].receipt.sha256, receipt.sha256);\n  } finally { await fixture.close(); }\n});\n\ntest(\"status-duplicate: reject duplicate index\", async () => {\n  const fixture = await createScenario({\n    seed: 3108, rootPrefix: 'driftship-status-duplicate-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/duplicate.bin\", bytes: 12582914, expectedSha256: 'a6c40452d66a0d8d389fa9682a47e40780ea7409b85fe59801564fa0e6e7e57e' }],\n    fault: { kind: 'status_duplicate_part', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'invalid_response');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'invalid_response');\n    assert.equal(fixture.committedObjects().length, 0);\n  } finally { await fixture.close(); }\n});\n\ntest(\"resume-same: upload missing parts only\", async () => {\n  const fixture = await createScenario({\n    seed: 3205, rootPrefix: 'driftship-resume-same-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/unchanged.bin\", bytes: 12582919, expectedSha256: '263b47543f655034e5de6df98def709ff23bb67f301996b4d504ab02a76d6a24' }],\n    fault: { kind: 'preexisting_parts_1_3', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"data/unchanged.bin\");\n    assert.equal(receipt.bytes, 12582919);\n    assert.equal(receipt.sha256, '263b47543f655034e5de6df98def709ff23bb67f301996b4d504ab02a76d6a24');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 12582919);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 12582919);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"data/unchanged.bin\"].receipt.sha256, receipt.sha256);\n  } finally { await fixture.close(); }\n});\n\ntest(\"resume-mtime: new session despite same hash\", async () => {\n  const fixture = await createScenario({\n    seed: 3302, rootPrefix: 'driftship-resume-mtime-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/touched.bin\", bytes: 12582921, expectedSha256: '19ccee6fea488b1ff0f366ac1cca5235808a0100433cbd3dc0c1c0dd2b32c7a9' }],\n    fault: { kind: 'local_mtime_changed', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"data/touched.bin\");\n    assert.equal(receipt.bytes, 12582921);\n    assert.equal(receipt.sha256, '19ccee6fea488b1ff0f366ac1cca5235808a0100433cbd3dc0c1c0dd2b32c7a9');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 12582921);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 12582921);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"data/touched.bin\"].receipt.sha256, receipt.sha256);\n  } finally { await fixture.close(); }\n});\n\ntest(\"resume-expired: new session; no cleanup call\", async () => {\n  const fixture = await createScenario({\n    seed: 3399, rootPrefix: 'driftship-resume-expired-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/expired.bin\", bytes: 12582924, expectedSha256: 'a58c9821423c1fc7dce75a92563ea1f59425eb142e169982a1906ab0a042a5ef' }],\n    fault: { kind: 'status_expired', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"data/expired.bin\");\n    assert.equal(receipt.bytes, 12582924);\n    assert.equal(receipt.sha256, 'a58c9821423c1fc7dce75a92563ea1f59425eb142e169982a1906ab0a042a5ef');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 12582924);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 12582924);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"data/expired.bin\"].receipt.sha256, receipt.sha256);\n  } finally { await fixture.close(); }\n});\n\ntest(\"resume-complete: reuse receipt; no complete POST\", async () => {\n  const fixture = await createScenario({\n    seed: 3496, rootPrefix: 'driftship-resume-complete-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/already.bin\", bytes: 12582926, expectedSha256: 'bdf262a3619de5f71f29b86a2e613eb3e5167732585cbc08420584799cabb7d9' }],\n    fault: { kind: 'status_complete', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"data/already.bin\");\n    assert.equal(receipt.bytes, 12582926);\n    assert.equal(receipt.sha256, 'bdf262a3619de5f71f29b86a2e613eb3e5167732585cbc08420584799cabb7d9');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 12582926);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 12582926);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"data/already.bin\"].receipt.sha256, receipt.sha256);\n    assert.equal(requests.filter(request => request.path.endsWith('/complete')).length, 0);\n  } finally { await fixture.close(); }\n});\n\ntest(\"complete-lost: one status read; no duplicate POST\", async () => {\n  const fixture = await createScenario({\n    seed: 3593, rootPrefix: 'driftship-complete-lost-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/commit-lost.bin\", bytes: 12582927, expectedSha256: '6c38441fcd2e13cb096994f42b45cb26c3498b4e860628e8ac4faa47476a8f6f' }],\n    fault: { kind: 'complete_after_commit_reset', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"data/commit-lost.bin\");\n    assert.equal(receipt.bytes, 12582927);\n    assert.equal(receipt.sha256, '6c38441fcd2e13cb096994f42b45cb26c3498b4e860628e8ac4faa47476a8f6f');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 12582927);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 12582927);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"data/commit-lost.bin\"].receipt.sha256, receipt.sha256);\n    assert.equal(fixture.completionAttempts(), 1);\n    assert.equal(fixture.reconciliationReads(), 1);\n  } finally { await fixture.close(); }\n});\n\ntest(\"journal-write: no new scheduling\", async () => {\n  const fixture = await createScenario({\n    seed: 3690, rootPrefix: 'driftship-journal-write-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/diskfull.bin\", bytes: 12582928, expectedSha256: 'b42020ff965558076fe8f2dd27be1147952703ed53ed8aaece5e340b0ec20cb6' }],\n    fault: { kind: 'local_ENOSPC_after_part', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'io_error');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'io_error');\n    assert.equal(fixture.committedObjects().length, 0);\n  } finally { await fixture.close(); }\n});\n\ntest(\"journal-corrupt: do not overwrite checkpoint\", async () => {\n  const fixture = await createScenario({\n    seed: 3787, rootPrefix: 'driftship-journal-corrupt-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/corrupt.bin\", bytes: 12582929, expectedSha256: '5220805d1ff36ee158ea7b22fea97ec1a5e45d6c54a8587dae9673fda14aebd3' }],\n    fault: { kind: 'journal_invalid_json', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'journal_invalid');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'journal_invalid');\n    assert.equal(fixture.committedObjects().length, 0);\n    assert.equal(await fixture.journalText(), fixture.originalJournalText);\n  } finally { await fixture.close(); }\n});\n\ntest(\"journal-newer: do not downgrade\", async () => {\n  const fixture = await createScenario({\n    seed: 3884, rootPrefix: 'driftship-journal-newer-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/future.bin\", bytes: 12582930, expectedSha256: 'deaba5da4c5fcd37b053b01fce666825272ca4161e1b27c20713116d78be5c14' }],\n    fault: { kind: 'journal_version_2', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'journal_unsupported');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'journal_unsupported');\n    assert.equal(fixture.committedObjects().length, 0);\n    assert.equal(await fixture.journalText(), fixture.originalJournalText);\n  } finally { await fixture.close(); }\n});\n\ntest(\"destination: explicit local restart required\", async () => {\n  const fixture = await createScenario({\n    seed: 3981, rootPrefix: 'driftship-destination-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/moved.bin\", bytes: 12582931, expectedSha256: 'dd6720504807ebfee13e812dcac8756069cc7392485690807d2e0c0604a8bf11' }],\n    fault: { kind: 'journal_other_tenant', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'destination_mismatch');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'destination_mismatch');\n    assert.equal(fixture.committedObjects().length, 0);\n  } finally { await fixture.close(); }\n});\n\ntest(\"fifo: never open blocking pipe\", async () => {\n  const fixture = await createScenario({\n    seed: 4078, rootPrefix: 'driftship-fifo-', tenant: '/tenant-blue/',\n    files: [{ path: \"special/pipe\", bytes: 0, expectedSha256: 'c77310d2260ae22b67e2cf44d939e48b3d55f2027d6767bde6bdac540e7853c6' }],\n    fault: { kind: 'named_pipe', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'skipped');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(requests.length, 0);\n    assert.equal(fixture.openedTargets().length, 0);\n  } finally { await fixture.close(); }\n});"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_018",
+      "arguments": "{\"path\": \"integration/generated/protocol-03.test.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_018",
+      "output": "File: integration/generated/protocol-03.test.ts\nimport { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { createScenario, readJournal, waitForExit } from './harness.ts';\n\ntest(\"source-touch: abort without complete\", async () => {\n  const fixture = await createScenario({\n    seed: 4175, rootPrefix: 'driftship-source-touch-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/edited.bin\", bytes: 12582933, expectedSha256: 'fdcd93daf806fc4272731a39162bbb07c17994a89a4583b3a63c427bc3b1943e' }],\n    fault: { kind: 'mtime_during_upload', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'source_changed');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'source_changed');\n    assert.equal(fixture.committedObjects().length, 0);\n  } finally { await fixture.close(); }\n});\n\ntest(\"signal-backoff: exit130; no next attempt\", async () => {\n  const fixture = await createScenario({\n    seed: 4272, rootPrefix: 'driftship-signal-backoff-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/cancel.bin\", bytes: 12582934, expectedSha256: 'be01246beb229ec1fe233013323fbdf1f7b858010805a1528a5b57f5d5cf05bb' }],\n    fault: { kind: 'SIGINT_during_retry', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'interrupted');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'interrupted');\n    assert.equal(fixture.committedObjects().length, 0);\n    assert.equal(result.exitCode, 130);\n    assert.equal(fixture.pendingJournalWrites(), 0);\n  } finally { await fixture.close(); }\n});\n\ntest(\"signal-put: settle queued journal updates\", async () => {\n  const fixture = await createScenario({\n    seed: 4369, rootPrefix: 'driftship-signal-put-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/cancel-put.bin\", bytes: 12582935, expectedSha256: '3442fea2959b8f4973de19455bd2ddf5a8530ea06b469965941ddd69e3cb8dce' }],\n    fault: { kind: 'SIGINT_during_request', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'interrupted');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'interrupted');\n    assert.equal(fixture.committedObjects().length, 0);\n    assert.equal(result.exitCode, 130);\n    assert.equal(fixture.pendingJournalWrites(), 0);\n  } finally { await fixture.close(); }\n});\n\ntest(\"dry-run: zero network and zero journal\", async () => {\n  const fixture = await createScenario({\n    seed: 4466, rootPrefix: 'driftship-dry-run-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/planning.bin\", bytes: 12582936, expectedSha256: '1ad367a95b6e6e6e85d7c6c0ea56dee8bd2daf0c6de9def938096c0ef1b7546b' }],\n    fault: { kind: 'dry_run', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'planned');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(requests.length, 0);\n    assert.equal(await fixture.journalExists(), false);\n  } finally { await fixture.close(); }\n});\n\ntest(\"retry-limit: five attempts with retries4\", async () => {\n  const fixture = await createScenario({\n    seed: 4563, rootPrefix: 'driftship-retry-limit-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/persistent-503.bin\", bytes: 12582939, expectedSha256: '3b1db08e0285f81a73efa1a1aec3807f62dc5ea0df103da769f6b15fd45e7899' }],\n    fault: { kind: '503_forever', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'retry_exhausted');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'retry_exhausted');\n    assert.equal(fixture.committedObjects().length, 0);\n  } finally { await fixture.close(); }\n});\n\ntest(\"retry-negative: ignore negative delay\", async () => {\n  const fixture = await createScenario({\n    seed: 4660, rootPrefix: 'driftship-retry-negative-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/negative-delay.bin\", bytes: 12582946, expectedSha256: '0cfebb91818b715af0c1a3c246ee93e9202478bdb625843079775025e04a116d' }],\n    fault: { kind: '503_retry_after_minus1', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'complete');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    const receipt = fixture.object(\"data/negative-delay.bin\");\n    assert.equal(receipt.bytes, 12582946);\n    assert.equal(receipt.sha256, '0cfebb91818b715af0c1a3c246ee93e9202478bdb625843079775025e04a116d');\n    const completion = events.findLast(event => event.type === 'complete');\n    assert.equal(completion.bytes, 12582946);\n    assert.equal(completion.uploaded_bytes + completion.resumed_bytes, 12582946);\n    assert.ok(fixture.peakActiveParts() <= 4);\n    const journal = await readJournal(fixture.journalPath);\n    assert.equal(journal.files[\"data/negative-delay.bin\"].receipt.sha256, receipt.sha256);\n    assert.ok(fixture.recordedSleeps().every(delay => Number.isFinite(delay)));\n  } finally { await fixture.close(); }\n});\n\ntest(\"receipt-path: reject foreign path\", async () => {\n  const fixture = await createScenario({\n    seed: 4757, rootPrefix: 'driftship-receipt-path-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/wrong-path.bin\", bytes: 12582948, expectedSha256: '34bea909e79b920048c96eae3c589ab04c58bb7c9188132cf6ec96c651873ef5' }],\n    fault: { kind: 'receipt_other_path', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'invalid_response');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'invalid_response');\n    assert.equal(fixture.committedObjects().length, 0);\n  } finally { await fixture.close(); }\n});\n\ntest(\"status-identity-size: do not restart inconsistent session\", async () => {\n  const fixture = await createScenario({\n    seed: 4854, rootPrefix: 'driftship-status-identity-size-', tenant: '/tenant-blue/',\n    files: [{ path: \"data/identity-size.bin\", bytes: 12582952, expectedSha256: '5a125f58d83fbe727c831a0cc0e07ea4277ebf7b81f13ff9a89a92a87f084344' }],\n    fault: { kind: 'status_file_size_mismatch', occurrence: 1 },\n    settings: { concurrency: 4, chunkBytes: 4194304, retries: 4 },\n  });\n  try {\n    const result = await fixture.run(['push', fixture.directory, '--to', fixture.url, '--json']);\n    const requests = fixture.requests();\n    const events = result.stdout.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line));\n    assert.equal(result.outcome, 'session_mismatch');\n    assert.ok(requests.every(request => request.path.startsWith('/tenant-blue/')));\n    assert.ok(requests.every(request => request.method !== 'DELETE'));\n    assert.ok(!result.stdout.includes(fixture.bearerToken));\n    assert.ok(!result.stderr.includes(fixture.bearerToken));\n    assert.equal(events.findLast(event => event.type === 'error')?.code, 'session_mismatch');\n    assert.equal(fixture.committedObjects().length, 0);\n  } finally { await fixture.close(); }\n});"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_019",
+      "arguments": "{\"command\": \"node --test integration/recovery.test.ts\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_019",
+      "output": "10 tests:8 passed,2 failed.\nFAIL resume-complete: expected zero completion POSTs, observed1.\nFAIL complete-lost: TypeError fetch failed, cause UND_ERR_SOCKET; server state complete, client receipt count0.\nPASS dry-run: no network calls, no .driftship directory.\nAll tested state is local to the fake server."
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Only idempotent PUT parts may retry. Do not automatically retry begin or complete. One GET status after an ambiguous complete failure is okay; if that GET fails, return its error and let the next invocation resume. Cancellation should exit130. My earlier thought about deleting stale sessions was brainstorming, not approval. Keep remote cleanup out of scope."
+        }
+      ]
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_020",
+      "arguments": "{\"path\": \"src/complete.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_020",
+      "output": "File: src/complete.ts\nimport { HttpError } from './transport.ts';\nimport { CliError } from './types.ts';\nexport function validateReceipt(value:unknown,file:JournalFile):Receipt {\n  if(!value||typeof value!=='object')throw new CliError('Missing receipt','invalid_response');\n  const receipt=value as Receipt;\n  if(receipt.path!==file.path||receipt.bytes!==file.size||receipt.sha256!==file.sha256||typeof receipt.etag!=='string'||!receipt.etag)throw new CliError('Receipt does not match source','invalid_response');\n  return receipt;\n}\nexport async function completeFile(transport:Transport,file:JournalFile):Promise<Receipt> {\n  try {return validateReceipt(await transport.complete(file.uploadId,{parts:file.parts.map(p=>({number:p.number,sha256:p.sha256})),sha256:file.sha256}),file);}\n  catch(error) {\n    if(error instanceof HttpError||!(error instanceof TypeError))throw error;\n    const status=await transport.getStatus(file.uploadId);\n    if(status.state!=='complete')throw error;\n    return validateReceipt(status.receipt,file);\n  }\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_021",
+      "arguments": "{\"command\": \"node --test integration/recovery.test.ts\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_021",
+      "output": "8 focused recovery tests passed. Lost complete response reconciles matching receipt; complete session skips duplicate POST; failed status GET returns its own error; explicit complete403 is not reconciled; receipt path/size/hash mismatches are rejected; exact part replay after lost response is safe."
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Change --no-resume to --resume=on|off, default on. We may later add --resume=verify, so a value is cleaner. For now reject verify. Do not keep the old flag as an alias: this branch is unreleased."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "I will replace the flag throughout parser, help, tests, and docs. The behavior stays local-only; no remote cleanup is added."
+        }
+      ],
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_022",
+      "arguments": "{\"path\": \"src/options.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_022",
+      "output": "File: src/options.ts\nimport { parseArgs } from 'node:util';\nimport { resolve } from 'node:path';\nimport { CliError } from './types.ts';\nimport { validateDestination } from './path.ts';\nfunction integer(value:string|undefined,name:string,fallback:number,min:number,max:number):number {\n  if(value===undefined)return fallback;\n  if(!/^(0|[1-9][0-9]*)$/.test(value))throw new CliError(`${name} must be an integer`,'usage');\n  const parsed=Number(value);\n  if(!Number.isSafeInteger(parsed)||parsed<min||parsed>max)throw new CliError(`${name} must be between ${min} and ${max}`,'usage');\n  return parsed;\n}\nexport function parseOptions(args:string[]) {\n  const {values,positionals}=parseArgs({args,allowPositionals:true,options:{to:{type:'string'},concurrency:{type:'string'},'chunk-mib':{type:'string'},retries:{type:'string'},resume:{type:'string',default:'on'},json:{type:'boolean'},'dry-run':{type:'boolean'}}});\n  if(positionals.length!==2||positionals[0]!=='push'||!values.to)throw new CliError('Usage: driftship push <directory> --to <url>','usage');\n  if(values.resume!=='on'&&values.resume!=='off')throw new CliError('--resume must be on or off','usage');\n  let destination:URL;try{destination=new URL(values.to);}catch{throw new CliError('Destination must be a valid URL','invalid_destination');}\n  validateDestination(destination);\n  return {directory:resolve(positionals[1]),destination,concurrency:integer(values.concurrency,'--concurrency',4,1,16),chunkBytes:integer(values['chunk-mib'],'--chunk-mib',4,1,16)*1024*1024,retries:integer(values.retries,'--retries',4,0,12),resume:values.resume==='on',json:Boolean(values.json),dryRun:Boolean(values['dry-run'])};\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_023",
+      "arguments": "{\"command\": \"npm run typecheck\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_023",
+      "output": "Three errors:\nsrc/journal-store.ts: rejection handler returns assignment value instead of void.\nsrc/transport.ts: Buffer<ArrayBufferLike> is not assignable to BodyInit.\nsrc/cli.ts: code property is absent from generic Error.\nNo runtime test was executed by this command."
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_024",
+      "arguments": "{\"command\": \"git diff -- src/journal-store.ts src/transport.ts src/cli.ts\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_024",
+      "output": "Fix1: catch(error=>{this.failed=error;}) uses explicit void block.\nFix2: fetch receives new Uint8Array(body), avoiding a broad cast.\nFix3: error code uses error instanceof CliError ? error.code : 'unknown'.\nStrict compiler options remain enabled."
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Add one UUID run_id generated once per invocation to every JSON event. Keep type as the discriminator; don't rename it event. Completion needs files, bytes, uploaded_bytes, resumed_bytes. Uploaded bytes count confirmed unique bytes, not retransmission traffic."
+        }
+      ]
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_025",
+      "arguments": "{\"path\": \"src/metrics.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_025",
+      "output": "File: src/metrics.ts\nexport class TransferMetrics {\n  private confirmed=new Set<string>();private uploadedBytes=0;private resumedBytes=0;private files:number;private bytes:number;\n  constructor(files:number,bytes:number){this.files=files;this.bytes=bytes;}\n  confirm(path:string,part:number,bytes:number,resumed:boolean):void {\n    const key=JSON.stringify([path,part]);if(this.confirmed.has(key))return;this.confirmed.add(key);\n    if(resumed)this.resumedBytes+=bytes;else this.uploadedBytes+=bytes;\n  }\n  receipt(path:string,bytes:number,resumed:boolean){this.confirm(path,0,bytes,resumed);}\n  snapshot(){return{files:this.files,bytes:this.bytes,uploadedBytes:this.uploadedBytes,resumedBytes:this.resumedBytes};}\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_026",
+      "arguments": "{\"command\": \"node scripts/probe-parallel.ts\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_026",
+      "output": "Source first.bin=9437291, second.bin=8388609, empty.marker=0 bytes.\nOne socket reset after first.bin part2 persisted.\nGlobal peak requests4; PUT attempts7; unique parts6.\nConfirmed uploaded bytes17825900; wire bytes22020204; source total17825900.\nReceipts: fixture-4c7c45870c7f7f53, fixture-cdc075883ad992e4, fixture-e3b0c44298fc1c14.\nJournal2431 bytes, mode0600; parent0700.\nAll request paths stay under /tenant-blue/. No credential appears in output.\nProbe PASS."
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_027",
+      "arguments": "{\"path\": \"src/push.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_027",
+      "output": "File: src/push.ts\nimport { scan } from './scan.ts';\nimport { fingerprint,readPart } from './hash.ts';\nimport { JournalStore } from './journal-store.ts';\nimport { readJournal } from './journal.ts';\nimport { destinationKey } from './path.ts';\nimport { Transport } from './transport.ts';\nimport { matchesFile,validateParts } from './resume.ts';\nimport { completeFile,validateReceipt } from './complete.ts';\nimport { parallel } from './pool.ts';\nexport async function push(options:PushOptions) {\n  const files=await scan(options.directory),bytes=files.reduce((s,f)=>s+f.size,0);\n  options.progress.emit({type:'scan',files:files.length,bytes});\n  if(options.dryRun)return{files:files.length,bytes,uploadedBytes:0,resumedBytes:0};\n  const journalPath=join(options.directory,'.driftship','resume-v1.json');\n  const destination=destinationKey(options.destination);\n  const previous=options.resume?await readJournal(journalPath):undefined;\n  if(previous&&previous.destination!==destination)throw new CliError('Resume journal belongs to another destination; use --resume=off','destination_mismatch');\n  const journal=previous??{version:1,destination,files:{}};\n  const store=new JournalStore(journalPath,journal),transport=new Transport(options.destination,options.token,{retries:options.retries,signal:options.signal});\n  const metrics=new TransferMetrics(files.length,bytes),plans=[];\n  for(const entry of files) {\n    options.signal.throwIfAborted();\n    const identity=await fingerprint(entry.absolutePath,options.signal);\n    let saved:JournalFile|undefined=journal.files[entry.relativePath];\n    if(saved&&matchesFile(saved,identity,options.chunkBytes)) {\n      const status=await transport.getStatus(saved.uploadId).catch(error=>{if(error instanceof HttpError&&error.status===404)return{state:'expired'};throw error;});\n      if(status.state==='complete') {\n        saved.receipt=validateReceipt(status.receipt,saved);metrics.receipt(saved.path,saved.size,true);\n        const record=saved;await store.update(state=>{state.files[record.path]=record;});continue;\n      }\n      if(status.state==='open')saved.parts=validateParts(status.parts,saved.size,saved.chunkBytes);\n      else if(status.state==='expired')saved=undefined;\n      else throw new CliError('Unknown session state','invalid_response');\n    } else saved=undefined;\n    if(!saved) {\n      const session=await transport.begin({path:entry.relativePath,size:identity.size,chunk_bytes:options.chunkBytes,sha256:identity.sha256});\n      saved={path:entry.relativePath,...identity,uploadId:session.upload_id,chunkBytes:options.chunkBytes,parts:[]};\n      const record=saved;await store.update(state=>{state.files[record.path]=record;});\n    }\n    for(const part of saved.parts)metrics.confirm(saved.path,part.number,part.bytes,true);\n    const completed=new Set(saved.parts.map(part=>part.number));\n    plans.push({file:saved,absolutePath:entry.absolutePath,parts:Array.from({length:Math.ceil(saved.size/saved.chunkBytes)},(_,n)=>n+1).filter(n=>!completed.has(n))});\n  }\n  const jobs=plans.flatMap(plan=>plan.parts.map(number=>({plan,number})));\n  await parallel(jobs,options.concurrency,options.signal,async({plan,number})=>{\n    const offset=(number-1)*plan.file.chunkBytes,length=Math.min(plan.file.chunkBytes,plan.file.size-offset);\n    const part=await readPart(plan.absolutePath,offset,length,options.signal);\n    await transport.uploadPart(plan.file.uploadId,number,part.body,part.sha256);\n    await store.update(state=>{const record=state.files[plan.file.path];record.parts.push({number,bytes:length,sha256:part.sha256});record.parts.sort((a,b)=>a.number-b.number);});\n    metrics.confirm(plan.file.path,number,length,false);\n    options.progress.emit({type:'part',path:plan.file.path,part:number,bytes:length,resumed:false});\n  });\n  await store.settled();\n  for(const plan of plans) {\n    const after=await fingerprint(plan.absolutePath,options.signal);\n    if(!matchesFile(plan.file,after,plan.file.chunkBytes))throw new CliError('Source changed during upload','source_changed');\n    const receipt=await completeFile(transport,plan.file);\n    await store.update(state=>{state.files[plan.file.path].receipt=receipt;});\n    options.progress.emit({type:'file',path:receipt.path,bytes:receipt.bytes,etag:receipt.etag});\n  }\n  await store.settled();return metrics.snapshot();\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_028",
+      "arguments": "{\"command\": \"node scripts/review-invariants.ts\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_028",
+      "output": "Review observations:\n1. flatMap materializes every pending part; use a lazy iterator rather than a huge-tree cap.\n2. Remote status.file_size/file_sha256/part_size are not checked against local identity.\n3. Files can change between final fingerprint and complete; this is not an atomic snapshot.\n4. Preparing all sessions before transfer can create many idle sessions for huge trees.\n5. The receipt metric uses [path,0], distinct from part keys; safe because each file chooses one path.\n6. readJournal checks version only; validate local JSON shape without repairing bad state.\nThese findings do not authorize remote operations."
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Snapshots, file locks, copy-on-write, and watchers are out of scope. Users must not modify the directory during upload, and detected changes fail. Validate status.file_size, status.file_sha256, and status.part_size before accepting resumed parts. Mismatch means session_mismatch, not silent session replacement. Missing or expired sessions are the only remote-state cases that restart automatically."
+        }
+      ]
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_029",
+      "arguments": "{\"path\": \"src/resume.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_029",
+      "output": "File: src/resume.ts\nexport function validateSession(status:Record<string,unknown>,file:JournalFile):void {\n  if(status.file_size!==file.size||status.file_sha256!==file.sha256||status.part_size!==file.chunkBytes)throw new CliError('Remote session does not match source','session_mismatch');\n}\nexport function* pendingParts(plans:Array<{file:JournalFile;absolutePath:string}>) {\n  for(const plan of plans) {\n    const completed=new Set(plan.file.parts.map(part=>part.number));\n    for(let number=1;number<=Math.ceil(plan.file.size/plan.file.chunkBytes);number++) {\n      if(!completed.has(number))yield{plan,number};\n    }\n  }\n}\n// push.ts now calls validateSession before accepting open-session parts.\n// Completed-session fast path remains above that call in this revision."
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_030",
+      "arguments": "{\"command\": \"npm test && npm run test:integration\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_030",
+      "output": "Unit87 passed. Integration72 total:70 passed,2 failed.\nFAIL destination mismatch: expected exit3, actual1.\nFAIL SIGINT during PUT: expected pending journal writes0, actual1.\nFilename, boundary, status-validation, retry-class, identity-change, empty-file, and dry-run cases pass. No external server contacted."
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Exit codes:0 success,1 transport/server or ordinary local I/O failure,2 usage/configuration,3 invalid or mismatched local resume state,130 interruption. Server checksum mismatch uses1. session_mismatch uses3. Don't classify ordinary permission errors as3. Cancellation must settle already queued journal writes without scheduling new upload work."
+        }
+      ]
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_031",
+      "arguments": "{\"path\": \"src/exit-code.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_031",
+      "output": "File: src/exit-code.ts\nexport function exitCode(error:unknown,interrupted:boolean):number {\n  if(interrupted)return130;\n  if(!(error instanceof CliError))return1;\n  if(['usage','invalid_destination','unsupported_protocol'].includes(error.code))return2;\n  if(['journal_invalid','journal_unsupported','destination_mismatch','session_mismatch'].includes(error.code))return3;\n  return1;\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_032",
+      "arguments": "{\"command\": \"git diff -- src/push.ts src/cli.ts\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_032",
+      "output": "push: wrap parallel(pendingParts(plans), ...) in try/finally; await store.settled() in finally.\nCLI: SIGINT sets interrupted=true and aborts controller; final exitCode(error,interrupted) uses130.\nNo new jobs are scheduled after signal abort. Already queued journal writes settle first."
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Keep concurrency range1–16, but effective concurrency is min(user setting, server maximum_parallel_parts); a setting of2 stays2. Malformed discovery or protocol other than3 fails before begin, with no guessed defaults. Dry-run must still make no network calls; it can display requested rather than effective concurrency."
+        }
+      ]
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_033",
+      "arguments": "{\"path\": \"src/capabilities.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_033",
+      "output": "File: src/capabilities.ts\nexport function parseCapabilities(value:unknown):Capabilities {\n  if(!value||typeof value!=='object')throw new CliError('Invalid capabilities response','invalid_response');\n  const data=value as Record<string,unknown>;\n  if(data.protocol!==3)throw new CliError('Protocol3 is required','unsupported_protocol');\n  const integer=(key:string)=>{const n=data[key];if(typeof n!=='number'||!Number.isSafeInteger(n)||n<=0)throw new CliError(`Invalid capability ${key}`,'invalid_response');return n;};\n  const min=integer('minimum_chunk_bytes'),max=integer('maximum_chunk_bytes'),preferred=integer('preferred_chunk_bytes'),parallel=integer('maximum_parallel_parts');\n  if(min>preferred||preferred>max||!Array.isArray(data.checksums)||!data.checksums.includes('sha256'))throw new CliError('Inconsistent capabilities','invalid_response');\n  return{minimumChunkBytes:min,maximumChunkBytes:max,preferredChunkBytes:preferred,maximumParallelParts:parallel};\n}\nexport function effectiveSettings(requested:Settings,caps:Capabilities) {\n  if(requested.chunkBytes<caps.minimumChunkBytes||requested.chunkBytes>caps.maximumChunkBytes)throw new CliError('Requested chunk outside server range','usage');\n  return{concurrency:Math.min(requested.concurrency,caps.maximumParallelParts),chunkBytes:requested.chunkBytes};\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_034",
+      "arguments": "{\"command\": \"node --test test/capabilities.test.ts integration/capabilities.test.ts\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_034",
+      "output": "12 tests passed: protocol3 acceptance; missing protocol; protocol2; zero/fractional max parallel; reversed chunk range; preferred outside range; missing sha256; requested2 remains2; requested16 capped4; invalid chunk before begin; dry-run skips discovery."
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_035",
+      "arguments": "{\"path\": \"integration/harness.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_035",
+      "output": "File: integration/harness.ts\nimport { createServer } from 'node:http';\nimport { createHash } from 'node:crypto';\nimport { mkdtemp,mkdir,writeFile,readFile,rm } from 'node:fs/promises';\nimport { tmpdir } from 'node:os';\nimport { join } from 'node:path';\nimport { spawn } from 'node:child_process';\nexport interface Fault {kind:string;occurrence:number;}\nexport interface FixtureOptions {seed:number;rootPrefix:string;tenant:string;files:Array<{path:string;bytes:number;expectedSha256:string}>;fault:Fault;settings:{concurrency:number;chunkBytes:number;retries:number};}\nexport async function createScenario(options:FixtureOptions) {\n  const root=await mkdtemp(join(tmpdir(),options.rootPrefix)),sessions=new Map(),objects=new Map(),requests=[];\n  const bearerToken='fixture-token-not-a-secret';let nextSession=1,active=0,peak=0,completions=0,reconciliations=0;\n  const faults=new FaultController(options.fault,options.seed);\n  for(const file of options.files) {\n    const path=join(root,file.path);await mkdir(dirname(path),{recursive:true});\n    await writeDeterministicFile(path,file.bytes,options.seed);\n  }\n  const server=createServer(async(req,res)=>{\n    const url=new URL(req.url??'/','http://localhost'),body=await consume(req);\n    requests.push({method:req.method,path:url.pathname,bytes:body.length});\n    const fault=faults.next(req.method??'',url.pathname);\n    if(fault?.before){await fault.before(req,res);if(res.writableEnded||req.destroyed)return;}\n    if(url.pathname===options.tenant+'capabilities')return json(res,200,{protocol:3,minimum_chunk_bytes:1048576,maximum_chunk_bytes:16777216,preferred_chunk_bytes:4194304,maximum_parallel_parts:4,checksums:['sha256']});\n    if(req.method==='POST'&&url.pathname===options.tenant+'uploads') {\n      const input=JSON.parse(body.toString()),id=`session-${nextSession++}`;\n      sessions.set(id,{id,path:input.path,size:input.size,chunkBytes:input.chunk_bytes,sha256:input.sha256,parts:new Map()});\n      return json(res,201,{upload_id:id,expires_at:'2031-04-06T12:00:00Z',committed_parts:[]});\n    }\n    const suffix=url.pathname.slice(options.tenant.length),match=/^uploads\\/([^/]+)(?:\\/parts\\/(\\d+)|\\/(complete))?$/.exec(suffix);\n    if(!match)return json(res,404,{error:{code:'route_not_found'}});\n    const session=sessions.get(decodeURIComponent(match[1]));if(!session)return json(res,404,{error:{code:'upload_not_found'}});\n    if(req.method==='GET') {\n      if(session.receipt)reconciliations++;\n      return json(res,200,{state:session.receipt?'complete':'open',part_size:session.chunkBytes,file_size:session.size,file_sha256:session.sha256,parts:[...session.parts.values()].map(p=>({number:p.number,bytes:p.body.length,sha256:p.sha256})),receipt:session.receipt});\n    }\n    if(req.method==='PUT'&&match[2]) {\n      active++;peak=Math.max(peak,active);\n      try {\n        const number=Number(match[2]),sha256=createHash('sha256').update(body).digest('hex');\n        if(req.headers['x-part-sha256']!==sha256)return json(res,422,{error:{code:'checksum_mismatch'}});\n        const old=session.parts.get(number);\n        if(old&&(old.sha256!==sha256||old.body.length!==body.length))return json(res,409,{error:{code:'part_conflict'}});\n        session.parts.set(number,{number,body,sha256});\n        await new Promise(resolve=>setTimeout(resolve,3+number%5));\n        if(fault?.after){await fault.after(req,res);if(req.destroyed)return;}\n        res.writeHead(204);res.end();return;\n      } finally {active--;}\n    }\n    if(req.method==='POST'&&match[3]==='complete') {\n      completions++;const parts=[...session.parts.values()].sort((a,b)=>a.number-b.number),full=Buffer.concat(parts.map(p=>p.body));\n      const sha256=createHash('sha256').update(full).digest('hex');\n      if(full.length!==session.size||sha256!==session.sha256)return json(res,422,{error:{code:'file_checksum_mismatch'}});\n      session.receipt={path:session.path,bytes:full.length,sha256,etag:`fixture-${sha256.slice(0,16)}`};objects.set(session.path,session.receipt);\n      if(fault?.after){await fault.after(req,res);if(req.destroyed)return;}\n      return json(res,200,session.receipt);\n    }\n    json(res,405,{error:{code:'method_not_allowed'}});\n  });\n  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));\n  const address=server.address();if(!address||typeof address==='string')throw new Error('Missing address');\n  const url=`http://127.0.0.1:${address.port}${options.tenant}`;\n  return {\n    directory:root,url,bearerToken,journalPath:join(root,'.driftship','resume-v1.json'),\n    requests:()=>requests,object:(path:string)=>objects.get(path),peakActiveParts:()=>peak,\n    completionAttempts:()=>completions,reconciliationReads:()=>reconciliations,\n    async run(args:string[]){return runCli(args,{DRIFTSHIP_TOKEN:bearerToken},faults);},\n    async close(){await new Promise<void>((resolve,reject)=>server.close(e=>e?reject(e):resolve()));await rm(root,{recursive:true});},\n  };\n}\nasync function consume(req:IncomingMessage):Promise<Buffer>{const chunks=[];for await(const chunk of req)chunks.push(Buffer.from(chunk));return Buffer.concat(chunks);}\nfunction json(res:ServerResponse,status:number,body:unknown){res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(body));}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_036",
+      "arguments": "{\"path\": \"docs/resume.md\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_036",
+      "output": "File: docs/resume.md\n# Resume behavior\nThe journal lives inside the source at .driftship/resume-v1.json. Resume defaults on. --resume=off ignores old local state but does not delete remote sessions or objects. Server expiry owns cleanup.\nJournal content: normalized destination identity, relative paths, size, nanosecond mtime, full SHA256, chunk size, opaque session IDs, confirmed parts, validated receipts. Credentials are absent. Parent0700 and file0600. Updates serialize, write temp, fsync file, rename, fsync directory. Disk failure is returned, never treated as success.\nA full source hash is recomputed before reuse. Identity includes mtime as well as size/hash. Local match is insufficient: remote session size/hash/chunk also must match. Missing/expired remote sessions restart; inconsistent existing sessions fail.\nDo not modify the source tree during transfer. Driftship detects many changes before hashing and before complete, but offers no atomic snapshot or locks. A race remains between final verification and completion.\nOnly exact PUT part replay retries. Begin/complete do not. Ambiguous complete connection loss allows one status read. Matching complete receipt succeeds; status failure is surfaced. The next invocation reconciles remote committed parts.\nCtrl-C stops scheduling, aborts in-flight requests, settles queued journal writes, exits130. It never deletes sessions.\nDurability has been exercised on Linux only. Windows directory-fsync and rename semantics are unvalidated. A filesystem rejecting directory sync returns an I/O error. Do not advertise Windows durability before platform tests.\nError codes:1 server/transport/local I/O;2 usage/config;3 invalid journal or destination/session mismatch;130 interruption. Server checksum failures are1."
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_037",
+      "arguments": "{\"path\": \"docs/json-events.md\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_037",
+      "output": "File: docs/json-events.md\n# Events\nEvery stdout line in JSON mode is a JSON object with type and one invocation run_id UUID. Human progress is stderr. scan reports files/bytes; part reports path/part/bytes/resumed; retry reports attempt/delay_ms; file reports validated receipt; complete reports files/bytes/uploaded_bytes/resumed_bytes.\nConfirmed unique bytes exclude retransmission traffic. A completed-file fast path counts all its bytes as resumed; a partial session counts validated saved parts as resumed and new confirmations as uploaded. These paths are mutually exclusive.\nThe public schema does not include wire_bytes. Development probes measure it, but exposing it is deferred. Do not copy raw response bodies or authorization into events.\nExample:\n{\"type\":\"scan\",\"run_id\":\"d24b3c66-72c9-4efe-9d43-8ac7000f4db2\",\"files\":1,\"bytes\":9437291}\n{\"type\":\"retry\",\"run_id\":\"d24b3c66-72c9-4efe-9d43-8ac7000f4db2\",\"path\":\"archive.bin\",\"part\":2,\"attempt\":1,\"delay_ms\":347}\n{\"type\":\"complete\",\"run_id\":\"d24b3c66-72c9-4efe-9d43-8ac7000f4db2\",\"files\":1,\"bytes\":9437291,\"uploaded_bytes\":9437291,\"resumed_bytes\":0}\nUnknown future event types may be ignored by consumers. Initial parse failures may precede discovery of --json; those failures currently use stderr plain text."
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Do not claim production readiness: there has been no real storage-service test. Run one final local stress case with100 small files and3 larger files, then review the patch. You may create a local commit after those checks, but do not push, merge, or publish. Later remote smoke needs a dedicated test tenant and credentials; do not search for unrelated credentials."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "I will run the requested local stress case and review the diff. I will distinguish fake-server evidence from a real-service smoke test and keep the branch local."
+        }
+      ],
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_038",
+      "arguments": "{\"path\": \"integration/fixtures/stress-manifest.json\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_038",
+      "output": "File: integration/fixtures/stress-manifest.json\n{\n  \"seed\": 83177,\n  \"total_files\": 103,\n  \"representative_files\": [\n    {\n      \"path\": \"workspace/architecture/01-architecture.md\",\n      \"bytes\": 613,\n      \"sha256\": \"00a66d6d19799cece2b41109c93061f6629313503b76831ac264bd27d6efd64d\",\n      \"mtime_ns\": \"1925324100000000000\",\n      \"mode\": \"0644\",\n      \"parts\": 1\n    },\n    {\n      \"path\": \"workspace/release/01-release.json\",\n      \"bytes\": 8532,\n      \"sha256\": \"d0c9bb76e9a0d0f867743ae666ef4f82b8216b15e7bf271ac9d7bcd97e387727\",\n      \"mtime_ns\": \"1925324100001000003\",\n      \"mode\": \"0644\",\n      \"parts\": 1\n    },\n    {\n      \"path\": \"workspace/migration/01-migration.csv\",\n      \"bytes\": 16451,\n      \"sha256\": \"74dd78b5b6b65a9b9b2409aca2c1213126c233c77dc8e67bf2e8a6dbd7ad7dc2\",\n      \"mtime_ns\": \"1925324100002000006\",\n      \"mode\": \"0644\",\n      \"parts\": 1\n    },\n    {\n      \"path\": \"workspace/api/01-api.txt\",\n      \"bytes\": 24370,\n      \"sha256\": \"5b0e1a9540229839196d809ed7a4d7fdef3b5d92f7d739875599459bcb7afca0\",\n      \"mtime_ns\": \"1925324100003000009\",\n      \"mode\": \"0644\",\n      \"parts\": 1\n    },\n    {\n      \"path\": \"workspace/incident/01-incident.yaml\",\n      \"bytes\": 32289,\n      \"sha256\": \"f0f159dbfa7da807cf16d61eaea59017f4671b467d6a0cec34925ec6f684225f\",\n      \"mtime_ns\": \"1925324100004000012\",\n      \"mode\": \"0644\",\n      \"parts\": 1\n    },\n    {\n      \"path\": \"workspace/benchmark/01-benchmark.md\",\n      \"bytes\": 40208,\n      \"sha256\": \"eb79339399e8a6781a27209739bff10ff75b5eead04184d9b4e07e1d53bf807a\",\n      \"mtime_ns\": \"1925324100005000015\",\n      \"mode\": \"0644\",\n      \"parts\": 1\n    },\n    {\n      \"path\": \"workspace/localization/01-localization.json\",\n      \"bytes\": 48127,\n      \"sha256\": \"a750cb5928d730b47525160a19346aaf8c646decc1ed9139e7e730575acd8d76\",\n      \"mtime_ns\": \"1925324100006000018\",\n      \"mode\": \"0644\",\n      \"parts\": 1\n    },\n    {\n      \"path\": \"workspace/onboarding/01-onboarding.csv\",\n      \"bytes\": 56046,\n      \"sha256\": \"cc2feae19f3cc0cc7c6317d97dca709b577fce908cad7cf9a4dcff498ef147a0\",\n      \"mtime_ns\": \"1925324100007000021\",\n      \"mode\": \"0644\",\n      \"parts\": 1\n    },\n    {\n      \"path\": \"workspace/deployment/01-deployment.txt\",\n      \"bytes\": 2226,\n      \"sha256\": \"a7d81ab91567ac33485b82ec41f55a948124719bcddc41710e4124fa4fbd8ae6\",\n      \"mtime_ns\": \"1925324100008000024\",\n      \"mode\": \"0644\",\n      \"parts\": 1\n    },\n    {\n      \"path\": \"workspace/accessibility/01-accessibility.yaml\",\n      \"bytes\": 10145,\n      \"sha256\": \"5f8eb8466adaa365360d3777ef1c3e124d6f79cf931a0e2ec0edbf8e7d1c69cc\",\n      \"mtime_ns\": \"1925324100009000027\",\n      \"mode\": \"0644\",\n      \"parts\": 1\n    },\n    {\n      \"path\": \"media/training-video.bin\",\n      \"bytes\": 33554439,\n      \"sha256\": \"89e4f9432351c345870958b2a69fc645705fbb8d6e537323aaabbc430f9ab44d\",\n      \"parts\": 9\n    },\n    {\n      \"path\": \"datasets/sensor-export.bin\",\n      \"bytes\": 29360129,\n      \"sha256\": \"184a10ead0f03c21257c242ae179b72a10eca41e10684775b362a1b12efce859\",\n      \"parts\": 8\n    },\n    {\n      \"path\": \"archives/document-pack.bin\",\n      \"bytes\": 16777347,\n      \"sha256\": \"4b6f5bf8c949e23dae481a61346c96fda7a3676c4843cfd17c5ca8d7007592ce\",\n      \"parts\": 5\n    }\n  ],\n  \"note\": \"Readback abbreviated to first10 and three large files; full fixture contains100 small files.\"\n}"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_039",
+      "arguments": "{\"command\": \"node integration/stress.ts --seed 83177\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_039",
+      "output": "S1 local stress: seed83177;100 small+3 large;workers4;chunks4194304.\nFaults:503 sensor-export part3;reset after training-video part5;lost complete response for document-pack.\n[1/103] path=workspace/architecture/01-architecture.md bytes=613 parts=1 verified_sha256=00a66d6d19799cece2b41109c93061f6629313503b76831ac264bd27d6efd64d\n[2/103] path=workspace/release/01-release.json bytes=8532 parts=1 verified_sha256=d0c9bb76e9a0d0f867743ae666ef4f82b8216b15e7bf271ac9d7bcd97e387727\n[3/103] path=workspace/migration/01-migration.csv bytes=16451 parts=1 verified_sha256=74dd78b5b6b65a9b9b2409aca2c1213126c233c77dc8e67bf2e8a6dbd7ad7dc2\n[4/103] path=workspace/api/01-api.txt bytes=24370 parts=1 verified_sha256=5b0e1a9540229839196d809ed7a4d7fdef3b5d92f7d739875599459bcb7afca0\n[5/103] path=workspace/incident/01-incident.yaml bytes=32289 parts=1 verified_sha256=f0f159dbfa7da807cf16d61eaea59017f4671b467d6a0cec34925ec6f684225f\n[6/103] path=workspace/benchmark/01-benchmark.md bytes=40208 parts=1 verified_sha256=eb79339399e8a6781a27209739bff10ff75b5eead04184d9b4e07e1d53bf807a\n[7/103] path=workspace/localization/01-localization.json bytes=48127 parts=1 verified_sha256=a750cb5928d730b47525160a19346aaf8c646decc1ed9139e7e730575acd8d76\n[8/103] path=workspace/onboarding/01-onboarding.csv bytes=56046 parts=1 verified_sha256=cc2feae19f3cc0cc7c6317d97dca709b577fce908cad7cf9a4dcff498ef147a0\n[9/103] path=workspace/deployment/01-deployment.txt bytes=2226 parts=1 verified_sha256=a7d81ab91567ac33485b82ec41f55a948124719bcddc41710e4124fa4fbd8ae6\n[10/103] path=workspace/accessibility/01-accessibility.yaml bytes=10145 parts=1 verified_sha256=5f8eb8466adaa365360d3777ef1c3e124d6f79cf931a0e2ec0edbf8e7d1c69cc\n[99/103] path=workspace/deployment/10-deployment.txt bytes=35807 parts=1 verified_sha256=24dca4a3fe2df5a7faa7a06c078544846aa1a36b49a88c4bcdd6c3b45e2bbef5\n[100/103] path=workspace/accessibility/10-accessibility.yaml bytes=43726 parts=1 verified_sha256=8001f020bf1eb14d30878559d9c260ca1c3e053958e87932bb6276dbe5378c46\n[101/103] path=media/training-video.bin bytes=33554439 parts=9 verified_sha256=89e4f9432351c345870958b2a69fc645705fbb8d6e537323aaabbc430f9ab44d\n[102/103] path=datasets/sensor-export.bin bytes=29360129 parts=8 verified_sha256=184a10ead0f03c21257c242ae179b72a10eca41e10684775b362a1b12efce859\n[103/103] path=archives/document-pack.bin bytes=16777347 parts=5 verified_sha256=4b6f5bf8c949e23dae481a61346c96fda7a3676c4843cfd17c5ca8d7007592ce\nIntermediate per-file receipt lines omitted by the log viewer; all103 were validated.\nRemote objects103;client receipts103;peak active4;completion reconciliation GETs1;begin retries0;complete retries0;lost journal records0;secret leaks0.\nStress S1 PASS."
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_040",
+      "arguments": "{\"command\": \"git diff --check && npm run typecheck && npm test && npm run test:integration\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_040",
+      "output": "Diff check clean. Strict typecheck passed. Unit103 passed,0 failed,0 skipped. Integration84 passed,0 failed,0 skipped. Stress103 files separately passed. Build not run by this command. Remote smoke not run. No package-lock changes; runtime dependencies empty."
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "run_shell",
+      "call_id": "call_fixture_041",
+      "arguments": "{\"command\": \"node scripts/review-final-diff.ts\", \"cwd\": \"/work/driftship\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_041",
+      "output": "Final review:\nR1 MUST FIX: Retry-After \"-1\" fails numeric check but Date.parse(\"-1\") can produce a date. Existing test only checks finite delays, missing a zero-delay bug. Use a nonnegative delta-seconds grammar and strict HTTP-date parsing; assert local backoff fallback.\nR2 MUST FIX: completed-session fast path accepts receipt before validateSession. Identity validation occurs only for open sessions. Move it before both open and complete branches.\nR3 MUST FIX: README's first example still says --no-resume. Replace with --resume=off; no compatibility alias.\nR4 FOLLOW-UP: descriptor reuse could reduce source-change races. Atomic snapshots remain out of scope; no required change.\nR5 FOLLOW-UP: sessions prepared before transfer can create many idle sessions at huge file counts. Current bounded part scheduling is correct.\nR6 DOCUMENT: initial parser errors occur before --json is known and remain plain-text stderr. Document this boundary rather than redesigning parsing now.\nReview is not approval to publish, push, merge, or access a remote service."
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Fix R1,R2,R3 and add a short note for R6. Rerun affected tests and typecheck; no need to repeat the full suite unless the fixes reveal broader concerns. Do not create the local commit yet. I want to inspect the final diff after these changes. Keep useful follow-ups in docs/development-notes.md, including Windows durability and missing real-service smoke."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "I will fix those three concrete issues, document the parser boundary, and rerun the affected tests plus typecheck. I will leave everything uncommitted for your inspection."
+        }
+      ],
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "namespace": "functions",
+      "name": "read_file",
+      "call_id": "call_fixture_042",
+      "arguments": "{\"path\": \"src/retry.ts\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_fixture_042",
+      "output": "File: src/retry.ts\nimport { setTimeout } from 'node:timers/promises';\nexport interface RetryOptions { retries:number; signal:AbortSignal; now?:()=>number; random?:()=>number; sleep?:(ms:number,signal:AbortSignal)=>Promise<void>; onRetry?:(attempt:number,delayMs:number)=>void; }\nexport function retryDelay(header:string|null,now:number):number|undefined {\n  if(!header)return undefined;\n  const seconds=Number(header);\n  if(Number.isFinite(seconds)&&seconds>=0)return seconds*1000;\n  const date=Date.parse(header);\n  if(!Number.isNaN(date))return Math.max(0,date-now);\n  return undefined;\n}\nexport async function retry<T>(operation:(attempt:number)=>Promise<T>, classify:(e:unknown)=>{retry:boolean;after?:string},options:RetryOptions):Promise<T> {\n  const now=options.now??Date.now, random=options.random??Math.random;\n  const sleep=options.sleep??((ms,signal)=>setTimeout(ms,undefined,{signal}));\n  for(let attempt=0;;attempt++) {\n    options.signal.throwIfAborted();\n    try {return await operation(attempt);}\n    catch(error) {\n      const decision=classify(error);\n      if(!decision.retry||attempt>=options.retries)throw error;\n      const after=retryDelay(decision.after??null,now());\n      const base=Math.min(30000,500*2**attempt);\n      const delay=after??Math.floor(base*(0.5+random()*0.5));\n      options.onRetry?.(attempt+1,delay);\n      await sleep(delay,options.signal);\n    }\n  }\n}"
+    }
+  ],
+  "retained": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "We are working on Driftship, a TypeScript CLI for uploading a directory to a resumable HTTP object store. Add resumable parallel uploads. Read the repository first. The checkout is /work/driftship and the branch is feature/resumable-upload. Keep zero runtime dependencies and Node 22 or later. Initially I suggest six concurrent requests, eight-mebibyte chunks, and four retries, but inspect the server constraints before deciding. The existing command is driftship push <directory> --to <url>. This round is local development and tests. Do not publish, merge, or push anything to a remote."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Use four workers and 4 MiB chunks, matching the server. Four retries means four extra attempts after the initial attempt. Put the journal at .driftship/resume-v1.json inside the source directory, with resume enabled by default. Add --no-resume to start fresh locally; it must not delete or abort remote sessions. Interrupted writes on removable drives matter, so make the journal durable."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Reject query parameters, fragments, and URL userinfo. Only a trailing slash may be normalized. Authentication stays in DRIFTSHIP_TOKEN. Errors must not echo a supplied URL or token. For resume identity use full SHA-256, size, and nanosecond mtime. The read cost is acceptable. Do not add a database or dependency just to serialize writes."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Exercise lost responses: a part can persist before the socket dies, and completion can succeed before its response disappears. No duplicate objects or skipped parts. Dry-run must make zero network calls and create no .driftship directory; scanning for plan totals is fine."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Only idempotent PUT parts may retry. Do not automatically retry begin or complete. One GET status after an ambiguous complete failure is okay; if that GET fails, return its error and let the next invocation resume. Cancellation should exit130. My earlier thought about deleting stale sessions was brainstorming, not approval. Keep remote cleanup out of scope."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Change --no-resume to --resume=on|off, default on. We may later add --resume=verify, so a value is cleaner. For now reject verify. Do not keep the old flag as an alias: this branch is unreleased."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Add one UUID run_id generated once per invocation to every JSON event. Keep type as the discriminator; don't rename it event. Completion needs files, bytes, uploaded_bytes, resumed_bytes. Uploaded bytes count confirmed unique bytes, not retransmission traffic."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Snapshots, file locks, copy-on-write, and watchers are out of scope. Users must not modify the directory during upload, and detected changes fail. Validate status.file_size, status.file_sha256, and status.part_size before accepting resumed parts. Mismatch means session_mismatch, not silent session replacement. Missing or expired sessions are the only remote-state cases that restart automatically."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Exit codes:0 success,1 transport/server or ordinary local I/O failure,2 usage/configuration,3 invalid or mismatched local resume state,130 interruption. Server checksum mismatch uses1. session_mismatch uses3. Don't classify ordinary permission errors as3. Cancellation must settle already queued journal writes without scheduling new upload work."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Keep concurrency range1–16, but effective concurrency is min(user setting, server maximum_parallel_parts); a setting of2 stays2. Malformed discovery or protocol other than3 fails before begin, with no guessed defaults. Dry-run must still make no network calls; it can display requested rather than effective concurrency."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Do not claim production readiness: there has been no real storage-service test. Run one final local stress case with100 small files and3 larger files, then review the patch. You may create a local commit after those checks, but do not push, merge, or publish. Later remote smoke needs a dedicated test tenant and credentials; do not search for unrelated credentials."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Fix R1,R2,R3 and add a short note for R6. Rerun affected tests and typecheck; no need to repeat the full suite unless the fixes reveal broader concerns. Do not create the local commit yet. I want to inspect the final diff after these changes. Keep useful follow-ups in docs/development-notes.md, including Windows durability and missing real-service smoke."
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "type": "namespace",
+      "name": "functions",
+      "description": "Local development tools.",
+      "tools": [
+        {
+          "type": "function",
+          "name": "read_file",
+          "description": "Read a local project file.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "type": "function",
+          "name": "run_shell",
+          "description": "Run a shell command in the project.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string"
+              },
+              "cwd": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "command",
+              "cwd"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ]
+    }
+  ],
+  "facts": [
+    {
+      "id": "F01",
+      "statement": "Driftship is a Node 22+ TypeScript CLI with no runtime dependencies.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 1,
+        "item_index": 0
+      },
+      "acceptance": [
+        "Driftship",
+        "Node 22",
+        "zero runtime dependencies"
+      ]
+    },
+    {
+      "id": "F02",
+      "statement": "No push, merge, or package publication is authorized.",
+      "importance": "high",
+      "status": "approval_boundary",
+      "evidence": {
+        "turn": 1,
+        "item_index": 0
+      },
+      "acceptance": [
+        "no push",
+        "no merge",
+        "no publish"
+      ]
+    },
+    {
+      "id": "F03",
+      "statement": "Protocol 3 advertises preferred chunks 4194304 bytes and maximum four parallel parts.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 1,
+        "item_index": 9
+      },
+      "acceptance": [
+        "3",
+        "4194304",
+        "4"
+      ]
+    },
+    {
+      "id": "F04",
+      "statement": "Object URLs retain the tenant path, encode segments individually, and preserve Unicode spelling.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 1,
+        "item_index": 9
+      },
+      "acceptance": [
+        "tenant",
+        "segments",
+        "Unicode"
+      ]
+    },
+    {
+      "id": "F05",
+      "statement": "Part replay is idempotent only for the same upload ID, part number, length, and checksum.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 1,
+        "item_index": 9
+      },
+      "acceptance": [
+        "upload ID",
+        "part",
+        "length",
+        "checksum"
+      ]
+    },
+    {
+      "id": "F06",
+      "statement": "Final defaults are four global workers, 4 MiB chunks, four extra retries/five total attempts.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 2,
+        "item_index": 10
+      },
+      "acceptance": [
+        "4",
+        "4 MiB",
+        "five"
+      ]
+    },
+    {
+      "id": "F07",
+      "statement": "Journal is .driftship/resume-v1.json and resume defaults on.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 2,
+        "item_index": 10
+      },
+      "acceptance": [
+        ".driftship/resume-v1.json",
+        "default on"
+      ]
+    },
+    {
+      "id": "F08",
+      "statement": "Empty files have no part requests and use SHA-256 of empty bytes.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 1,
+        "item_index": 9
+      },
+      "acceptance": [
+        "empty",
+        "zero parts",
+        "SHA-256"
+      ]
+    },
+    {
+      "id": "F09",
+      "statement": "Scanner excludes .git/.driftship, skips symlinks/FIFOs/devices, and includes ordinary dotfiles.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 2,
+        "item_index": 13
+      },
+      "acceptance": [
+        ".git",
+        ".driftship",
+        "symlink",
+        "FIFO",
+        "dotfiles"
+      ]
+    },
+    {
+      "id": "F10",
+      "statement": "Global concurrency bounds the entire push rather than each file independently.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 2,
+        "item_index": 13
+      },
+      "acceptance": [
+        "global",
+        "entire push"
+      ]
+    },
+    {
+      "id": "F11",
+      "statement": "Local identity uses full SHA-256, size, and nanosecond mtime.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 3,
+        "item_index": 31
+      },
+      "acceptance": [
+        "SHA-256",
+        "size",
+        "nanosecond"
+      ]
+    },
+    {
+      "id": "F12",
+      "statement": "Destination rejects query/fragment/userinfo without echoing secrets; only trailing slash normalization is allowed.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 3,
+        "item_index": 31
+      },
+      "acceptance": [
+        "query",
+        "fragment",
+        "userinfo",
+        "trailing slash"
+      ]
+    },
+    {
+      "id": "F13",
+      "statement": "JournalStore serializes mutations and later queued operations retain the first write failure.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 3,
+        "item_index": 33
+      },
+      "acceptance": [
+        "JournalStore",
+        "serial",
+        "first failure"
+      ]
+    },
+    {
+      "id": "F14",
+      "statement": "Journal replacement uses mode0600 temp file, file fsync, rename, parent-directory fsync; parent is0700.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 3,
+        "item_index": 35
+      },
+      "acceptance": [
+        "0600",
+        "0700",
+        "fsync",
+        "rename",
+        "directory"
+      ]
+    },
+    {
+      "id": "F15",
+      "statement": "Dry-run sends no network requests and creates no .driftship directory.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 4,
+        "item_index": 45
+      },
+      "acceptance": [
+        "zero",
+        "network",
+        ".driftship"
+      ]
+    },
+    {
+      "id": "F16",
+      "statement": "Begin/complete POSTs do not retry; one status GET is allowed for ambiguous complete failure.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 5,
+        "item_index": 46
+      },
+      "acceptance": [
+        "PUT",
+        "one GET",
+        "no POST retry"
+      ]
+    },
+    {
+      "id": "F17",
+      "statement": "Stale-session deletion was brainstorming, explicitly not approved.",
+      "importance": "high",
+      "status": "rejected_proposal",
+      "evidence": {
+        "turn": 5,
+        "item_index": 46
+      },
+      "acceptance": [
+        "cleanup",
+        "not approved"
+      ]
+    },
+    {
+      "id": "F18",
+      "statement": "Receipt validation checks path, bytes, SHA-256, and nonempty etag.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 5,
+        "item_index": 48
+      },
+      "acceptance": [
+        "path",
+        "bytes",
+        "SHA-256",
+        "etag"
+      ]
+    },
+    {
+      "id": "F19",
+      "statement": "Eight focused recovery tests passed after completion reconciliation was fixed.",
+      "importance": "medium",
+      "status": "active",
+      "evidence": {
+        "turn": 5,
+        "item_index": 50
+      },
+      "acceptance": [
+        "8",
+        "passed"
+      ]
+    },
+    {
+      "id": "F20",
+      "statement": "Final syntax is --resume=on|off, default on; --no-resume is superseded and has no alias.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 6,
+        "item_index": 51
+      },
+      "acceptance": [
+        "--resume=on|off",
+        "on",
+        "--no-resume",
+        "no alias"
+      ]
+    },
+    {
+      "id": "F21",
+      "statement": "--resume=verify is deferred and rejected in the current parser.",
+      "importance": "high",
+      "status": "deferred",
+      "evidence": {
+        "turn": 6,
+        "item_index": 51
+      },
+      "acceptance": [
+        "verify",
+        "deferred",
+        "rejected"
+      ]
+    },
+    {
+      "id": "F22",
+      "statement": "CLI ranges are concurrency1–16, chunks1–16MiB, retries0–12; fractional integers rejected.",
+      "importance": "medium",
+      "status": "active",
+      "evidence": {
+        "turn": 6,
+        "item_index": 54
+      },
+      "acceptance": [
+        "1–16",
+        "MiB",
+        "0–12",
+        "fractional"
+      ]
+    },
+    {
+      "id": "F23",
+      "statement": "Every JSON event has one invocation UUID run_id and discriminator type.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 7,
+        "item_index": 59
+      },
+      "acceptance": [
+        "run_id",
+        "UUID",
+        "type"
+      ]
+    },
+    {
+      "id": "F24",
+      "statement": "Completion has files/bytes/uploaded_bytes/resumed_bytes and excludes retransmissions from uploaded_bytes.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 7,
+        "item_index": 59
+      },
+      "acceptance": [
+        "files",
+        "bytes",
+        "uploaded_bytes",
+        "resumed_bytes",
+        "retransmissions"
+      ]
+    },
+    {
+      "id": "F25",
+      "statement": "Parallel probe measured17825900 unique bytes versus22020204 wire bytes, peak4, seven PUT attempts for six unique parts.",
+      "importance": "medium",
+      "status": "active",
+      "evidence": {
+        "turn": 7,
+        "item_index": 63
+      },
+      "acceptance": [
+        "17825900",
+        "22020204",
+        "4",
+        "7",
+        "6"
+      ]
+    },
+    {
+      "id": "F26",
+      "statement": "Pending part scheduling now uses a lazy iterator rather than materializing the entire jobs array.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 8,
+        "item_index": 70
+      },
+      "acceptance": [
+        "lazy iterator",
+        "pendingParts"
+      ]
+    },
+    {
+      "id": "F27",
+      "statement": "No source snapshots/locks/watchers; users must not modify files while upload runs.",
+      "importance": "high",
+      "status": "scope_boundary",
+      "evidence": {
+        "turn": 8,
+        "item_index": 68
+      },
+      "acceptance": [
+        "snapshot",
+        "lock",
+        "watcher",
+        "out of scope"
+      ]
+    },
+    {
+      "id": "F28",
+      "statement": "Remote status identity must match size/hash/chunk size; mismatch gives session_mismatch; only missing/expired sessions restart.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 8,
+        "item_index": 68
+      },
+      "acceptance": [
+        "file_size",
+        "file_sha256",
+        "part_size",
+        "session_mismatch",
+        "missing",
+        "expired"
+      ]
+    },
+    {
+      "id": "F29",
+      "statement": "Exit codes are0 success,1 server/transport/local I/O,2 usage/config,3 resume state,130 interruption.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 9,
+        "item_index": 73
+      },
+      "acceptance": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "130"
+      ]
+    },
+    {
+      "id": "F30",
+      "statement": "Cancellation now settles queued journal writes in finally and schedules no new jobs.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 9,
+        "item_index": 77
+      },
+      "acceptance": [
+        "finally",
+        "settled",
+        "no new"
+      ]
+    },
+    {
+      "id": "F31",
+      "statement": "Effective concurrency is min(requested, maximum_parallel_parts), preserving requested2.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 10,
+        "item_index": 80
+      },
+      "acceptance": [
+        "min",
+        "maximum_parallel_parts",
+        "2"
+      ]
+    },
+    {
+      "id": "F32",
+      "statement": "Capability tests12 passed, including malformed responses, protocol2, missing SHA256, and dry-run skipping discovery.",
+      "importance": "medium",
+      "status": "active",
+      "evidence": {
+        "turn": 10,
+        "item_index": 82
+      },
+      "acceptance": [
+        "12",
+        "protocol2",
+        "sha256",
+        "dry-run"
+      ]
+    },
+    {
+      "id": "F33",
+      "statement": "Durability tested Linux only; Windows directory-fsync/rename remains unvalidated.",
+      "importance": "high",
+      "status": "limitation",
+      "evidence": {
+        "turn": 10,
+        "item_index": 86
+      },
+      "acceptance": [
+        "Linux",
+        "Windows",
+        "unvalidated"
+      ]
+    },
+    {
+      "id": "F34",
+      "statement": "wire_bytes is only in development probes and is not in public JSON events.",
+      "importance": "medium",
+      "status": "active",
+      "evidence": {
+        "turn": 10,
+        "item_index": 88
+      },
+      "acceptance": [
+        "wire_bytes",
+        "not public"
+      ]
+    },
+    {
+      "id": "F35",
+      "statement": "Receipt fast path counts whole file as resumed, while partial resume separates validated saved parts from new uploaded parts.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 10,
+        "item_index": 88
+      },
+      "acceptance": [
+        "receipt",
+        "resumed",
+        "partial",
+        "uploaded"
+      ]
+    },
+    {
+      "id": "F36",
+      "statement": "Latest full local checks passed103 unit and84 integration tests plus strict typecheck/diff-check.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 11,
+        "item_index": 96
+      },
+      "acceptance": [
+        "103",
+        "84",
+        "typecheck",
+        "diff"
+      ]
+    },
+    {
+      "id": "F37",
+      "statement": "Latest check command did not run build or remote smoke; runtime dependencies remain empty.",
+      "importance": "medium",
+      "status": "active",
+      "evidence": {
+        "turn": 11,
+        "item_index": 96
+      },
+      "acceptance": [
+        "build not run",
+        "remote not run",
+        "dependencies"
+      ]
+    },
+    {
+      "id": "F38",
+      "statement": "Stress S1 used seed83177 and103 files, with103 objects/receipts, peak4, one reconciliation GET, zero lost journal records.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 11,
+        "item_index": 94
+      },
+      "acceptance": [
+        "83177",
+        "103",
+        "4",
+        "1",
+        "0"
+      ]
+    },
+    {
+      "id": "F39",
+      "statement": "No real-service smoke has run; dedicated tenant/credentials are required later.",
+      "importance": "high",
+      "status": "limitation",
+      "evidence": {
+        "turn": 11,
+        "item_index": 89
+      },
+      "acceptance": [
+        "no real-service",
+        "dedicated",
+        "credentials"
+      ]
+    },
+    {
+      "id": "F40",
+      "statement": "R1 is an unfixed negative Retry-After bug: Date.parse accepts -1 after numeric rejection; strict parsing and fallback-delay assertion required.",
+      "importance": "high",
+      "status": "pending",
+      "evidence": {
+        "turn": 11,
+        "item_index": 98
+      },
+      "acceptance": [
+        "R1",
+        "-1",
+        "Date.parse",
+        "strict",
+        "pending"
+      ]
+    },
+    {
+      "id": "F41",
+      "statement": "R2 is an unfixed completed-session identity-validation omission; move validateSession before open and complete branches.",
+      "importance": "high",
+      "status": "pending",
+      "evidence": {
+        "turn": 11,
+        "item_index": 98
+      },
+      "acceptance": [
+        "R2",
+        "validateSession",
+        "complete",
+        "pending"
+      ]
+    },
+    {
+      "id": "F42",
+      "statement": "R3 is an obsolete README --no-resume example; replace with --resume=off without alias.",
+      "importance": "high",
+      "status": "pending",
+      "evidence": {
+        "turn": 11,
+        "item_index": 98
+      },
+      "acceptance": [
+        "R3",
+        "README",
+        "--no-resume",
+        "--resume=off"
+      ]
+    },
+    {
+      "id": "F43",
+      "statement": "R4 descriptor reuse is only a follow-up; no atomic snapshot implementation is required.",
+      "importance": "medium",
+      "status": "deferred",
+      "evidence": {
+        "turn": 11,
+        "item_index": 98
+      },
+      "acceptance": [
+        "R4",
+        "descriptor",
+        "follow-up"
+      ]
+    },
+    {
+      "id": "F44",
+      "statement": "R5 many idle sessions for huge trees is a follow-up, not a current scheduling-correctness failure.",
+      "importance": "medium",
+      "status": "deferred",
+      "evidence": {
+        "turn": 11,
+        "item_index": 98
+      },
+      "acceptance": [
+        "R5",
+        "idle",
+        "follow-up"
+      ]
+    },
+    {
+      "id": "F45",
+      "statement": "R6 plain-text stderr parser errors before --json recognition should be documented without redesign.",
+      "importance": "high",
+      "status": "active",
+      "evidence": {
+        "turn": 11,
+        "item_index": 98
+      },
+      "acceptance": [
+        "R6",
+        "stderr",
+        "--json",
+        "document"
+      ]
+    },
+    {
+      "id": "F46",
+      "statement": "Latest user revokes immediate commit permission: fix R1/R2/R3, document R6, run affected tests+typecheck, show diff before committing.",
+      "importance": "high",
+      "status": "approval_boundary",
+      "evidence": {
+        "turn": 12,
+        "item_index": 99
+      },
+      "acceptance": [
+        "R1",
+        "R2",
+        "R3",
+        "R6",
+        "affected tests",
+        "typecheck",
+        "before commit"
+      ]
+    },
+    {
+      "id": "F47",
+      "statement": "At checkpoint those fixes are not implemented; only retry.ts has been reread and work promised.",
+      "importance": "high",
+      "status": "pending",
+      "evidence": {
+        "turn": 12,
+        "item_index": 102
+      },
+      "acceptance": [
+        "not implemented",
+        "reread retry.ts"
+      ]
+    },
+    {
+      "id": "F48",
+      "statement": "Local backoff starts500ms, doubles to30000ms cap, jitters50%–100% when Retry-After invalid/missing.",
+      "importance": "medium",
+      "status": "active",
+      "evidence": {
+        "turn": 12,
+        "item_index": 102
+      },
+      "acceptance": [
+        "500",
+        "30000",
+        "50%",
+        "100%"
+      ]
+    },
+    {
+      "id": "F49",
+      "statement": "Follow-ups must be recorded in docs/development-notes.md, including Windows durability and missing real-service smoke.",
+      "importance": "medium",
+      "status": "active",
+      "evidence": {
+        "turn": 12,
+        "item_index": 99
+      },
+      "acceptance": [
+        "docs/development-notes.md",
+        "Windows",
+        "smoke"
+      ]
+    },
+    {
+      "id": "F50",
+      "statement": "The green full suite predates final review and does not prove pending R1/R2/R3 fixes are done.",
+      "importance": "high",
+      "status": "pending",
+      "evidence": {
+        "turn": 11,
+        "item_index": 98
+      },
+      "acceptance": [
+        "green",
+        "before review",
+        "pending"
+      ]
+    }
+  ]
+}

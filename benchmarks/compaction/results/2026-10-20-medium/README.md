@@ -117,12 +117,12 @@ K4/K5 的 155 个回答完全相同。两者对 `tool_history-01` 至 `tool_hist
 ## 已提交材料与复跑
 
 - 输入、题目和 gold：[开发完整材料](../../fixtures/normal.json)、[开发题目](../../fixtures/normal-questions.json)、[高密度完整材料与题目](stress-fixture.json)。高密度文件也保存实际 U；可以直接用它重跑，无需重新生成。
-- 冻结提示词与来源：[prompts/manifest.json](../../prompts/manifest.json)。K3 逐字保存用户提供的版本，不声称对应某个 Claude Code 官方发布版本。
+- 冻结提示词与来源：[prompts/manifest.json](../../prompts/manifest.json)。K3 基于用户提供的全文，不声称对应某个 Claude Code 官方发布版本。后续核对发现一个示例占位措辞差异：原文 `[User feedback on the error if any]`，实测快照为 `[User feedback on the fix, if any]`；保留实测文本与原始成绩。
 - 开发产物：[K1](normal-K1.txt)、[K2](normal-K2.txt)、[K3](normal-K3.txt)、[K5](normal-K5.txt)；高密度产物：[K1](stress-K1.txt)、[K2](stress-K2.txt)、[K3](stress-K3.txt)、[K5](stress-K5.txt)。
 - [开发 K4 元数据](normal-K4-metadata.json)、[高密度 K4 元数据](stress-K4-metadata.json)记录原生 item 类型和是否共用同一个 K4。密文及真实服务标识留在本地；元数据不能作为可重放检查点。复跑 K4/K5 要重新生成自己的 K4。
 - 每份 `*-quiz-*.txt` 是实际回答；[results.json](results.json)链接它们并记录 hash、逐题预期/实际、分类分数、每次 usage、请求设置、响应设置与时间。公开文件可离线复算评分；不包含凭据、真实会话或设备专有路径。
 
-执行命令和环境参数见[benchmark 用法](../../README.md#手动运行)。本轮最终评测源码可以直接重跑同样方法；模型生成不保证逐字复现。通常的运行产物在忽略目录中，本次样本是显式整理提交；benchmark 不进入 CI 或 npm 包。
+执行命令和环境参数见[benchmark 用法](../../README.md#手动运行)。本轮五路 runner 固定在[提交 d766451](https://github.com/WAcry/codeks-bridge/tree/d766451c643e6b2e8c270f304a2d2b28ed203872/benchmarks/compaction)；当前入口已采用四路新编号，不能直接将新编号解释为本报告的五路编号。模型生成不保证逐字复现。通常的运行产物在忽略目录中，本次样本是显式整理提交；benchmark 不进入 CI 或 npm 包。
 
 在仓库根目录离线复算已归档的全部最终与初步回答，不调用 API：
 

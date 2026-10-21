@@ -1,0 +1,10 @@
+{
+  "type": "compaction",
+  "ciphertext_characters": 142712,
+  "replayable": false,
+  "source": {
+    "experiment": "replication",
+    "case": "stress-3617033",
+    "arm": "K3"
+  }
+}

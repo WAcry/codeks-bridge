@@ -1,0 +1,10 @@
+{
+  "type": "compaction",
+  "ciphertext_characters": 157540,
+  "replayable": false,
+  "source": {
+    "experiment": "replication",
+    "case": "ablation-3617033",
+    "arm": "legacy-plus-tools"
+  }
+}
