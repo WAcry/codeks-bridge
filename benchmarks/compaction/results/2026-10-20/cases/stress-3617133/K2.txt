@@ -1,0 +1,390 @@
+<analysis>
+I can provide a factual summary of the requests, recorded data, and previous actions. The conversation concerns preserving authoritative project records across ten epochs, with unrelated archive material explicitly excluded. There was no code development, file work, or documented troubleshooting. The summary below distinguishes user-provided records from tool results and assistant acknowledgments, preserves the current instructions, and includes the complete most recent epoch for continuation. Earlier epochs contain separate active records and remain authoritative; they were not replaced by later epochs.
+</analysis>
+
+<summary>
+1. Primary Request and Intent:
+
+The user supplied authoritative records for project 3617133 across epochs 0 through 9. Each epoch contains 20 separate identifiers. Across all epochs, the identifiers cover 1 through 200.
+
+For epoch e, the identifiers are e+1, e+11, e+21, and so on through e+191. For example, epoch 0 covers 1, 11, …, 191, and epoch 9 covers 10, 20, …, 200.
+
+For every epoch, the user supplied six messages in this order:
+
+a. AUTHORITATIVE EXACT LEDGER: 20 parameter keys and exact values.
+b. AUTHORITATIVE DIRECTED ROUTES: 20 source-to-target routes.
+c. SUPERSEDED CANDIDATES: 20 explicitly obsolete correction values.
+d. FINAL AUTHORITATIVE CORRECTIONS: 20 final correction values replacing those obsolete candidates.
+e. AUTHORITATIVE WORK CHECKPOINT: 20 work items, each associated with a state, receipt, and next-action identifier.
+f. UNRELATED ARCHIVAL MATERIAL: large amounts of obsolete simulation material explicitly excluded from active-project continuation.
+
+The user's exact preservation requirements were:
+
+“Preserve every key and value exactly.”
+
+“Every arrow is directional and current.”
+
+“Every value in this ledger is obsolete.”
+
+“These values replace the superseded candidates exactly.”
+
+“Each state, receipt, and next action is current and must remain associated with its work item.”
+
+“Ignore it for active-project continuation.”
+
+The archive messages repeatedly specified that archive notebooks were unrelated and their obsolete simulation values were “non-authoritative; they update no active key, route, tool result, correction, or task checkpoint.”
+
+The primary objective was accurate retention of these records and their associations. No application behavior, implementation task, deployment, or actual execution of the opaque next-action identifiers was requested.
+
+The latest request is to summarize the conversation in plain text using an <analysis> block followed by a <summary> block, without calling tools.
+
+Current explicit tool constraints, preserved verbatim:
+
+“CRITICAL: Respond with TEXT ONLY. Do NOT call any tools.”
+
+“- Do NOT use Read, Bash, Grep, Glob, Edit, Write, or ANY other tool.
+- You already have all the context you need in the conversation above.
+- Tool calls will be REJECTED and will waste your only turn — you will fail the task.
+- Your entire response must be plain text: an <analysis> block followed by a <summary> block.”
+
+“REMINDER: Do NOT call any tools. Respond with plain text only — an <analysis> block followed by a <summary> block. Tool calls will be rejected and you will fail the task.”
+
+No credentials, sensitive-file restrictions, secret-handling rules, or other security-specific requirements were supplied.
+
+2. Key Technical Concepts:
+
+- Project identifier: 3617133.
+- Ten epochs, numbered 0–9.
+- Twenty identifiers per epoch, covering 200 identifiers overall.
+- Exact string preservation: values are opaque identifiers and must not be inferred, normalized, shortened, regenerated, or reassigned.
+- Parameter namespace:
+  parameter-3617133-N=value-HEX
+- Directed routing namespace:
+  route-source-3617133-N->route-target-HEX
+- Probe namespace:
+  probe-3617133-N=probe-result-HEX
+- Correction namespace:
+  corrected-field-3617133-N=final-HEX
+- Obsolete correction candidates use obsolete-HEX and must not be used as current values.
+- Work checkpoint namespace:
+  work-item-3617133-N:STATE|receipt=receipt-HEX|next=next-HEX
+- Work states appearing in the records:
+  QUEUED, IN_PROGRESS, VERIFYING, BLOCKED, DONE.
+- State, receipt, and next action form an associated record for a particular work item.
+- A DONE state does not remove the supplied receipt or next field.
+- Routes are directional. There is no authorization to reverse an arrow or assume a reverse route exists.
+- Later epochs introduce different identifiers; they do not globally supersede earlier epochs.
+- Final corrections supersede the obsolete candidates for the same corrected-field key. They do not replace parameters, routes, probe results, or checkpoints.
+- Archive notebook numbers and simulation values have no effect on active records.
+- No programming languages, frameworks, database schema, application architecture, or implementation patterns were discussed.
+
+The available read-only tool used earlier had this signature:
+
+functions.database_query({
+  project: integer,
+  probe: string
+})
+
+Its description was: “Read an authoritative project probe without modifying state.”
+
+Earlier assistant calls were represented as multi_tool_use.parallel batches, each containing 20 functions.database_query calls for the current epoch. The authoritative responses appeared individually as functions.database_query tool messages.
+
+3. Files and Code Sections:
+
+No files were examined, created, edited, or deleted. No filesystem paths, repositories, branches, commits, pull requests, tests, or source-code sections were provided.
+
+There are no application code snippets to preserve.
+
+The only operational invocation pattern was:
+
+functions.database_query({
+  "probe": "probe-3617133-N",
+  "project": 3617133
+})
+
+The tool returned:
+
+AUTHORITATIVE TOOL OUTPUT probe-3617133-N=probe-result-HEX
+
+These were read-only queries. There is no evidence of external persistence or database mutations.
+
+The assistant's acknowledgments such as “Recorded,” “Applied,” and “Archived” describe its handling of conversation context. They are not evidence that files were written, an external ledger was updated, corrections were applied to a running system, or archive notebooks were actually stored somewhere.
+
+4. Errors and fixes:
+
+No tool errors, implementation failures, failed tests, or troubleshooting steps were reported.
+
+The user did not issue corrections about an assistant implementation. The “FINAL AUTHORITATIVE CORRECTIONS” messages were part of the user's data sequence and explicitly replaced previously supplied obsolete correction candidates.
+
+Some archive messages ended mid-sentence or mid-entry. Their opening instructions unambiguously classified the entire supplied archive material as unrelated and non-authoritative. No active record should be changed based on those partial archive entries.
+
+A reporting limitation in the earlier acknowledgments is that “Applied” and “Archived” could sound like external changes. The actual visible actions were conversation acknowledgments and read-only probe queries; no write operation was shown.
+
+The earlier probe-running announcements were assistant messages, not user requests. Do not attribute those announcements or the assistant's parallel-call payloads to the user as explicit instructions.
+
+5. Problem Solving:
+
+For each epoch, the assistant followed the same record-handling sequence:
+
+- Acknowledged the exact parameter ledger.
+- Acknowledged the directed routing graph.
+- Announced authoritative probes and queried all 20 probe identifiers for that epoch.
+- Received 20 authoritative probe outputs.
+- Acknowledged recording those results.
+- Marked the supplied superseded correction candidates obsolete.
+- Acknowledged the final corrections.
+- Acknowledged the work checkpoint.
+- Acknowledged the unrelated archive material while stating active-project state was unchanged.
+
+There were 10 batches of 20 probes, totaling 200 authoritative probe results.
+
+The central data-resolution rules are:
+
+- Use the exact supplied parameter value for each parameter key.
+- Use the exact target associated with each route source, in the supplied direction.
+- Use the actual authoritative tool output for each probe.
+- Use final- values for current corrected-field records.
+- Keep obsolete- candidates excluded from current corrected-field values.
+- Keep every work item's state, receipt, and next identifier together.
+- Exclude every archive simulation value from active-project state.
+
+No ongoing troubleshooting exists. There is no evidence that the work items themselves were advanced or that their next identifiers were executed.
+
+6. All user messages:
+
+There were 60 record-supply user messages, followed by the current summary request: 61 user messages total. The list below identifies every user-role message in chronological order. It summarizes the message contents rather than reproducing the large archive bodies or all earlier opaque values.
+
+Epoch 0:
+1. AUTHORITATIVE EXACT LEDGER, epoch 0: parameter records for identifiers 1, 11, 21, 31, 41, 51, 61, 71, 81, 91, 101, 111, 121, 131, 141, 151, 161, 171, 181, 191. Required exact preservation.
+2. AUTHORITATIVE DIRECTED ROUTES, epoch 0: current directional routes for those identifiers.
+3. SUPERSEDED CANDIDATES, epoch 0: obsolete corrected-field values for those identifiers.
+4. FINAL AUTHORITATIVE CORRECTIONS, epoch 0: final corrected-field values replacing the obsolete candidates exactly.
+5. AUTHORITATIVE WORK CHECKPOINT, epoch 0: current states, receipts, and next identifiers for those work items.
+6. UNRELATED ARCHIVAL MATERIAL FOR EPOCH 0: unrelated obsolete simulation material; explicitly excluded from active continuation.
+
+Epoch 1:
+7. AUTHORITATIVE EXACT LEDGER, epoch 1: parameter records for identifiers 2, 12, 22, 32, 42, 52, 62, 72, 82, 92, 102, 112, 122, 132, 142, 152, 162, 172, 182, 192.
+8. AUTHORITATIVE DIRECTED ROUTES, epoch 1: current directional routes for those identifiers.
+9. SUPERSEDED CANDIDATES, epoch 1: obsolete corrected-field values.
+10. FINAL AUTHORITATIVE CORRECTIONS, epoch 1: final replacements.
+11. AUTHORITATIVE WORK CHECKPOINT, epoch 1: associated states, receipts, and next identifiers.
+12. UNRELATED ARCHIVAL MATERIAL FOR EPOCH 1: excluded unrelated archive material.
+
+Epoch 2:
+13. AUTHORITATIVE EXACT LEDGER, epoch 2: parameter records for identifiers 3, 13, 23, 33, 43, 53, 63, 73, 83, 93, 103, 113, 123, 133, 143, 153, 163, 173, 183, 193.
+14. AUTHORITATIVE DIRECTED ROUTES, epoch 2.
+15. SUPERSEDED CANDIDATES, epoch 2.
+16. FINAL AUTHORITATIVE CORRECTIONS, epoch 2.
+17. AUTHORITATIVE WORK CHECKPOINT, epoch 2.
+18. UNRELATED ARCHIVAL MATERIAL FOR EPOCH 2: excluded unrelated archive material.
+
+Epoch 3:
+19. AUTHORITATIVE EXACT LEDGER, epoch 3: parameter records for identifiers 4, 14, 24, 34, 44, 54, 64, 74, 84, 94, 104, 114, 124, 134, 144, 154, 164, 174, 184, 194.
+20. AUTHORITATIVE DIRECTED ROUTES, epoch 3.
+21. SUPERSEDED CANDIDATES, epoch 3.
+22. FINAL AUTHORITATIVE CORRECTIONS, epoch 3.
+23. AUTHORITATIVE WORK CHECKPOINT, epoch 3.
+24. UNRELATED ARCHIVAL MATERIAL FOR EPOCH 3: excluded unrelated archive material.
+
+Epoch 4:
+25. AUTHORITATIVE EXACT LEDGER, epoch 4: parameter records for identifiers 5, 15, 25, 35, 45, 55, 65, 75, 85, 95, 105, 115, 125, 135, 145, 155, 165, 175, 185, 195.
+26. AUTHORITATIVE DIRECTED ROUTES, epoch 4.
+27. SUPERSEDED CANDIDATES, epoch 4.
+28. FINAL AUTHORITATIVE CORRECTIONS, epoch 4.
+29. AUTHORITATIVE WORK CHECKPOINT, epoch 4.
+30. UNRELATED ARCHIVAL MATERIAL FOR EPOCH 4: excluded unrelated archive material.
+
+Epoch 5:
+31. AUTHORITATIVE EXACT LEDGER, epoch 5: parameter records for identifiers 6, 16, 26, 36, 46, 56, 66, 76, 86, 96, 106, 116, 126, 136, 146, 156, 166, 176, 186, 196.
+32. AUTHORITATIVE DIRECTED ROUTES, epoch 5.
+33. SUPERSEDED CANDIDATES, epoch 5.
+34. FINAL AUTHORITATIVE CORRECTIONS, epoch 5.
+35. AUTHORITATIVE WORK CHECKPOINT, epoch 5.
+36. UNRELATED ARCHIVAL MATERIAL FOR EPOCH 5: excluded unrelated archive material.
+
+Epoch 6:
+37. AUTHORITATIVE EXACT LEDGER, epoch 6: parameter records for identifiers 7, 17, 27, 37, 47, 57, 67, 77, 87, 97, 107, 117, 127, 137, 147, 157, 167, 177, 187, 197.
+38. AUTHORITATIVE DIRECTED ROUTES, epoch 6.
+39. SUPERSEDED CANDIDATES, epoch 6.
+40. FINAL AUTHORITATIVE CORRECTIONS, epoch 6.
+41. AUTHORITATIVE WORK CHECKPOINT, epoch 6.
+42. UNRELATED ARCHIVAL MATERIAL FOR EPOCH 6: excluded unrelated archive material.
+
+Epoch 7:
+43. AUTHORITATIVE EXACT LEDGER, epoch 7: parameter records for identifiers 8, 18, 28, 38, 48, 58, 68, 78, 88, 98, 108, 118, 128, 138, 148, 158, 168, 178, 188, 198.
+44. AUTHORITATIVE DIRECTED ROUTES, epoch 7.
+45. SUPERSEDED CANDIDATES, epoch 7.
+46. FINAL AUTHORITATIVE CORRECTIONS, epoch 7.
+47. AUTHORITATIVE WORK CHECKPOINT, epoch 7.
+48. UNRELATED ARCHIVAL MATERIAL FOR EPOCH 7: excluded unrelated archive material.
+
+Epoch 8:
+49. AUTHORITATIVE EXACT LEDGER, epoch 8: parameter records for identifiers 9, 19, 29, 39, 49, 59, 69, 79, 89, 99, 109, 119, 129, 139, 149, 159, 169, 179, 189, 199.
+50. AUTHORITATIVE DIRECTED ROUTES, epoch 8.
+51. SUPERSEDED CANDIDATES, epoch 8.
+52. FINAL AUTHORITATIVE CORRECTIONS, epoch 8.
+53. AUTHORITATIVE WORK CHECKPOINT, epoch 8.
+54. UNRELATED ARCHIVAL MATERIAL FOR EPOCH 8: excluded unrelated archive material.
+
+Epoch 9:
+55. AUTHORITATIVE EXACT LEDGER, epoch 9: parameter records for identifiers 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200.
+56. AUTHORITATIVE DIRECTED ROUTES, epoch 9.
+57. SUPERSEDED CANDIDATES, epoch 9.
+58. FINAL AUTHORITATIVE CORRECTIONS, epoch 9.
+59. AUTHORITATIVE WORK CHECKPOINT, epoch 9.
+60. UNRELATED ARCHIVAL MATERIAL FOR EPOCH 9: excluded unrelated archive material, ending with repeated “archived” padding.
+
+Current request:
+61. Requested this detailed conversation summary with nine sections, exact preservation of applicable constraints, correct attribution of user-role messages, no tool calls, and plain text containing an <analysis> block followed by a <summary> block.
+
+The 200 probe results are tool messages, not user messages. Assistant acknowledgments and probe announcements likewise are not user messages.
+
+7. Pending Tasks:
+
+The current task is this summary.
+
+No development task is pending. The user has not requested implementation, file changes, tests, deployment, or execution of work-item next actions.
+
+The checkpoints contain unfinished work states, but their opaque next-action identifiers do not describe executable operations. Their presence alone does not establish that the assistant has been asked to perform those operations.
+
+All earlier exact values remain authoritative in their original messages. This summary does not reproduce the complete opaque-value payloads of epochs 0–8 and therefore is not a lossless replacement for the original conversation ledger. Do not reconstruct missing earlier values from patterns or assume epoch 9 supersedes them.
+
+8. Current Work:
+
+Immediately before the summary request, the assistant had finished acknowledging epoch 9's unrelated archival material.
+
+The latest assistant response was:
+
+“Archived epoch 9; active-project state is unchanged.”
+
+The latest active records preceding that archive were the epoch 9 checkpoint. The user explicitly required:
+
+“Each state, receipt, and next action is current and must remain associated with its work item.”
+
+The complete current epoch 9 active data is reproduced below. Each namespace remains distinct.
+
+Epoch 9 exact parameter ledger:
+
+parameter-3617133-10=value-a3ee0985c53529e06d0a0af8
+parameter-3617133-20=value-5d9319794afbdfddd03f8aa3
+parameter-3617133-30=value-315afdd1e5e3d22c92bd5bd1
+parameter-3617133-40=value-455a41af06afd18acc26bd0a
+parameter-3617133-50=value-f331e458974867f4393967a7
+parameter-3617133-60=value-7711113e4455896e6072c548
+parameter-3617133-70=value-c706eb9abdf04595a3874b49
+parameter-3617133-80=value-9beee947286a174cb63ffb34
+parameter-3617133-90=value-3c78e031f76651133ea976d1
+parameter-3617133-100=value-9805347da45950dec71f64f6
+parameter-3617133-110=value-9e7bff59c53cdc62a5ec85fd
+parameter-3617133-120=value-325394cdd4528bd41a3aa4c8
+parameter-3617133-130=value-cf387789336d2ff81b1fc80e
+parameter-3617133-140=value-8884f62e60913d98a5da8ace
+parameter-3617133-150=value-b34c4e4580f1a7f2239c60a9
+parameter-3617133-160=value-5304a37df665b1fff8479bea
+parameter-3617133-170=value-96642b3a7f69ae7442a0c096
+parameter-3617133-180=value-5dee0d2cebaa42287e4daa77
+parameter-3617133-190=value-6e842e897ce8d40ef3b53da3
+parameter-3617133-200=value-c1c6a9b79d8b830f00385662
+
+Epoch 9 directed routes:
+
+route-source-3617133-10->route-target-a144c45b51f512f5312cc3
+route-source-3617133-20->route-target-085afdf63f31a0d7a48600
+route-source-3617133-30->route-target-8185041de1ff21302a8f62
+route-source-3617133-40->route-target-ad19e488563d60b8052427
+route-source-3617133-50->route-target-07665c9da07321451b9adb
+route-source-3617133-60->route-target-10d2fafcefe63fb3064c9e
+route-source-3617133-70->route-target-dd8a8582505cf6d2ca2f13
+route-source-3617133-80->route-target-ac7d9396c78485c24d4c0a
+route-source-3617133-90->route-target-60af433fadd415ed089404
+route-source-3617133-100->route-target-1653722b8168fb9a641305
+route-source-3617133-110->route-target-e176f3139d0016b93cb996
+route-source-3617133-120->route-target-56fbf26a9172283c867c8c
+route-source-3617133-130->route-target-7b71d287dc5728d4479ada
+route-source-3617133-140->route-target-dd4c04f0f65e797fa6a9ad
+route-source-3617133-150->route-target-31224ef86c5c7f10490d0c
+route-source-3617133-160->route-target-9dcfd37fbfd23efc44cfd3
+route-source-3617133-170->route-target-1f3962c2a5eeef7550d977
+route-source-3617133-180->route-target-d472f453751ae3f5f6a267
+route-source-3617133-190->route-target-488ef830757627a4f6f386
+route-source-3617133-200->route-target-d303ac01929ba0b4884c6f
+
+Epoch 9 authoritative probe results:
+
+probe-3617133-10=probe-result-22030ae85c899f95022565ef38
+probe-3617133-20=probe-result-7d95f64265314ed5d62d11fd4b
+probe-3617133-30=probe-result-c2e54a2029535eed5d2be2a269
+probe-3617133-40=probe-result-2a15a751aaca83984d07c8f15a
+probe-3617133-50=probe-result-e037ae22001b376554198d2b36
+probe-3617133-60=probe-result-dcac547187fc6eff4f3b149d8c
+probe-3617133-70=probe-result-a805b6f4c482a0f9ddb0bc630e
+probe-3617133-80=probe-result-94b075f2880ae75f5f3cbb4075
+probe-3617133-90=probe-result-5dcbd5740e63ae21d11a0384b0
+probe-3617133-100=probe-result-291b3171328614506fb50dbc4c
+probe-3617133-110=probe-result-7385a58bb215c28b6b1a826ef3
+probe-3617133-120=probe-result-abc8226212fd02e90df9012564
+probe-3617133-130=probe-result-a4d3d3102585586ace767661cb
+probe-3617133-140=probe-result-fc89cfb38055cf7b3c2a277902
+probe-3617133-150=probe-result-b4ed3e6d989e9aff0702c706f0
+probe-3617133-160=probe-result-ddaa8853dfde29ac74e98eeeec
+probe-3617133-170=probe-result-b7630f4bf53a2c1dbd6e75467c
+probe-3617133-180=probe-result-6ab913bded6a6c9a38b07e3794
+probe-3617133-190=probe-result-20ec4470e7e5c89e874c80943b
+probe-3617133-200=probe-result-e5086c4f26b0c65530b149331c
+
+Epoch 9 final authoritative corrections:
+
+corrected-field-3617133-10=final-7dfde75d0576fd10a95991ba
+corrected-field-3617133-20=final-393bcbd97cfeb99995daf41a
+corrected-field-3617133-30=final-bb9beaadafd026784b105c54
+corrected-field-3617133-40=final-f5c6d8e73e7feda7711e7f4c
+corrected-field-3617133-50=final-8fc2d66f48511bdb4c76d95a
+corrected-field-3617133-60=final-ff0ac7ceaa19a00418d85420
+corrected-field-3617133-70=final-731f333643d6b357e7429a21
+corrected-field-3617133-80=final-d479f5ba7b051b86e9ffe939
+corrected-field-3617133-90=final-f78bc02ec34d8cde98f4a5f2
+corrected-field-3617133-100=final-3cfc8920153ff015cce619dd
+corrected-field-3617133-110=final-9c8b1b9349bb14dfecf7131c
+corrected-field-3617133-120=final-49c3d400ffa5ed2dc7ff18a4
+corrected-field-3617133-130=final-418ab9a286b633ab7d532a4e
+corrected-field-3617133-140=final-2bd5f8cce44641104902ba8b
+corrected-field-3617133-150=final-73ab030e91f59bd47ec1745e
+corrected-field-3617133-160=final-1bf7594d4f59cad9b579ea83
+corrected-field-3617133-170=final-0c7e18e8c481945f25545cba
+corrected-field-3617133-180=final-c6a96d6f6b379470f62f1631
+corrected-field-3617133-190=final-5e36178d4b681fe06029570f
+corrected-field-3617133-200=final-074331d48136fde2fbace929
+
+Epoch 9 authoritative work checkpoint:
+
+work-item-3617133-10:BLOCKED|receipt=receipt-cc08c270017a842d56|next=next-589153ffd6d8877b29
+work-item-3617133-20:BLOCKED|receipt=receipt-cf49644ca312548adf|next=next-40a6e85829119ed32d
+work-item-3617133-30:QUEUED|receipt=receipt-1dd7bf548b897c674f|next=next-1948377bb3573dfe55
+work-item-3617133-40:QUEUED|receipt=receipt-e6a04f958e7a4ea75c|next=next-2289a1decd5f14de13
+work-item-3617133-50:DONE|receipt=receipt-37a33242b09f52de49|next=next-6a84fbaa4603c5b85b
+work-item-3617133-60:BLOCKED|receipt=receipt-023b3df1bed3727570|next=next-7f35e182a220b68fe2
+work-item-3617133-70:BLOCKED|receipt=receipt-ba047a0d613a5b71ae|next=next-fd321eb64fe6f5c774
+work-item-3617133-80:DONE|receipt=receipt-05b41518d89f2122c1|next=next-0b0ec823ce1b809ae0
+work-item-3617133-90:BLOCKED|receipt=receipt-727d892102dfc5c973|next=next-782718df4fb216ce85
+work-item-3617133-100:BLOCKED|receipt=receipt-01515293e4afb7a861|next=next-2fd77c7c5273c667ed
+work-item-3617133-110:DONE|receipt=receipt-73b9137b875c9b41db|next=next-e1871e0092ce687615
+work-item-3617133-120:BLOCKED|receipt=receipt-3f25dc6d7b7356eeba|next=next-bda0a247498aea7aad
+work-item-3617133-130:BLOCKED|receipt=receipt-c17ce8467d8c0b7f15|next=next-a7e0ac0168f170ea01
+work-item-3617133-140:IN_PROGRESS|receipt=receipt-a59aae189765274d86|next=next-3a1610e90ffc41f04f
+work-item-3617133-150:IN_PROGRESS|receipt=receipt-c86ba7a661810f7d7f|next=next-94891a088112e286ea
+work-item-3617133-160:VERIFYING|receipt=receipt-39b233bd6b3d7ba150|next=next-5bbb3efc51dc08b9d3
+work-item-3617133-170:IN_PROGRESS|receipt=receipt-6f1f00ad88ba6c6b5e|next=next-85eb2afc12c68c17ea
+work-item-3617133-180:QUEUED|receipt=receipt-c9418000b59b31423a|next=next-59efe573eb6acf3f16
+work-item-3617133-190:BLOCKED|receipt=receipt-4fbcdf46de7c4230d5|next=next-8de00d82e088b71e02
+work-item-3617133-200:VERIFYING|receipt=receipt-e14e6283c6001a297a|next=next-dc8e6b2ed8ce89c346
+
+Epoch 9 work-state counts are 9 BLOCKED, 3 QUEUED, 3 DONE, 3 IN_PROGRESS, and 2 VERIFYING. These counts are descriptive only; the exact individual records above govern continuation.
+
+The epoch 9 obsolete candidates remain obsolete. The archive material following the checkpoint changed none of the records above.
+
+9. Optional Next Step:
+
+No additional operational next step was requested before this summary. The record-handling sequence had concluded, and the current request is satisfied by providing this summary without tools.
+
+For subsequent continuation, preserve all active records across all ten epochs, use final corrections for their corresponding keys, retain route direction and work-item associations, and continue excluding unrelated archive material. Any exact lookup for an earlier epoch must use its original authoritative record or tool output; this summary does not supply every earlier opaque value.
+</summary>

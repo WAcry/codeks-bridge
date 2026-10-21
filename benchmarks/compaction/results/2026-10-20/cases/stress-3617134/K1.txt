@@ -1,0 +1,78 @@
+## Task and current progress
+
+The conversation is maintaining authoritative state for **project `3617134`**. The user supplied ten batches, **epochs 0–9**, covering **200 distinct IDs**. All batches have been acknowledged. There is no pending implementation, deployment, or other concrete action.
+
+Each epoch contains:
+
+1. An exact parameter ledger.
+2. Directed routes.
+3. Authoritative database probe results.
+4. Obsolete correction candidates.
+5. Final authoritative corrections replacing those candidates.
+6. A work checkpoint associating each item with its current state, receipt, and next-action token.
+7. Unrelated archival padding that must be ignored.
+
+## Rules that must survive compaction
+
+- **Preserve every authoritative key and value exactly**, including leading zeros.
+- Epoch `e` contains IDs `e + 1, e + 11, …, e + 191`. Thus epoch 0 contains IDs 1, 11, …, 191; epoch 9 contains IDs 10, 20, …, 200.
+- Epochs contain **different keys**. Later epochs do not invalidate earlier epochs’ records.
+- Routes are directional: `route-source-3617134-N -> route-target-…`. Do not reverse them.
+- Only `final-…` values are current for `corrected-field-3617134-N`. Every `obsolete-…` candidate was explicitly superseded.
+- Preserve the tuple **`state | receipt | next`** for each work item. A `DONE` state can still have a next-action token; retain it.
+- All archival notebooks and simulation values are explicitly non-authoritative and update nothing.
+- “Recorded,” “applied,” and “archived” in prior acknowledgments refer to conversational bookkeeping. **No persistent file or external database write was performed.**
+- Probe results were returned by `functions.database_query` with project `3617134` and probe names `probe-3617134-N`; results for all 200 probes appear in the preceding tool messages.
+
+## Authoritative source references
+
+For **each epoch 0–9**, retain or consult its preceding messages titled:
+
+- `AUTHORITATIVE EXACT LEDGER`
+- `AUTHORITATIVE DIRECTED ROUTES`
+- `AUTHORITATIVE TOOL OUTPUT` (20 results per epoch)
+- `FINAL AUTHORITATIVE CORRECTIONS`
+- `AUTHORITATIVE WORK CHECKPOINT`
+
+These messages contain the exact opaque values. **This summary is an index and continuation guide, not a complete replacement for those ledgers.** Do not infer or regenerate missing hashes from ID patterns.
+
+## Latest checkpoint: epoch 9
+
+The latest completed batch covers IDs 10, 20, …, 200. Its work checkpoint is:
+
+```text
+work-item-3617134-10:IN_PROGRESS|receipt=receipt-31577e6413e134b7bb|next=next-ca6c4ec1af525a83f8
+work-item-3617134-20:DONE|receipt=receipt-e7c9d04103c28daa9f|next=next-114269f89798323588
+work-item-3617134-30:DONE|receipt=receipt-bb724ac186f203f4c4|next=next-22b1b236d4c545c91e
+work-item-3617134-40:DONE|receipt=receipt-04bcbb412e9f8ce14b|next=next-1112dfc6ceeea854f0
+work-item-3617134-50:VERIFYING|receipt=receipt-90e308412ab1b08ec8|next=next-3140354647069bad71
+work-item-3617134-60:IN_PROGRESS|receipt=receipt-b69f84dc2a8d45e116|next=next-d60c5e798eab8cd0e7
+work-item-3617134-70:VERIFYING|receipt=receipt-14296463683150602b|next=next-d5eb36c9c0bc3176d3
+work-item-3617134-80:IN_PROGRESS|receipt=receipt-1d1bc5a56a604794af|next=next-e7c010ee0ba14c40ee
+work-item-3617134-90:IN_PROGRESS|receipt=receipt-852cdaffee2e14fb4b|next=next-6482def7bbb0ed03f7
+work-item-3617134-100:IN_PROGRESS|receipt=receipt-e2646a66e43ec6e298|next=next-a8169d6d4effd22d3b
+work-item-3617134-110:BLOCKED|receipt=receipt-56bafbde7fe39ff756|next=next-df10c75377e3474ef2
+work-item-3617134-120:IN_PROGRESS|receipt=receipt-4d199b651ea0e615f8|next=next-ff0e3b829e4201e8c5
+work-item-3617134-130:BLOCKED|receipt=receipt-05128f151f13d11888|next=next-d1e701ea2004c36cf2
+work-item-3617134-140:DONE|receipt=receipt-d7e37693b8610f65f7|next=next-88c0b0ba5dfca0f89f
+work-item-3617134-150:IN_PROGRESS|receipt=receipt-90f87822aa38355ed4|next=next-1633188e56ca9b8576
+work-item-3617134-160:QUEUED|receipt=receipt-b86e71ae8fbdcaac1f|next=next-1ebe0470afc5f16a00
+work-item-3617134-170:QUEUED|receipt=receipt-69dc044f5a69843b52|next=next-bc11406040475175ae
+work-item-3617134-180:IN_PROGRESS|receipt=receipt-3288bedaf2a1e45ef1|next=next-5c8937722d12943242
+work-item-3617134-190:QUEUED|receipt=receipt-fc0e7789d1a2af3297|next=next-c13517a0fe245b66a4
+work-item-3617134-200:VERIFYING|receipt=receipt-2b70a3f4a2c04dfe25|next=next-a9ab9886819763d74c
+```
+
+Example complete record, ID 200:
+
+```text
+parameter-3617134-200=value-4d7baa393bf58dc4853d5bd1
+route-source-3617134-200->route-target-8ee58a2d926a74b7ee7533
+probe-3617134-200=probe-result-77ab6bcf158abd44d71c321551
+corrected-field-3617134-200=final-0a8a993e6e89e99b7489d690
+work-item-3617134-200:VERIFYING|receipt=receipt-2b70a3f4a2c04dfe25|next=next-a9ab9886819763d74c
+```
+
+## Next steps
+
+Await the user’s next instruction or authoritative batch. Answer any lookup using the exact corresponding source record, including earlier epochs. Do not execute opaque `next-…` tokens or advance work-item states without an actual instruction and sufficient operational details. Continue ignoring archival padding.

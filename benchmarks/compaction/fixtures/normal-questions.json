@@ -1,0 +1,1773 @@
+{
+  "schema_version": 1,
+  "fixture_id": "normal",
+  "questions": [
+    {
+      "id": "Q001",
+      "question": "What are the project name, implementation language, minimum Node major version, and allowed runtime dependency count? Return {\"project\":string,\"language\":string,\"node_major_min\":number,\"runtime_dependencies\":number}.",
+      "expected": {
+        "project": "Driftship",
+        "language": "TypeScript",
+        "node_major_min": 22,
+        "runtime_dependencies": 0
+      },
+      "category": "context",
+      "fact_ids": [
+        "F01",
+        "F37"
+      ],
+      "evidence": [
+        {
+          "item_index": 0,
+          "quote": "Driftship, a TypeScript CLI"
+        },
+        {
+          "item_index": 0,
+          "quote": "Keep zero runtime dependencies and Node 22 or later."
+        },
+        {
+          "item_index": 96,
+          "quote": "runtime dependencies empty."
+        }
+      ]
+    },
+    {
+      "id": "Q002",
+      "question": "At the checkpoint, which repository or release actions may the assistant perform immediately? Return {\"remote_push\":boolean,\"merge\":boolean,\"package_publication\":boolean,\"local_commit\":boolean}, applying the latest user instruction.",
+      "expected": {
+        "remote_push": false,
+        "merge": false,
+        "package_publication": false,
+        "local_commit": false
+      },
+      "category": "authority",
+      "fact_ids": [
+        "F02",
+        "F46"
+      ],
+      "evidence": [
+        {
+          "item_index": 0,
+          "quote": "Do not publish, merge, or push anything to a remote."
+        },
+        {
+          "item_index": 99,
+          "quote": "Do not create the local commit yet."
+        }
+      ]
+    },
+    {
+      "id": "Q003",
+      "question": "What protocol revision must capability discovery report? Return an integer.",
+      "expected": 3,
+      "category": "protocol",
+      "fact_ids": [
+        "F03"
+      ],
+      "evidence": [
+        {
+          "item_index": 9,
+          "quote": "protocol:3"
+        },
+        {
+          "item_index": 80,
+          "quote": "if(data.protocol!==3)"
+        }
+      ]
+    },
+    {
+      "id": "Q004",
+      "question": "What preferred chunk size in bytes and maximum parallel part count does the server advertise? Return {\"preferred_chunk_bytes\":number,\"maximum_parallel_parts\":number}.",
+      "expected": {
+        "preferred_chunk_bytes": 4194304,
+        "maximum_parallel_parts": 4
+      },
+      "category": "protocol",
+      "fact_ids": [
+        "F03"
+      ],
+      "evidence": [
+        {
+          "item_index": 9,
+          "quote": "preferred_chunk_bytes:4194304, maximum_parallel_parts:4"
+        }
+      ]
+    },
+    {
+      "id": "Q005",
+      "question": "How must object URL construction handle the tenant prefix, path escaping, and Unicode spelling? Return {\"tenant_prefix\":\"preserve\"|\"discard\",\"escaping\":\"per_segment\"|\"whole_path\",\"unicode\":\"preserve\"|\"normalize\"}.",
+      "expected": {
+        "tenant_prefix": "preserve",
+        "escaping": "per_segment",
+        "unicode": "preserve"
+      },
+      "category": "protocol",
+      "fact_ids": [
+        "F04"
+      ],
+      "evidence": [
+        {
+          "item_index": 9,
+          "quote": "Preserve the entire path. Object names use escaped path segments, not a single escaped slash-containing string."
+        },
+        {
+          "item_index": 9,
+          "quote": "Do not normalize Unicode names."
+        }
+      ]
+    },
+    {
+      "id": "Q006",
+      "question": "Which dimensions must match for idempotent replay of an uploaded part? Return an array selected from [\"upload_id\",\"part_number\",\"byte_length\",\"checksum\",\"request_timestamp\",\"display_alias\"].",
+      "expected": [
+        "upload_id",
+        "part_number",
+        "byte_length",
+        "checksum"
+      ],
+      "category": "protocol",
+      "fact_ids": [
+        "F05"
+      ],
+      "evidence": [
+        {
+          "item_index": 9,
+          "quote": "Exact replay is idempotent for the same upload ID, part number, size, and checksum."
+        }
+      ],
+      "unordered": true
+    },
+    {
+      "id": "Q007",
+      "question": "What are the final upload defaults after the user revised the initial proposal? Return {\"workers\":number,\"chunk_bytes\":number,\"extra_retries\":number,\"total_attempts\":number}.",
+      "expected": {
+        "workers": 4,
+        "chunk_bytes": 4194304,
+        "extra_retries": 4,
+        "total_attempts": 5
+      },
+      "category": "defaults",
+      "fact_ids": [
+        "F06"
+      ],
+      "evidence": [
+        {
+          "item_index": 10,
+          "quote": "Use four workers and 4 MiB chunks, matching the server. Four retries means four extra attempts after the initial attempt."
+        },
+        {
+          "item_index": 11,
+          "quote": "five total attempts with four retries"
+        }
+      ]
+    },
+    {
+      "id": "Q008",
+      "question": "Where is the resume journal stored, relative to the source directory? Return the exact relative path.",
+      "expected": ".driftship/resume-v1.json",
+      "category": "journal",
+      "fact_ids": [
+        "F07"
+      ],
+      "evidence": [
+        {
+          "item_index": 10,
+          "quote": "Put the journal at .driftship/resume-v1.json inside the source directory"
+        }
+      ]
+    },
+    {
+      "id": "Q009",
+      "question": "What is the current default resume value? Return \"on\" or \"off\".",
+      "expected": "on",
+      "category": "resume",
+      "fact_ids": [
+        "F07",
+        "F20"
+      ],
+      "evidence": [
+        {
+          "item_index": 51,
+          "quote": "--resume=on|off, default on"
+        }
+      ]
+    },
+    {
+      "id": "Q010",
+      "question": "For an empty file, how many part requests are made, which digest algorithm is used, and what bytes are hashed? Return {\"part_requests\":number,\"digest_algorithm\":\"sha256\"|\"md5\",\"digest_input\":\"empty_bytes\"|\"path_bytes\"}.",
+      "expected": {
+        "part_requests": 0,
+        "digest_algorithm": "sha256",
+        "digest_input": "empty_bytes"
+      },
+      "category": "protocol",
+      "fact_ids": [
+        "F08"
+      ],
+      "evidence": [
+        {
+          "item_index": 9,
+          "quote": "Empty files use begin/complete with zero parts, SHA-256 of empty bytes, and no zero-byte part 1."
+        }
+      ]
+    },
+    {
+      "id": "Q011",
+      "question": "Which two directory names must the scanner exclude? Return an array of exact names.",
+      "expected": [
+        ".git",
+        ".driftship"
+      ],
+      "category": "scanning",
+      "fact_ids": [
+        "F09"
+      ],
+      "evidence": [
+        {
+          "item_index": 13,
+          "quote": "Keep .git and .driftship excluded."
+        }
+      ],
+      "unordered": true
+    },
+    {
+      "id": "Q012",
+      "question": "How does scanning treat each entry kind? Return {\"symlink\":\"include\"|\"skip\",\"fifo\":\"include\"|\"skip\",\"device\":\"include\"|\"skip\",\"ordinary_dotfile\":\"include\"|\"skip\"}.",
+      "expected": {
+        "symlink": "skip",
+        "fifo": "skip",
+        "device": "skip",
+        "ordinary_dotfile": "include"
+      },
+      "category": "scanning",
+      "fact_ids": [
+        "F09"
+      ],
+      "evidence": [
+        {
+          "item_index": 13,
+          "quote": "Skip symlinks, FIFOs, and devices; do not follow targets or block on named pipes. Ordinary dotfiles are included."
+        }
+      ]
+    },
+    {
+      "id": "Q013",
+      "question": "What is the scope of the active request concurrency bound? Return \"entire_push\" or \"each_file\".",
+      "expected": "entire_push",
+      "category": "scheduling",
+      "fact_ids": [
+        "F10"
+      ],
+      "evidence": [
+        {
+          "item_index": 13,
+          "quote": "Bound active requests globally across the entire push, not separately per file."
+        }
+      ]
+    },
+    {
+      "id": "Q014",
+      "question": "Which fingerprint property names represent local file identity for resume? Return the three exact property names from the fingerprint result as an array.",
+      "expected": [
+        "size",
+        "mtimeNs",
+        "sha256"
+      ],
+      "category": "resume",
+      "fact_ids": [
+        "F11"
+      ],
+      "evidence": [
+        {
+          "item_index": 17,
+          "quote": "return {size:Number(after.size),mtimeNs:String(after.mtimeNs),sha256:hash.digest('hex')};"
+        },
+        {
+          "item_index": 31,
+          "quote": "For resume identity use full SHA-256, size, and nanosecond mtime."
+        }
+      ],
+      "unordered": true
+    },
+    {
+      "id": "Q015",
+      "question": "What are the required mtime precision and hash coverage for local identity? Return {\"mtime_unit\":\"seconds\"|\"milliseconds\"|\"nanoseconds\",\"hash_coverage\":\"whole_file\"|\"prefix\"|\"sample\"}.",
+      "expected": {
+        "mtime_unit": "nanoseconds",
+        "hash_coverage": "whole_file"
+      },
+      "category": "resume",
+      "fact_ids": [
+        "F11"
+      ],
+      "evidence": [
+        {
+          "item_index": 31,
+          "quote": "For resume identity use full SHA-256, size, and nanosecond mtime."
+        }
+      ]
+    },
+    {
+      "id": "Q016",
+      "question": "Which destination URL components are rejected instead of silently removed? Return an array selected from [\"query\",\"fragment\",\"userinfo\",\"tenant_path\",\"port\"].",
+      "expected": [
+        "query",
+        "fragment",
+        "userinfo"
+      ],
+      "category": "security",
+      "fact_ids": [
+        "F12"
+      ],
+      "evidence": [
+        {
+          "item_index": 31,
+          "quote": "Reject query parameters, fragments, and URL userinfo."
+        }
+      ],
+      "unordered": true
+    },
+    {
+      "id": "Q017",
+      "question": "What destination URL normalization is allowed? Return \"trailing_slash_only\", \"remove_query_and_fragment\", or \"none\".",
+      "expected": "trailing_slash_only",
+      "category": "security",
+      "fact_ids": [
+        "F12"
+      ],
+      "evidence": [
+        {
+          "item_index": 31,
+          "quote": "Only a trailing slash may be normalized."
+        }
+      ]
+    },
+    {
+      "id": "Q018",
+      "question": "May an error echo a user-supplied destination URL or authentication token? Return {\"supplied_url\":boolean,\"token\":boolean}.",
+      "expected": {
+        "supplied_url": false,
+        "token": false
+      },
+      "category": "security",
+      "fact_ids": [
+        "F12"
+      ],
+      "evidence": [
+        {
+          "item_index": 31,
+          "quote": "Errors must not echo a supplied URL or token."
+        }
+      ]
+    },
+    {
+      "id": "Q019",
+      "question": "Which class owns queued journal mutations, and how do mutations execute? Return {\"class_name\":string,\"execution\":\"serialized\"|\"concurrent\"}.",
+      "expected": {
+        "class_name": "JournalStore",
+        "execution": "serialized"
+      },
+      "category": "journal",
+      "fact_ids": [
+        "F13"
+      ],
+      "evidence": [
+        {
+          "item_index": 33,
+          "quote": "export class JournalStore"
+        },
+        {
+          "item_index": 35,
+          "quote": "Pending mutations are serialized"
+        }
+      ]
+    },
+    {
+      "id": "Q020",
+      "question": "After the first journal write fails, what do later queued mutations report? Return \"first_write_error\", \"success\", or \"independent_new_attempt\".",
+      "expected": "first_write_error",
+      "category": "journal",
+      "fact_ids": [
+        "F13"
+      ],
+      "evidence": [
+        {
+          "item_index": 33,
+          "quote": "if(this.failed!==undefined)throw this.failed;"
+        },
+        {
+          "item_index": 35,
+          "quote": "fail permanently after the first write error."
+        }
+      ]
+    },
+    {
+      "id": "Q021",
+      "question": "What octal permissions are required for the journal temporary file and its parent directory? Return {\"file\":string,\"parent\":string}, using four-character octal strings.",
+      "expected": {
+        "file": "0600",
+        "parent": "0700"
+      },
+      "category": "journal",
+      "fact_ids": [
+        "F14"
+      ],
+      "evidence": [
+        {
+          "item_index": 35,
+          "quote": "Temporary file is mode0600; parent created0700."
+        }
+      ]
+    },
+    {
+      "id": "Q022",
+      "question": "In what order does a durable journal replacement perform these operations? Return an ordered array using each label once: \"write_temp\", \"fsync_file\", \"rename\", \"fsync_parent\".",
+      "expected": [
+        "write_temp",
+        "fsync_file",
+        "rename",
+        "fsync_parent"
+      ],
+      "category": "journal",
+      "fact_ids": [
+        "F14"
+      ],
+      "evidence": [
+        {
+          "item_index": 86,
+          "quote": "Updates serialize, write temp, fsync file, rename, fsync directory."
+        }
+      ]
+    },
+    {
+      "id": "Q023",
+      "question": "What side effects may dry-run produce? Return {\"network_requests\":number,\"creates_state_directory\":boolean}.",
+      "expected": {
+        "network_requests": 0,
+        "creates_state_directory": false
+      },
+      "category": "dry_run",
+      "fact_ids": [
+        "F15"
+      ],
+      "evidence": [
+        {
+          "item_index": 45,
+          "quote": "PASS dry-run: no network calls, no .driftship directory."
+        }
+      ]
+    },
+    {
+      "id": "Q024",
+      "question": "Which upload operations may automatically retry? Return {\"part_put\":boolean,\"begin_post\":boolean,\"complete_post\":boolean}.",
+      "expected": {
+        "part_put": true,
+        "begin_post": false,
+        "complete_post": false
+      },
+      "category": "retry",
+      "fact_ids": [
+        "F16"
+      ],
+      "evidence": [
+        {
+          "item_index": 46,
+          "quote": "Only idempotent PUT parts may retry. Do not automatically retry begin or complete."
+        }
+      ]
+    },
+    {
+      "id": "Q025",
+      "question": "After an ambiguous completion connection failure, how many status GETs are allowed for reconciliation? Return an integer.",
+      "expected": 1,
+      "category": "retry",
+      "fact_ids": [
+        "F16"
+      ],
+      "evidence": [
+        {
+          "item_index": 46,
+          "quote": "One GET status after an ambiguous complete failure is okay"
+        }
+      ]
+    },
+    {
+      "id": "Q026",
+      "question": "If that reconciliation status GET fails, which error is returned? Return \"status_get_error\", \"original_complete_error\", or \"no_error\".",
+      "expected": "status_get_error",
+      "category": "retry",
+      "fact_ids": [
+        "F16"
+      ],
+      "evidence": [
+        {
+          "item_index": 46,
+          "quote": "if that GET fails, return its error and let the next invocation resume."
+        }
+      ]
+    },
+    {
+      "id": "Q027",
+      "question": "What is the authorization status of the stale remote-session cleanup proposal? Return \"approved\", \"not_approved\", or \"unmentioned\".",
+      "expected": "not_approved",
+      "category": "authority",
+      "fact_ids": [
+        "F17"
+      ],
+      "evidence": [
+        {
+          "item_index": 46,
+          "quote": "My earlier thought about deleting stale sessions was brainstorming, not approval. Keep remote cleanup out of scope."
+        }
+      ]
+    },
+    {
+      "id": "Q028",
+      "question": "Which receipt field names are validated before acceptance? Return an array of exact field names.",
+      "expected": [
+        "path",
+        "bytes",
+        "sha256",
+        "etag"
+      ],
+      "category": "protocol",
+      "fact_ids": [
+        "F18"
+      ],
+      "evidence": [
+        {
+          "item_index": 48,
+          "quote": "receipt.path!==file.path||receipt.bytes!==file.size||receipt.sha256!==file.sha256||typeof receipt.etag!=='string'||!receipt.etag"
+        }
+      ],
+      "unordered": true
+    },
+    {
+      "id": "Q029",
+      "question": "What is the etag acceptance rule? Return \"nonempty_string\", \"any_string\", or \"any_json_value\".",
+      "expected": "nonempty_string",
+      "category": "protocol",
+      "fact_ids": [
+        "F18"
+      ],
+      "evidence": [
+        {
+          "item_index": 48,
+          "quote": "typeof receipt.etag!=='string'||!receipt.etag"
+        }
+      ]
+    },
+    {
+      "id": "Q030",
+      "question": "How many focused recovery tests passed after completion reconciliation was fixed? Return an integer.",
+      "expected": 8,
+      "category": "validation",
+      "fact_ids": [
+        "F19"
+      ],
+      "evidence": [
+        {
+          "item_index": 50,
+          "quote": "8 focused recovery tests passed."
+        }
+      ]
+    },
+    {
+      "id": "Q031",
+      "question": "What is the final documented resume option syntax? Return the exact syntax showing both accepted values.",
+      "expected": "--resume=on|off",
+      "category": "cli",
+      "fact_ids": [
+        "F20"
+      ],
+      "evidence": [
+        {
+          "item_index": 51,
+          "quote": "Change --no-resume to --resume=on|off"
+        }
+      ]
+    },
+    {
+      "id": "Q032",
+      "question": "How does the current parser treat the former --no-resume spelling? Return \"accepted_alias\" or \"rejected\".",
+      "expected": "rejected",
+      "category": "cli",
+      "fact_ids": [
+        "F20"
+      ],
+      "evidence": [
+        {
+          "item_index": 51,
+          "quote": "Do not keep the old flag as an alias: this branch is unreleased."
+        }
+      ]
+    },
+    {
+      "id": "Q033",
+      "question": "What is the current state of the verify resume mode? Return {\"feature\":\"active\"|\"deferred\",\"parser\":\"accept\"|\"reject\"}.",
+      "expected": {
+        "feature": "deferred",
+        "parser": "reject"
+      },
+      "category": "cli",
+      "fact_ids": [
+        "F21"
+      ],
+      "evidence": [
+        {
+          "item_index": 51,
+          "quote": "We may later add --resume=verify, so a value is cleaner. For now reject verify."
+        }
+      ]
+    },
+    {
+      "id": "Q034",
+      "question": "What inclusive numeric ranges does the CLI accept? Return {\"concurrency\":{\"min\":number,\"max\":number},\"chunk_mib\":{\"min\":number,\"max\":number},\"retries\":{\"min\":number,\"max\":number}}.",
+      "expected": {
+        "concurrency": {
+          "min": 1,
+          "max": 16
+        },
+        "chunk_mib": {
+          "min": 1,
+          "max": 16
+        },
+        "retries": {
+          "min": 0,
+          "max": 12
+        }
+      },
+      "category": "cli",
+      "fact_ids": [
+        "F22"
+      ],
+      "evidence": [
+        {
+          "item_index": 54,
+          "quote": "concurrency:integer(values.concurrency,'--concurrency',4,1,16),chunkBytes:integer(values['chunk-mib'],'--chunk-mib',4,1,16)*1024*1024,retries:integer(values.retries,'--retries',4,0,12)"
+        }
+      ]
+    },
+    {
+      "id": "Q035",
+      "question": "How does the CLI treat fractional numeric values for its integer options? Return \"accept\" or \"reject\".",
+      "expected": "reject",
+      "category": "cli",
+      "fact_ids": [
+        "F22"
+      ],
+      "evidence": [
+        {
+          "item_index": 54,
+          "quote": "if(!/^(0|[1-9][0-9]*)$/.test(value))throw new CliError(`${name} must be an integer`,'usage');"
+        }
+      ]
+    },
+    {
+      "id": "Q036",
+      "question": "What are the exact shared field names for the JSON event identifier and discriminator? Return {\"identifier\":string,\"discriminator\":string}.",
+      "expected": {
+        "identifier": "run_id",
+        "discriminator": "type"
+      },
+      "category": "events",
+      "fact_ids": [
+        "F23"
+      ],
+      "evidence": [
+        {
+          "item_index": 59,
+          "quote": "Add one UUID run_id generated once per invocation to every JSON event. Keep type as the discriminator"
+        }
+      ]
+    },
+    {
+      "id": "Q037",
+      "question": "What are the event identifier format and generation scope? Return {\"format\":\"UUID\"|\"integer\",\"scope\":\"invocation\"|\"event\"|\"file\"}.",
+      "expected": {
+        "format": "UUID",
+        "scope": "invocation"
+      },
+      "category": "events",
+      "fact_ids": [
+        "F23"
+      ],
+      "evidence": [
+        {
+          "item_index": 59,
+          "quote": "Add one UUID run_id generated once per invocation to every JSON event."
+        }
+      ]
+    },
+    {
+      "id": "Q038",
+      "question": "Which four count fields must the completion event contain, in addition to its shared event fields? Return exact field names as an array.",
+      "expected": [
+        "files",
+        "bytes",
+        "uploaded_bytes",
+        "resumed_bytes"
+      ],
+      "category": "events",
+      "fact_ids": [
+        "F24"
+      ],
+      "evidence": [
+        {
+          "item_index": 59,
+          "quote": "Completion needs files, bytes, uploaded_bytes, resumed_bytes."
+        }
+      ],
+      "unordered": true
+    },
+    {
+      "id": "Q039",
+      "question": "What does uploaded_bytes count? Return \"confirmed_unique_bytes\", \"all_wire_bytes\", or \"all_source_reads\".",
+      "expected": "confirmed_unique_bytes",
+      "category": "events",
+      "fact_ids": [
+        "F24"
+      ],
+      "evidence": [
+        {
+          "item_index": 59,
+          "quote": "Uploaded bytes count confirmed unique bytes, not retransmission traffic."
+        }
+      ]
+    },
+    {
+      "id": "Q040",
+      "question": "In the parallel probe with first.bin, second.bin, and empty.marker, what were confirmed uploaded bytes and wire bytes? Return {\"confirmed_uploaded_bytes\":number,\"wire_bytes\":number}.",
+      "expected": {
+        "confirmed_uploaded_bytes": 17825900,
+        "wire_bytes": 22020204
+      },
+      "category": "measurements",
+      "fact_ids": [
+        "F25"
+      ],
+      "evidence": [
+        {
+          "item_index": 63,
+          "quote": "Confirmed uploaded bytes17825900; wire bytes22020204; source total17825900."
+        }
+      ]
+    },
+    {
+      "id": "Q041",
+      "question": "What request counts did that three-file parallel probe measure? Return {\"peak_requests\":number,\"put_attempts\":number,\"unique_parts\":number}.",
+      "expected": {
+        "peak_requests": 4,
+        "put_attempts": 7,
+        "unique_parts": 6
+      },
+      "category": "measurements",
+      "fact_ids": [
+        "F25"
+      ],
+      "evidence": [
+        {
+          "item_index": 63,
+          "quote": "Global peak requests4; PUT attempts7; unique parts6."
+        }
+      ]
+    },
+    {
+      "id": "Q042",
+      "question": "What is the latest pending-part scheduling mechanism and its function name? Return {\"mechanism\":\"lazy_iterator\"|\"materialized_jobs_array\",\"function_name\":string}.",
+      "expected": {
+        "mechanism": "lazy_iterator",
+        "function_name": "pendingParts"
+      },
+      "category": "scheduling",
+      "fact_ids": [
+        "F26"
+      ],
+      "evidence": [
+        {
+          "item_index": 70,
+          "quote": "export function* pendingParts"
+        },
+        {
+          "item_index": 77,
+          "quote": "parallel(pendingParts(plans), ...)"
+        }
+      ]
+    },
+    {
+      "id": "Q043",
+      "question": "Which source consistency mechanisms did the user exclude from scope? Return an array selected from [\"snapshots\",\"file_locks\",\"copy_on_write\",\"watchers\",\"change_detection\"].",
+      "expected": [
+        "snapshots",
+        "file_locks",
+        "copy_on_write",
+        "watchers"
+      ],
+      "category": "scope",
+      "fact_ids": [
+        "F27"
+      ],
+      "evidence": [
+        {
+          "item_index": 68,
+          "quote": "Snapshots, file locks, copy-on-write, and watchers are out of scope."
+        }
+      ],
+      "unordered": true
+    },
+    {
+      "id": "Q044",
+      "question": "What is the source mutation contract during upload? Return {\"user_may_modify\":boolean,\"detected_change\":\"fail\"|\"continue\"}.",
+      "expected": {
+        "user_may_modify": false,
+        "detected_change": "fail"
+      },
+      "category": "scope",
+      "fact_ids": [
+        "F27"
+      ],
+      "evidence": [
+        {
+          "item_index": 68,
+          "quote": "Users must not modify the directory during upload, and detected changes fail."
+        }
+      ]
+    },
+    {
+      "id": "Q045",
+      "question": "Which exact remote status fields must match local file identity for session reuse? Return an array of field names.",
+      "expected": [
+        "file_size",
+        "file_sha256",
+        "part_size"
+      ],
+      "category": "resume",
+      "fact_ids": [
+        "F28"
+      ],
+      "evidence": [
+        {
+          "item_index": 68,
+          "quote": "Validate status.file_size, status.file_sha256, and status.part_size before accepting resumed parts."
+        }
+      ],
+      "unordered": true
+    },
+    {
+      "id": "Q046",
+      "question": "What error code is required when existing remote session identity does not match? Return the exact identifier.",
+      "expected": "session_mismatch",
+      "category": "resume",
+      "fact_ids": [
+        "F28"
+      ],
+      "evidence": [
+        {
+          "item_index": 68,
+          "quote": "Mismatch means session_mismatch, not silent session replacement."
+        }
+      ]
+    },
+    {
+      "id": "Q047",
+      "question": "Which remote session states allow an automatic restart? Return an array selected from [\"missing\",\"expired\",\"open_mismatched\",\"complete_mismatched\"].",
+      "expected": [
+        "missing",
+        "expired"
+      ],
+      "category": "resume",
+      "fact_ids": [
+        "F28"
+      ],
+      "evidence": [
+        {
+          "item_index": 68,
+          "quote": "Missing or expired sessions are the only remote-state cases that restart automatically."
+        }
+      ],
+      "unordered": true
+    },
+    {
+      "id": "Q048",
+      "question": "What are the exit codes for the main outcome classes? Return {\"success\":number,\"server_transport_local_io\":number,\"usage_config\":number,\"invalid_resume_state\":number,\"interruption\":number}.",
+      "expected": {
+        "success": 0,
+        "server_transport_local_io": 1,
+        "usage_config": 2,
+        "invalid_resume_state": 3,
+        "interruption": 130
+      },
+      "category": "errors",
+      "fact_ids": [
+        "F29"
+      ],
+      "evidence": [
+        {
+          "item_index": 73,
+          "quote": "Exit codes:0 success,1 transport/server or ordinary local I/O failure,2 usage/configuration,3 invalid or mismatched local resume state,130 interruption."
+        }
+      ]
+    },
+    {
+      "id": "Q049",
+      "question": "What exit codes apply to these specific failures? Return {\"server_checksum_mismatch\":number,\"session_mismatch\":number,\"ordinary_local_permission_error\":number}.",
+      "expected": {
+        "server_checksum_mismatch": 1,
+        "session_mismatch": 3,
+        "ordinary_local_permission_error": 1
+      },
+      "category": "errors",
+      "fact_ids": [
+        "F29"
+      ],
+      "evidence": [
+        {
+          "item_index": 73,
+          "quote": "Server checksum mismatch uses1. session_mismatch uses3. Don't classify ordinary permission errors as3."
+        },
+        {
+          "item_index": 73,
+          "quote": "1 transport/server or ordinary local I/O failure"
+        }
+      ]
+    },
+    {
+      "id": "Q050",
+      "question": "What happens on cancellation in the latest implementation? Return {\"queued_journal_writes\":\"settle\"|\"abandon\",\"new_jobs\":\"schedule\"|\"stop\",\"settle_block\":\"try\"|\"catch\"|\"finally\"}.",
+      "expected": {
+        "queued_journal_writes": "settle",
+        "new_jobs": "stop",
+        "settle_block": "finally"
+      },
+      "category": "cancellation",
+      "fact_ids": [
+        "F30"
+      ],
+      "evidence": [
+        {
+          "item_index": 77,
+          "quote": "await store.settled() in finally."
+        },
+        {
+          "item_index": 77,
+          "quote": "No new jobs are scheduled after signal abort. Already queued journal writes settle first."
+        }
+      ]
+    },
+    {
+      "id": "Q051",
+      "question": "When requested concurrency is 2 and the server maximum is 4, what effective concurrency is used? Return an integer.",
+      "expected": 2,
+      "category": "scheduling",
+      "fact_ids": [
+        "F31"
+      ],
+      "evidence": [
+        {
+          "item_index": 78,
+          "quote": "effective concurrency is min(user setting, server maximum_parallel_parts); a setting of2 stays2."
+        }
+      ]
+    },
+    {
+      "id": "Q052",
+      "question": "When requested concurrency is 16 and the server maximum is 4, what effective concurrency is used? Return an integer.",
+      "expected": 4,
+      "category": "scheduling",
+      "fact_ids": [
+        "F31"
+      ],
+      "evidence": [
+        {
+          "item_index": 82,
+          "quote": "requested16 capped4"
+        }
+      ]
+    },
+    {
+      "id": "Q053",
+      "question": "How many capability tests passed in the focused capability run? Return an integer.",
+      "expected": 12,
+      "category": "validation",
+      "fact_ids": [
+        "F32"
+      ],
+      "evidence": [
+        {
+          "item_index": 82,
+          "quote": "12 tests passed:"
+        }
+      ]
+    },
+    {
+      "id": "Q054",
+      "question": "What behavior did the capability tests cover for protocol revision 2, missing sha256 support, and dry-run discovery? Return {\"protocol_2\":\"accept\"|\"reject\",\"missing_sha256\":\"accept\"|\"reject\",\"dry_run_discovery\":\"perform\"|\"skip\"}.",
+      "expected": {
+        "protocol_2": "reject",
+        "missing_sha256": "reject",
+        "dry_run_discovery": "skip"
+      },
+      "category": "validation",
+      "fact_ids": [
+        "F32"
+      ],
+      "evidence": [
+        {
+          "item_index": 80,
+          "quote": "if(data.protocol!==3)throw new CliError('Protocol3 is required','unsupported_protocol');"
+        },
+        {
+          "item_index": 80,
+          "quote": "!data.checksums.includes('sha256')"
+        },
+        {
+          "item_index": 82,
+          "quote": "dry-run skips discovery."
+        }
+      ]
+    },
+    {
+      "id": "Q055",
+      "question": "What are the journal durability validation states on the named platforms? Return {\"Linux\":\"validated\"|\"unvalidated\",\"Windows\":\"validated\"|\"unvalidated\"}.",
+      "expected": {
+        "Linux": "validated",
+        "Windows": "unvalidated"
+      },
+      "category": "limitations",
+      "fact_ids": [
+        "F33"
+      ],
+      "evidence": [
+        {
+          "item_index": 86,
+          "quote": "Durability has been exercised on Linux only. Windows directory-fsync and rename semantics are unvalidated."
+        }
+      ]
+    },
+    {
+      "id": "Q056",
+      "question": "Where is wire_bytes available at the checkpoint? Return {\"development_probe\":boolean,\"public_json_event_schema\":boolean}.",
+      "expected": {
+        "development_probe": true,
+        "public_json_event_schema": false
+      },
+      "category": "events",
+      "fact_ids": [
+        "F34"
+      ],
+      "evidence": [
+        {
+          "item_index": 88,
+          "quote": "The public schema does not include wire_bytes. Development probes measure it"
+        }
+      ]
+    },
+    {
+      "id": "Q057",
+      "question": "Which public counter receives the whole file size when a validated completed-file receipt is reused? Return the exact field name.",
+      "expected": "resumed_bytes",
+      "category": "events",
+      "fact_ids": [
+        "F35"
+      ],
+      "evidence": [
+        {
+          "item_index": 88,
+          "quote": "A completed-file fast path counts all its bytes as resumed"
+        }
+      ]
+    },
+    {
+      "id": "Q058",
+      "question": "For a partial resume, which public counters receive saved validated parts and newly confirmed parts? Return {\"saved_validated_parts\":string,\"new_confirmations\":string}, using exact field names.",
+      "expected": {
+        "saved_validated_parts": "resumed_bytes",
+        "new_confirmations": "uploaded_bytes"
+      },
+      "category": "events",
+      "fact_ids": [
+        "F35"
+      ],
+      "evidence": [
+        {
+          "item_index": 88,
+          "quote": "a partial session counts validated saved parts as resumed and new confirmations as uploaded."
+        },
+        {
+          "item_index": 88,
+          "quote": "complete reports files/bytes/uploaded_bytes/resumed_bytes."
+        }
+      ]
+    },
+    {
+      "id": "Q059",
+      "question": "What were the passing unit and integration test counts in the latest full local check? Return {\"unit\":number,\"integration\":number}.",
+      "expected": {
+        "unit": 103,
+        "integration": 84
+      },
+      "category": "validation",
+      "fact_ids": [
+        "F36"
+      ],
+      "evidence": [
+        {
+          "item_index": 96,
+          "quote": "Unit103 passed,0 failed,0 skipped. Integration84 passed,0 failed,0 skipped."
+        }
+      ]
+    },
+    {
+      "id": "Q060",
+      "question": "What did that full check report for strict typecheck and diff check? Return {\"strict_typecheck\":\"passed\"|\"failed\"|\"not_run\",\"diff_check\":\"clean\"|\"failed\"|\"not_run\"}.",
+      "expected": {
+        "strict_typecheck": "passed",
+        "diff_check": "clean"
+      },
+      "category": "validation",
+      "fact_ids": [
+        "F36"
+      ],
+      "evidence": [
+        {
+          "item_index": 96,
+          "quote": "Diff check clean. Strict typecheck passed."
+        }
+      ]
+    },
+    {
+      "id": "Q061",
+      "question": "Did the latest full local check execute a build and a real-service smoke test? Return {\"build_executed\":boolean,\"remote_smoke_executed\":boolean}.",
+      "expected": {
+        "build_executed": false,
+        "remote_smoke_executed": false
+      },
+      "category": "validation",
+      "fact_ids": [
+        "F37"
+      ],
+      "evidence": [
+        {
+          "item_index": 96,
+          "quote": "Build not run by this command. Remote smoke not run."
+        }
+      ]
+    },
+    {
+      "id": "Q062",
+      "question": "What seed and source-file counts defined stress case S1? Return {\"seed\":number,\"small_files\":number,\"large_files\":number}.",
+      "expected": {
+        "seed": 83177,
+        "small_files": 100,
+        "large_files": 3
+      },
+      "category": "measurements",
+      "fact_ids": [
+        "F38"
+      ],
+      "evidence": [
+        {
+          "item_index": 94,
+          "quote": "S1 local stress: seed83177;100 small+3 large;workers4;chunks4194304."
+        }
+      ]
+    },
+    {
+      "id": "Q063",
+      "question": "What were the final S1 object and receipt counts? Return {\"objects\":number,\"receipts\":number}.",
+      "expected": {
+        "objects": 103,
+        "receipts": 103
+      },
+      "category": "measurements",
+      "fact_ids": [
+        "F38"
+      ],
+      "evidence": [
+        {
+          "item_index": 94,
+          "quote": "Remote objects103;client receipts103"
+        }
+      ]
+    },
+    {
+      "id": "Q064",
+      "question": "What were the other S1 integrity and concurrency measurements? Return {\"peak_active\":number,\"completion_reconciliation_gets\":number,\"lost_journal_records\":number}.",
+      "expected": {
+        "peak_active": 4,
+        "completion_reconciliation_gets": 1,
+        "lost_journal_records": 0
+      },
+      "category": "measurements",
+      "fact_ids": [
+        "F38"
+      ],
+      "evidence": [
+        {
+          "item_index": 94,
+          "quote": "peak active4;completion reconciliation GETs1;begin retries0;complete retries0;lost journal records0"
+        }
+      ]
+    },
+    {
+      "id": "Q065",
+      "question": "What is the real storage-service smoke-test status? Return {\"has_run\":boolean,\"dedicated_test_tenant_required\":boolean,\"test_credentials_required\":boolean}.",
+      "expected": {
+        "has_run": false,
+        "dedicated_test_tenant_required": true,
+        "test_credentials_required": true
+      },
+      "category": "limitations",
+      "fact_ids": [
+        "F39"
+      ],
+      "evidence": [
+        {
+          "item_index": 89,
+          "quote": "there has been no real storage-service test."
+        },
+        {
+          "item_index": 89,
+          "quote": "Later remote smoke needs a dedicated test tenant and credentials"
+        }
+      ]
+    },
+    {
+      "id": "Q066",
+      "question": "What Retry-After literal triggers R1, and which JavaScript function incorrectly accepts it after numeric rejection? Return {\"header_literal\":string,\"function_name\":string}.",
+      "expected": {
+        "header_literal": "-1",
+        "function_name": "Date.parse"
+      },
+      "category": "review",
+      "fact_ids": [
+        "F40"
+      ],
+      "evidence": [
+        {
+          "item_index": 98,
+          "quote": "R1 MUST FIX: Retry-After \"-1\" fails numeric check but Date.parse(\"-1\") can produce a date."
+        }
+      ]
+    },
+    {
+      "id": "Q067",
+      "question": "What parsing rules does the R1 repair require? Return {\"delta_seconds\":\"nonnegative_grammar\"|\"any_numeric_string\",\"date\":\"strict_http_date\"|\"permissive_date_parse\"}.",
+      "expected": {
+        "delta_seconds": "nonnegative_grammar",
+        "date": "strict_http_date"
+      },
+      "category": "review",
+      "fact_ids": [
+        "F40"
+      ],
+      "evidence": [
+        {
+          "item_index": 98,
+          "quote": "Use a nonnegative delta-seconds grammar and strict HTTP-date parsing"
+        }
+      ]
+    },
+    {
+      "id": "Q068",
+      "question": "What must the R1 regression test verify for an invalid Retry-After value? Return \"local_backoff_fallback\", \"any_finite_delay\", or \"zero_delay\".",
+      "expected": "local_backoff_fallback",
+      "category": "review",
+      "fact_ids": [
+        "F40"
+      ],
+      "evidence": [
+        {
+          "item_index": 98,
+          "quote": "assert local backoff fallback."
+        }
+      ]
+    },
+    {
+      "id": "Q069",
+      "question": "Which exact function must be repositioned for R2? Return its identifier.",
+      "expected": "validateSession",
+      "category": "review",
+      "fact_ids": [
+        "F41"
+      ],
+      "evidence": [
+        {
+          "item_index": 98,
+          "quote": "R2 MUST FIX: completed-session fast path accepts receipt before validateSession."
+        }
+      ]
+    },
+    {
+      "id": "Q070",
+      "question": "Which remote session branches currently receive identity validation, and which must receive it after R2? Return {\"current\":\"open_only\"|\"complete_only\"|\"both\",\"required\":\"open_only\"|\"complete_only\"|\"both\"}.",
+      "expected": {
+        "current": "open_only",
+        "required": "both"
+      },
+      "category": "review",
+      "fact_ids": [
+        "F41"
+      ],
+      "evidence": [
+        {
+          "item_index": 98,
+          "quote": "Identity validation occurs only for open sessions. Move it before both open and complete branches."
+        }
+      ]
+    },
+    {
+      "id": "Q071",
+      "question": "For R3, what option spelling must replace the obsolete README example, and should the old spelling remain an alias? Return {\"replacement\":string,\"keep_old_alias\":boolean}.",
+      "expected": {
+        "replacement": "--resume=off",
+        "keep_old_alias": false
+      },
+      "category": "review",
+      "fact_ids": [
+        "F42"
+      ],
+      "evidence": [
+        {
+          "item_index": 98,
+          "quote": "R3 MUST FIX: README's first example still says --no-resume. Replace with --resume=off; no compatibility alias."
+        }
+      ]
+    },
+    {
+      "id": "Q072",
+      "question": "What are R4's disposition and proposed technique? Return {\"disposition\":\"must_fix\"|\"follow_up\"|\"document\",\"technique\":\"descriptor_reuse\"|\"atomic_snapshot\"|\"watcher\"}.",
+      "expected": {
+        "disposition": "follow_up",
+        "technique": "descriptor_reuse"
+      },
+      "category": "review",
+      "fact_ids": [
+        "F43"
+      ],
+      "evidence": [
+        {
+          "item_index": 98,
+          "quote": "R4 FOLLOW-UP: descriptor reuse could reduce source-change races. Atomic snapshots remain out of scope; no required change."
+        }
+      ]
+    },
+    {
+      "id": "Q073",
+      "question": "What are R5's disposition and remaining scaling concern? Return {\"disposition\":\"must_fix\"|\"follow_up\"|\"document\",\"concern\":\"many_idle_sessions\"|\"unbounded_active_parts\"}.",
+      "expected": {
+        "disposition": "follow_up",
+        "concern": "many_idle_sessions"
+      },
+      "category": "review",
+      "fact_ids": [
+        "F44"
+      ],
+      "evidence": [
+        {
+          "item_index": 98,
+          "quote": "R5 FOLLOW-UP: sessions prepared before transfer can create many idle sessions at huge file counts. Current bounded part scheduling is correct."
+        }
+      ]
+    },
+    {
+      "id": "Q074",
+      "question": "What output does R6 describe for parser errors before JSON mode is recognized? Return {\"stream\":\"stdout\"|\"stderr\",\"format\":\"json\"|\"plain_text\"}.",
+      "expected": {
+        "stream": "stderr",
+        "format": "plain_text"
+      },
+      "category": "review",
+      "fact_ids": [
+        "F45"
+      ],
+      "evidence": [
+        {
+          "item_index": 98,
+          "quote": "R6 DOCUMENT: initial parser errors occur before --json is known and remain plain-text stderr."
+        }
+      ]
+    },
+    {
+      "id": "Q075",
+      "question": "What action is required for R6 in this round? Return \"document_boundary\", \"redesign_parser\", or \"remove_json_mode\".",
+      "expected": "document_boundary",
+      "category": "review",
+      "fact_ids": [
+        "F45",
+        "F46"
+      ],
+      "evidence": [
+        {
+          "item_index": 98,
+          "quote": "Document this boundary rather than redesigning parsing now."
+        },
+        {
+          "item_index": 99,
+          "quote": "add a short note for R6."
+        }
+      ]
+    },
+    {
+      "id": "Q076",
+      "question": "Which final-review findings did the latest user request require code or example fixes for? Return an array of review IDs.",
+      "expected": [
+        "R1",
+        "R2",
+        "R3"
+      ],
+      "category": "next_steps",
+      "fact_ids": [
+        "F46"
+      ],
+      "evidence": [
+        {
+          "item_index": 99,
+          "quote": "Fix R1,R2,R3 and add a short note for R6."
+        }
+      ],
+      "unordered": true
+    },
+    {
+      "id": "Q077",
+      "question": "Which validation work is required immediately after those fixes? Return an array selected from [\"affected_tests\",\"typecheck\",\"full_suite\",\"build\",\"remote_smoke\"].",
+      "expected": [
+        "affected_tests",
+        "typecheck"
+      ],
+      "category": "next_steps",
+      "fact_ids": [
+        "F46"
+      ],
+      "evidence": [
+        {
+          "item_index": 99,
+          "quote": "Rerun affected tests and typecheck; no need to repeat the full suite unless the fixes reveal broader concerns."
+        }
+      ],
+      "unordered": true
+    },
+    {
+      "id": "Q078",
+      "question": "Under what condition does the latest request call for repeating the full suite? Return \"broader_concerns_from_fixes\", \"always\", or \"never\".",
+      "expected": "broader_concerns_from_fixes",
+      "category": "next_steps",
+      "fact_ids": [
+        "F46"
+      ],
+      "evidence": [
+        {
+          "item_index": 99,
+          "quote": "no need to repeat the full suite unless the fixes reveal broader concerns."
+        }
+      ]
+    },
+    {
+      "id": "Q079",
+      "question": "How did local-commit authorization change between the penultimate and latest user instructions? Return {\"earlier_after_requested_checks\":\"allowed\"|\"withheld\",\"latest_instruction\":\"allowed\"|\"withheld\",\"next_gate\":\"user_inspects_final_diff\"|\"only_existing_checks_pass\"|\"none\"}.",
+      "expected": {
+        "earlier_after_requested_checks": "allowed",
+        "latest_instruction": "withheld",
+        "next_gate": "user_inspects_final_diff"
+      },
+      "category": "authority",
+      "fact_ids": [
+        "F46"
+      ],
+      "evidence": [
+        {
+          "item_index": 89,
+          "quote": "You may create a local commit after those checks"
+        },
+        {
+          "item_index": 99,
+          "quote": "Do not create the local commit yet. I want to inspect the final diff after these changes."
+        }
+      ]
+    },
+    {
+      "id": "Q080",
+      "question": "Which of the requested R1, R2, and R3 fixes have implementation evidence after the final review and before the checkpoint? Return an array containing only implemented review IDs, or [] when none are implemented. Do not count a promise to work as implementation.",
+      "expected": [],
+      "category": "checkpoint_state",
+      "fact_ids": [
+        "F47"
+      ],
+      "evidence": [
+        {
+          "item_index": 99,
+          "quote": "Fix R1,R2,R3"
+        },
+        {
+          "item_index": 100,
+          "quote": "I will fix those three concrete issues"
+        },
+        {
+          "item_index": 102,
+          "quote": "const date=Date.parse(header);"
+        },
+        {
+          "item_index": 100,
+          "end_item_index": 102,
+          "note": "The complete suffix after the latest user request contains a promise and one read_file call/result, with no edit or subsequent test result."
+        }
+      ]
+    },
+    {
+      "id": "Q081",
+      "question": "What file was read in the final tool call at the checkpoint? Return its exact relative path.",
+      "expected": "src/retry.ts",
+      "category": "checkpoint_state",
+      "fact_ids": [
+        "F47"
+      ],
+      "evidence": [
+        {
+          "item_index": 101,
+          "quote": "src/retry.ts"
+        }
+      ]
+    },
+    {
+      "id": "Q082",
+      "question": "What fallback backoff parameters are in the current retry implementation? Return {\"initial_ms\":number,\"growth_factor\":number,\"base_cap_ms\":number,\"jitter_min_fraction\":number,\"jitter_max_fraction\":number}.",
+      "expected": {
+        "initial_ms": 500,
+        "growth_factor": 2,
+        "base_cap_ms": 30000,
+        "jitter_min_fraction": 0.5,
+        "jitter_max_fraction": 1
+      },
+      "category": "retry",
+      "fact_ids": [
+        "F48"
+      ],
+      "evidence": [
+        {
+          "item_index": 102,
+          "quote": "const base=Math.min(30000,500*2**attempt);"
+        },
+        {
+          "item_index": 102,
+          "quote": "Math.floor(base*(0.5+random()*0.5))"
+        }
+      ]
+    },
+    {
+      "id": "Q083",
+      "question": "In which exact path must useful follow-ups be recorded? Return the relative path.",
+      "expected": "docs/development-notes.md",
+      "category": "next_steps",
+      "fact_ids": [
+        "F49"
+      ],
+      "evidence": [
+        {
+          "item_index": 99,
+          "quote": "Keep useful follow-ups in docs/development-notes.md"
+        }
+      ]
+    },
+    {
+      "id": "Q084",
+      "question": "Which two validation gaps does the latest user explicitly require in the follow-up notes? Return an array selected from [\"windows_durability\",\"real_service_smoke\",\"linux_durability\",\"strict_typecheck\"].",
+      "expected": [
+        "windows_durability",
+        "real_service_smoke"
+      ],
+      "category": "next_steps",
+      "fact_ids": [
+        "F49"
+      ],
+      "evidence": [
+        {
+          "item_index": 99,
+          "quote": "including Windows durability and missing real-service smoke."
+        }
+      ],
+      "unordered": true
+    },
+    {
+      "id": "Q085",
+      "question": "Did the latest green full local suite occur before or after the final review that identified R1 through R6? Return \"before\" or \"after\".",
+      "expected": "before",
+      "category": "checkpoint_state",
+      "fact_ids": [
+        "F50"
+      ],
+      "evidence": [
+        {
+          "item_index": 96,
+          "quote": "Unit103 passed,0 failed,0 skipped. Integration84 passed,0 failed,0 skipped."
+        },
+        {
+          "item_index": 98,
+          "quote": "Final review:"
+        }
+      ]
+    },
+    {
+      "id": "Q086",
+      "question": "Do the recorded green full-suite results establish that the requested R1, R2, and R3 changes have been implemented and validated? Return a boolean.",
+      "expected": false,
+      "category": "checkpoint_state",
+      "fact_ids": [
+        "F47",
+        "F50"
+      ],
+      "evidence": [
+        {
+          "item_index": 96,
+          "quote": "Unit103 passed,0 failed,0 skipped."
+        },
+        {
+          "item_index": 98,
+          "quote": "R1 MUST FIX:"
+        },
+        {
+          "item_index": 99,
+          "quote": "Fix R1,R2,R3"
+        },
+        {
+          "item_index": 100,
+          "quote": "I will fix those three concrete issues"
+        }
+      ]
+    },
+    {
+      "id": "Q087",
+      "question": "What exact wire-format capability field names specify the lower and upper chunk size limits? Return {\"lower_bound\":string,\"upper_bound\":string}.",
+      "expected": {
+        "lower_bound": "minimum_chunk_bytes",
+        "upper_bound": "maximum_chunk_bytes"
+      },
+      "category": "protocol",
+      "fact_ids": [
+        "F51"
+      ],
+      "evidence": [
+        {
+          "item_index": 9,
+          "quote": "minimum_chunk_bytes:1048576, maximum_chunk_bytes:16777216"
+        },
+        {
+          "item_index": 80,
+          "quote": "const min=integer('minimum_chunk_bytes'),max=integer('maximum_chunk_bytes')"
+        }
+      ]
+    },
+    {
+      "id": "Q088",
+      "question": "What lower and upper chunk size limits in bytes does the advertised protocol expose? Return {\"minimum_bytes\":number,\"maximum_bytes\":number}.",
+      "expected": {
+        "minimum_bytes": 1048576,
+        "maximum_bytes": 16777216
+      },
+      "category": "protocol",
+      "fact_ids": [
+        "F51"
+      ],
+      "evidence": [
+        {
+          "item_index": 9,
+          "quote": "minimum_chunk_bytes:1048576, maximum_chunk_bytes:16777216"
+        }
+      ]
+    },
+    {
+      "id": "Q089",
+      "question": "How does capability discovery handle malformed responses or an unsupported protocol? Return {\"before_begin\":\"fail\"|\"continue\",\"guess_defaults\":boolean}.",
+      "expected": {
+        "before_begin": "fail",
+        "guess_defaults": false
+      },
+      "category": "protocol",
+      "fact_ids": [
+        "F52"
+      ],
+      "evidence": [
+        {
+          "item_index": 78,
+          "quote": "Malformed discovery or protocol other than3 fails before begin, with no guessed defaults."
+        }
+      ]
+    },
+    {
+      "id": "Q090",
+      "question": "What is the exact tenant identifier provisioned for the later real-service smoke test? Return a string or null if it has not been specified.",
+      "expected": null,
+      "category": "unknown",
+      "fact_ids": [],
+      "evidence": [
+        {
+          "item_index": 89,
+          "quote": "Later remote smoke needs a dedicated test tenant and credentials"
+        },
+        {
+          "item_index": 0,
+          "end_item_index": 102,
+          "note": "Absence checked across the complete original thread; the neighboring evidence states the related known status, not a missing value."
+        }
+      ]
+    },
+    {
+      "id": "Q091",
+      "question": "What was the elapsed duration in milliseconds of stress run S1? Return a number or null if no duration was recorded.",
+      "expected": null,
+      "category": "unknown",
+      "fact_ids": [],
+      "evidence": [
+        {
+          "item_index": 94,
+          "quote": "Stress S1 PASS."
+        },
+        {
+          "item_index": 0,
+          "end_item_index": 102,
+          "note": "Absence checked across the complete original thread; the neighboring evidence states the related known status, not a missing value."
+        }
+      ]
+    },
+    {
+      "id": "Q092",
+      "question": "What exact Windows version or build was used for journal durability validation? Return a string or null if no such validated environment is recorded.",
+      "expected": null,
+      "category": "unknown",
+      "fact_ids": [],
+      "evidence": [
+        {
+          "item_index": 86,
+          "quote": "Windows directory-fsync and rename semantics are unvalidated."
+        },
+        {
+          "item_index": 0,
+          "end_item_index": 102,
+          "note": "Absence checked across the complete original thread; the neighboring evidence states the related known status, not a missing value."
+        }
+      ]
+    },
+    {
+      "id": "Q093",
+      "question": "What is the SHA of a local commit containing the requested R1, R2, and R3 fixes? Return a string or null if no such commit is recorded.",
+      "expected": null,
+      "category": "unknown",
+      "fact_ids": [],
+      "evidence": [
+        {
+          "item_index": 99,
+          "quote": "Do not create the local commit yet."
+        },
+        {
+          "item_index": 100,
+          "quote": "I will leave everything uncommitted for your inspection."
+        },
+        {
+          "item_index": 0,
+          "end_item_index": 102,
+          "note": "Absence checked across the complete original thread; the neighboring evidence states the related known status, not a missing value."
+        }
+      ]
+    }
+  ],
+  "quiz": "Answer the questions using only the checkpoint product supplied with this request. Return one JSON object whose keys are the question IDs below and whose values follow each question's requested JSON shape. Do not add Markdown, explanations, evidence, or extra keys. Use exact field identifiers where requested. For a missing or unknown answer, use null; for a known object with an unknown component, use null for that component. Do not infer missing details from general knowledge. An empty array means the known set is empty; null means it is unknown. Apply the latest instruction and distinguish implemented work from proposals, promises, and pending changes.\n\nQ001: What are the project name, implementation language, minimum Node major version, and allowed runtime dependency count? Return {\"project\":string,\"language\":string,\"node_major_min\":number,\"runtime_dependencies\":number}.\nQ002: At the checkpoint, which repository or release actions may the assistant perform immediately? Return {\"remote_push\":boolean,\"merge\":boolean,\"package_publication\":boolean,\"local_commit\":boolean}, applying the latest user instruction.\nQ003: What protocol revision must capability discovery report? Return an integer.\nQ004: What preferred chunk size in bytes and maximum parallel part count does the server advertise? Return {\"preferred_chunk_bytes\":number,\"maximum_parallel_parts\":number}.\nQ005: How must object URL construction handle the tenant prefix, path escaping, and Unicode spelling? Return {\"tenant_prefix\":\"preserve\"|\"discard\",\"escaping\":\"per_segment\"|\"whole_path\",\"unicode\":\"preserve\"|\"normalize\"}.\nQ006: Which dimensions must match for idempotent replay of an uploaded part? Return an array selected from [\"upload_id\",\"part_number\",\"byte_length\",\"checksum\",\"request_timestamp\",\"display_alias\"].\nQ007: What are the final upload defaults after the user revised the initial proposal? Return {\"workers\":number,\"chunk_bytes\":number,\"extra_retries\":number,\"total_attempts\":number}.\nQ008: Where is the resume journal stored, relative to the source directory? Return the exact relative path.\nQ009: What is the current default resume value? Return \"on\" or \"off\".\nQ010: For an empty file, how many part requests are made, which digest algorithm is used, and what bytes are hashed? Return {\"part_requests\":number,\"digest_algorithm\":\"sha256\"|\"md5\",\"digest_input\":\"empty_bytes\"|\"path_bytes\"}.\nQ011: Which two directory names must the scanner exclude? Return an array of exact names.\nQ012: How does scanning treat each entry kind? Return {\"symlink\":\"include\"|\"skip\",\"fifo\":\"include\"|\"skip\",\"device\":\"include\"|\"skip\",\"ordinary_dotfile\":\"include\"|\"skip\"}.\nQ013: What is the scope of the active request concurrency bound? Return \"entire_push\" or \"each_file\".\nQ014: Which fingerprint property names represent local file identity for resume? Return the three exact property names from the fingerprint result as an array.\nQ015: What are the required mtime precision and hash coverage for local identity? Return {\"mtime_unit\":\"seconds\"|\"milliseconds\"|\"nanoseconds\",\"hash_coverage\":\"whole_file\"|\"prefix\"|\"sample\"}.\nQ016: Which destination URL components are rejected instead of silently removed? Return an array selected from [\"query\",\"fragment\",\"userinfo\",\"tenant_path\",\"port\"].\nQ017: What destination URL normalization is allowed? Return \"trailing_slash_only\", \"remove_query_and_fragment\", or \"none\".\nQ018: May an error echo a user-supplied destination URL or authentication token? Return {\"supplied_url\":boolean,\"token\":boolean}.\nQ019: Which class owns queued journal mutations, and how do mutations execute? Return {\"class_name\":string,\"execution\":\"serialized\"|\"concurrent\"}.\nQ020: After the first journal write fails, what do later queued mutations report? Return \"first_write_error\", \"success\", or \"independent_new_attempt\".\nQ021: What octal permissions are required for the journal temporary file and its parent directory? Return {\"file\":string,\"parent\":string}, using four-character octal strings.\nQ022: In what order does a durable journal replacement perform these operations? Return an ordered array using each label once: \"write_temp\", \"fsync_file\", \"rename\", \"fsync_parent\".\nQ023: What side effects may dry-run produce? Return {\"network_requests\":number,\"creates_state_directory\":boolean}.\nQ024: Which upload operations may automatically retry? Return {\"part_put\":boolean,\"begin_post\":boolean,\"complete_post\":boolean}.\nQ025: After an ambiguous completion connection failure, how many status GETs are allowed for reconciliation? Return an integer.\nQ026: If that reconciliation status GET fails, which error is returned? Return \"status_get_error\", \"original_complete_error\", or \"no_error\".\nQ027: What is the authorization status of the stale remote-session cleanup proposal? Return \"approved\", \"not_approved\", or \"unmentioned\".\nQ028: Which receipt field names are validated before acceptance? Return an array of exact field names.\nQ029: What is the etag acceptance rule? Return \"nonempty_string\", \"any_string\", or \"any_json_value\".\nQ030: How many focused recovery tests passed after completion reconciliation was fixed? Return an integer.\nQ031: What is the final documented resume option syntax? Return the exact syntax showing both accepted values.\nQ032: How does the current parser treat the former --no-resume spelling? Return \"accepted_alias\" or \"rejected\".\nQ033: What is the current state of the verify resume mode? Return {\"feature\":\"active\"|\"deferred\",\"parser\":\"accept\"|\"reject\"}.\nQ034: What inclusive numeric ranges does the CLI accept? Return {\"concurrency\":{\"min\":number,\"max\":number},\"chunk_mib\":{\"min\":number,\"max\":number},\"retries\":{\"min\":number,\"max\":number}}.\nQ035: How does the CLI treat fractional numeric values for its integer options? Return \"accept\" or \"reject\".\nQ036: What are the exact shared field names for the JSON event identifier and discriminator? Return {\"identifier\":string,\"discriminator\":string}.\nQ037: What are the event identifier format and generation scope? Return {\"format\":\"UUID\"|\"integer\",\"scope\":\"invocation\"|\"event\"|\"file\"}.\nQ038: Which four count fields must the completion event contain, in addition to its shared event fields? Return exact field names as an array.\nQ039: What does uploaded_bytes count? Return \"confirmed_unique_bytes\", \"all_wire_bytes\", or \"all_source_reads\".\nQ040: In the parallel probe with first.bin, second.bin, and empty.marker, what were confirmed uploaded bytes and wire bytes? Return {\"confirmed_uploaded_bytes\":number,\"wire_bytes\":number}.\nQ041: What request counts did that three-file parallel probe measure? Return {\"peak_requests\":number,\"put_attempts\":number,\"unique_parts\":number}.\nQ042: What is the latest pending-part scheduling mechanism and its function name? Return {\"mechanism\":\"lazy_iterator\"|\"materialized_jobs_array\",\"function_name\":string}.\nQ043: Which source consistency mechanisms did the user exclude from scope? Return an array selected from [\"snapshots\",\"file_locks\",\"copy_on_write\",\"watchers\",\"change_detection\"].\nQ044: What is the source mutation contract during upload? Return {\"user_may_modify\":boolean,\"detected_change\":\"fail\"|\"continue\"}.\nQ045: Which exact remote status fields must match local file identity for session reuse? Return an array of field names.\nQ046: What error code is required when existing remote session identity does not match? Return the exact identifier.\nQ047: Which remote session states allow an automatic restart? Return an array selected from [\"missing\",\"expired\",\"open_mismatched\",\"complete_mismatched\"].\nQ048: What are the exit codes for the main outcome classes? Return {\"success\":number,\"server_transport_local_io\":number,\"usage_config\":number,\"invalid_resume_state\":number,\"interruption\":number}.\nQ049: What exit codes apply to these specific failures? Return {\"server_checksum_mismatch\":number,\"session_mismatch\":number,\"ordinary_local_permission_error\":number}.\nQ050: What happens on cancellation in the latest implementation? Return {\"queued_journal_writes\":\"settle\"|\"abandon\",\"new_jobs\":\"schedule\"|\"stop\",\"settle_block\":\"try\"|\"catch\"|\"finally\"}.\nQ051: When requested concurrency is 2 and the server maximum is 4, what effective concurrency is used? Return an integer.\nQ052: When requested concurrency is 16 and the server maximum is 4, what effective concurrency is used? Return an integer.\nQ053: How many capability tests passed in the focused capability run? Return an integer.\nQ054: What behavior did the capability tests cover for protocol revision 2, missing sha256 support, and dry-run discovery? Return {\"protocol_2\":\"accept\"|\"reject\",\"missing_sha256\":\"accept\"|\"reject\",\"dry_run_discovery\":\"perform\"|\"skip\"}.\nQ055: What are the journal durability validation states on the named platforms? Return {\"Linux\":\"validated\"|\"unvalidated\",\"Windows\":\"validated\"|\"unvalidated\"}.\nQ056: Where is wire_bytes available at the checkpoint? Return {\"development_probe\":boolean,\"public_json_event_schema\":boolean}.\nQ057: Which public counter receives the whole file size when a validated completed-file receipt is reused? Return the exact field name.\nQ058: For a partial resume, which public counters receive saved validated parts and newly confirmed parts? Return {\"saved_validated_parts\":string,\"new_confirmations\":string}, using exact field names.\nQ059: What were the passing unit and integration test counts in the latest full local check? Return {\"unit\":number,\"integration\":number}.\nQ060: What did that full check report for strict typecheck and diff check? Return {\"strict_typecheck\":\"passed\"|\"failed\"|\"not_run\",\"diff_check\":\"clean\"|\"failed\"|\"not_run\"}.\nQ061: Did the latest full local check execute a build and a real-service smoke test? Return {\"build_executed\":boolean,\"remote_smoke_executed\":boolean}.\nQ062: What seed and source-file counts defined stress case S1? Return {\"seed\":number,\"small_files\":number,\"large_files\":number}.\nQ063: What were the final S1 object and receipt counts? Return {\"objects\":number,\"receipts\":number}.\nQ064: What were the other S1 integrity and concurrency measurements? Return {\"peak_active\":number,\"completion_reconciliation_gets\":number,\"lost_journal_records\":number}.\nQ065: What is the real storage-service smoke-test status? Return {\"has_run\":boolean,\"dedicated_test_tenant_required\":boolean,\"test_credentials_required\":boolean}.\nQ066: What Retry-After literal triggers R1, and which JavaScript function incorrectly accepts it after numeric rejection? Return {\"header_literal\":string,\"function_name\":string}.\nQ067: What parsing rules does the R1 repair require? Return {\"delta_seconds\":\"nonnegative_grammar\"|\"any_numeric_string\",\"date\":\"strict_http_date\"|\"permissive_date_parse\"}.\nQ068: What must the R1 regression test verify for an invalid Retry-After value? Return \"local_backoff_fallback\", \"any_finite_delay\", or \"zero_delay\".\nQ069: Which exact function must be repositioned for R2? Return its identifier.\nQ070: Which remote session branches currently receive identity validation, and which must receive it after R2? Return {\"current\":\"open_only\"|\"complete_only\"|\"both\",\"required\":\"open_only\"|\"complete_only\"|\"both\"}.\nQ071: For R3, what option spelling must replace the obsolete README example, and should the old spelling remain an alias? Return {\"replacement\":string,\"keep_old_alias\":boolean}.\nQ072: What are R4's disposition and proposed technique? Return {\"disposition\":\"must_fix\"|\"follow_up\"|\"document\",\"technique\":\"descriptor_reuse\"|\"atomic_snapshot\"|\"watcher\"}.\nQ073: What are R5's disposition and remaining scaling concern? Return {\"disposition\":\"must_fix\"|\"follow_up\"|\"document\",\"concern\":\"many_idle_sessions\"|\"unbounded_active_parts\"}.\nQ074: What output does R6 describe for parser errors before JSON mode is recognized? Return {\"stream\":\"stdout\"|\"stderr\",\"format\":\"json\"|\"plain_text\"}.\nQ075: What action is required for R6 in this round? Return \"document_boundary\", \"redesign_parser\", or \"remove_json_mode\".\nQ076: Which final-review findings did the latest user request require code or example fixes for? Return an array of review IDs.\nQ077: Which validation work is required immediately after those fixes? Return an array selected from [\"affected_tests\",\"typecheck\",\"full_suite\",\"build\",\"remote_smoke\"].\nQ078: Under what condition does the latest request call for repeating the full suite? Return \"broader_concerns_from_fixes\", \"always\", or \"never\".\nQ079: How did local-commit authorization change between the penultimate and latest user instructions? Return {\"earlier_after_requested_checks\":\"allowed\"|\"withheld\",\"latest_instruction\":\"allowed\"|\"withheld\",\"next_gate\":\"user_inspects_final_diff\"|\"only_existing_checks_pass\"|\"none\"}.\nQ080: Which of the requested R1, R2, and R3 fixes have implementation evidence after the final review and before the checkpoint? Return an array containing only implemented review IDs, or [] when none are implemented. Do not count a promise to work as implementation.\nQ081: What file was read in the final tool call at the checkpoint? Return its exact relative path.\nQ082: What fallback backoff parameters are in the current retry implementation? Return {\"initial_ms\":number,\"growth_factor\":number,\"base_cap_ms\":number,\"jitter_min_fraction\":number,\"jitter_max_fraction\":number}.\nQ083: In which exact path must useful follow-ups be recorded? Return the relative path.\nQ084: Which two validation gaps does the latest user explicitly require in the follow-up notes? Return an array selected from [\"windows_durability\",\"real_service_smoke\",\"linux_durability\",\"strict_typecheck\"].\nQ085: Did the latest green full local suite occur before or after the final review that identified R1 through R6? Return \"before\" or \"after\".\nQ086: Do the recorded green full-suite results establish that the requested R1, R2, and R3 changes have been implemented and validated? Return a boolean.\nQ087: What exact wire-format capability field names specify the lower and upper chunk size limits? Return {\"lower_bound\":string,\"upper_bound\":string}.\nQ088: What lower and upper chunk size limits in bytes does the advertised protocol expose? Return {\"minimum_bytes\":number,\"maximum_bytes\":number}.\nQ089: How does capability discovery handle malformed responses or an unsupported protocol? Return {\"before_begin\":\"fail\"|\"continue\",\"guess_defaults\":boolean}.\nQ090: What is the exact tenant identifier provisioned for the later real-service smoke test? Return a string or null if it has not been specified.\nQ091: What was the elapsed duration in milliseconds of stress run S1? Return a number or null if no duration was recorded.\nQ092: What exact Windows version or build was used for journal durability validation? Return a string or null if no such validated environment is recorded.\nQ093: What is the SHA of a local commit containing the requested R1, R2, and R3 fixes? Return a string or null if no such commit is recorded."
+}

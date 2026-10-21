@@ -1,0 +1,759 @@
+HANDOFF: EXACT AUTHORITATIVE PROJECT DATA
+
+Task and current state
+
+The user has supplied exact ledgers, directed routes, final corrections, and work checkpoints for project 3617134 across epochs 0–9. The task so far is to retain these exact associations for later retrieval or continuation. No substantive follow-up request to retrieve data or execute work has arrived.
+
+The latest substantive data are epoch 9. The latest message before this handoff request was explicitly unrelated archival padding for epoch 9. It changes no active data.
+
+Epochs use distinct keys; a newer epoch does not invalidate entries from earlier epochs:
+- Epoch 0: IDs 1, 11, …, 191.
+- Epoch 1: IDs 2, 12, …, 192.
+- …
+- Epoch 9: IDs 10, 20, …, 200.
+
+Together these cover IDs 1–200, according to the previous compacted summary. Full earlier-epoch data are no longer available in the current context. Preserve the distinction between data actually retained below and data known to have existed but unavailable.
+
+Important rules and decisions
+
+1. Preserve every identifier and value exactly, including leading zeros.
+2. Routes are directional, from route-source to route-target. Do not reverse them.
+3. Final authoritative corrections replace the explicitly superseded obsolete correction candidates for the same key.
+4. All “UNRELATED ARCHIVAL MATERIAL” is explicitly non-authoritative. Ignore its simulation values entirely. Archival messages do not alter parameters, routes, probe results, corrections, checkpoints, or the active status of earlier epochs.
+5. Each checkpoint’s state, receipt, and next action must remain attached to its own work item.
+6. “next-…” values are opaque identifiers. No implementation or execution instructions have been provided for them. Do not invent actions or claim they have run.
+7. No external writes are established. Any earlier acknowledgment of “recorded” or “applied” means conversation tracking.
+8. The preceding compacted summary reports that the assistant queried all 200 read-only database probes and acknowledged all data. Those tool calls are not visible in the current uncompressed context. Probe results retained by that summary are included below.
+9. Only functions.database_query({project: integer, probe: string}) is exposed, and it is read-only. If necessary, probe results could be queried again. There are no filesystem or write tools.
+10. The user requested this handoff as text only, with no tool calls.
+
+Next steps
+
+Wait for the user’s actual retrieval or continuation request, then answer from exact retained data. Requery read-only probes if needed and appropriate. Do not invent missing values from earlier epochs. If requested information is absent, state that limitation rather than infer hashes or claim complete retention.
+
+Data representation below
+
+For every row:
+- P is the suffix after “value-” in parameter-3617134-ID.
+- R is the suffix after “route-target-” reached from route-source-3617134-ID.
+- C is the suffix after “final-” in corrected-field-3617134-ID.
+- S is the exact checkpoint state.
+- Receipt is the suffix after “receipt-”.
+- Next is the suffix after “next-”.
+- Q, where provided, is the suffix after “probe-result-” for probe-3617134-ID.
+
+Thus a row ID=8, P=bd1… means parameter-3617134-8=value-bd1…, not a bare suffix value.
+
+FULL RETAINED EPOCH 7 DATA
+
+ID 8
+P bd1b6d4086628a1c804192c7
+R 19949cecf2bebb2a5c49d5
+C 7a5edcf9f729c5208d08f031
+S IN_PROGRESS
+Receipt cb769fc6328512c0a3
+Next b18b2ad7cf52c96839
+Q 0f6e100a81ba9c8fde1b450e5f
+
+ID 18
+P 440e1cd48981f328ad2592fe
+R 6614b29e11ca757ae422f0
+C d66136f00e203391c35af49c
+S BLOCKED
+Receipt a7551d2da73a7bdeb3
+Next 5d567c3a940bedefc9
+
+ID 28
+P 29fd2ac4d46de9ce4766db26
+R d33ca6e5884b5a9e38fd6f
+C d49bd98a2121a02d4cbfcb86
+S QUEUED
+Receipt b16be20d4b0fd732d3
+Next 1e70a5e878edb3dead
+
+ID 38
+P d249daf8b32e231273f4cfe7
+R a84d3121a878fba96b0041
+C 74950437894bbbb40e27b6d9
+S DONE
+Receipt a51cda82b128737a1f
+Next cb3021755c0fbe7e71
+
+ID 48
+P 5ef5854ba61d3a730fdcf5c2
+R d32065bef16dbb6b5b5eae
+C ee91bde41addcac4d4f020aa
+S QUEUED
+Receipt 3f5bca9e3d42d906e9
+Next 6e2015a28f0700de4a
+
+ID 58
+P cd53c710d802798acd37f1c0
+R 4de6e7bf04c5e7be19198f
+C aea6a49546ac2d51a33c099b
+S QUEUED
+Receipt 4ba740e1a61ea3d0e4
+Next fdfb38eb42c88a28ce
+
+ID 68
+P b347d699ee458f581927b119
+R 539f59e2ea2e31310ad133
+C 5280d943ff1e6ffb2f2ba62a
+S VERIFYING
+Receipt d7a6639378be182ae1
+Next 0f6567cca32276fd48
+
+ID 78
+P a8b4f461257137ea85756d7f
+R cf68585718b74e1bbe4dd9
+C 1ae3fc845950416fc410cb16
+S DONE
+Receipt 729346ec58fd0ddf17
+Next d5f8b8c87179b7345e
+
+ID 88
+P 59fea3737031489d72a256b6
+R 9ae31e02a30d46d3ca374c
+C c1137d9af206f48232e6aecf
+S BLOCKED
+Receipt ef531dab58e0db3d13
+Next 93bab10e71829c6988
+
+ID 98
+P 523e9ef32b36e544135123ce
+R 06e46f94f27e7e4270d7c2
+C ea01916956d40fa42ae1edd4
+S IN_PROGRESS
+Receipt 72cc5fa4e5ef45e4a9
+Next 0a80b37a1a6c036c33
+
+ID 108
+P 0671148c642f1f5bd15ce839
+R c87d1b8ad8b0f78ca4d6a8
+C ab3e809f5d76c5c8d9ab1189
+S BLOCKED
+Receipt 960a45ecd2b6e3b2a6
+Next 6e6517e26d3e387063
+
+ID 118
+P 7d1d43a0182a263ed96a425f
+R 70e2bc28120c2a9cfa62b9
+C 24d3b02bc299d29110a4afe1
+S QUEUED
+Receipt 2f9ae0b191fc3d0c6a
+Next b37e2f28be8c0ecfc9
+
+ID 128
+P a9d53b7fa40851949869fb5f
+R 2e2f4364cb71c56649985c
+C 4cecc1af1048ac5e2d6a208f
+S QUEUED
+Receipt 67582e66770cf1601b
+Next 56ea5b4d27577a5099
+
+ID 138
+P 6e810090c3f9c44ba8fc9b9f
+R 4264f206f0a099690b8b50
+C 1a3056b0fc6c0967c2b7ef78
+S BLOCKED
+Receipt 757e198dc15ecab626
+Next efae32ce4fb39a88c2
+
+ID 148
+P b0f87a2dd8499b7dfd87adfd
+R f9f812d6f08cdb2d36ecb3
+C d6c8442a25a2e81ecec96436
+S DONE
+Receipt 5c4eab722e93384d9b
+Next 48239c67bf87647e65
+
+ID 158
+P 8bb3b1cce57b69c1f2cda297
+R 4eca6a0fa77f325dab714d
+C 376b957fc8d8eabf62c98973
+S BLOCKED
+Receipt 14c80860a7519191d6
+Next 22a58edc7ab6d32713
+
+ID 168
+P 477eb500ac867c1ef690b4c7
+R 1497a927762be45de03e9e
+C d9e98fc33d46a50fbc81481a
+S QUEUED
+Receipt af1d1a0bdd0b03bb23
+Next 9a681963aef0f5a71e
+
+ID 178
+P d22a1a3c94b895e124cf6a1d
+R 86a440fc95f2f54be7f787
+C 9d999e749710674ef9003945
+S VERIFYING
+Receipt 006b856a4cb6cb8a49
+Next 1c6c0512a7ec0658ef
+
+ID 188
+P f6c9c299f8409ee3738e5259
+R bda47a95d554356966b0b9
+C a8828cdd2ef7a7aad02fc142
+S DONE
+Receipt 1fa745582a9a08d6ef
+Next 1a53e5d28a0e781e9f
+
+ID 198
+P 0d808be6256ae2443184c05c
+R 0175be17f68f991979b8f5
+C 24c0eebc9696dfca1227ffd9
+S IN_PROGRESS
+Receipt 7b4ba4d9d4ed934559
+Next e5c954e83acc3fc0c4
+Q 585113c9784617ba3a7752f1ff
+
+FULL RETAINED EPOCH 8 DATA
+
+ID 9
+P c0f1074ea78f667ea027a813
+R cb028dee4f84f839359c09
+C c770b8a4d405eb76a8189e8c
+S BLOCKED
+Receipt a2065f103e7312116c
+Next e080e2c5e22f23a671
+Q 61e42815bf3a367e7b1c9ed006
+
+ID 19
+P e13f369277de175ceb26713c
+R 02fb61365b5e5906fefa8b
+C e4b4b2f04035f5bd7320742c
+S IN_PROGRESS
+Receipt 9246f72ec83ae649b9
+Next 832c27ab12933c42c4
+
+ID 29
+P 44eeae0b6e61f61c667680a0
+R 017e1ee1fab6723d9efc65
+C 2601017e1e0946d17410b1c6
+S VERIFYING
+Receipt 73dedc5ff9971bf90d
+Next 73190c3c706c5637ee
+
+ID 39
+P 0ff757d0b48e1a37e10b2d67
+R 1b1e0e9426bac1824876ee
+C 9039eb2535d4ea0a87267ed2
+S IN_PROGRESS
+Receipt ae7d3e1aa08876c4a8
+Next ec5832d54d61418042
+
+ID 49
+P 46492752380cac99b5e3ccf1
+R 298fd92731bc3f4b865130
+C c7be86cbb23f339058a2c48f
+S BLOCKED
+Receipt f65ae4017a6d7e3aff
+Next 5de1c44aadda3b6ee1
+
+ID 59
+P 9d6acb891fc7cf1335bbe108
+R fc9f4eb5818151728680e3
+C e257c75505347915c25721e4
+S DONE
+Receipt 62445ee575adfe8622
+Next b3e441031cbfe40557
+
+ID 69
+P b0febb9b2e9378b184baf14b
+R 9138bf1347dede7beda45d
+C f1f60b93cf976a8d00e83912
+S DONE
+Receipt d8ba0d6b401992f697
+Next 0450fa765a3d9514d6
+
+ID 79
+P 90d970429dcf5dbd6388dbb2
+R 9722835d78f5ce5d307bcc
+C 60d3d71c6cd9c3a3d202cb93
+S IN_PROGRESS
+Receipt db4cccea4454846e8b
+Next b0edce8d27bb39d3b2
+
+ID 89
+P 289bc17c1435e67b6d16089d
+R 13edc8b609a185e6109720
+C e14992d5b36d4c6d5c04367e
+S VERIFYING
+Receipt b32896a1abd8b62246
+Next 148cf9c49dacc2d4a8
+
+ID 99
+P d0a0f9ceff47324ed6d7a6fc
+R 3082c911708327e240040a
+C fbb476820a359c3b26b5bd20
+S QUEUED
+Receipt 402997f90c7fc661ef
+Next d8b6a96317a2422d8f
+
+ID 109
+P 2c5d2cc87a93b0d275498e56
+R 01c8d0b2d7b2a5518f6c5d
+C 6947690f882ead2d2fc3451e
+S QUEUED
+Receipt 254c1a962287dde96b
+Next 16c0e0487a66d7a7e6
+
+ID 119
+P b2021fe14b99ad5962910f33
+R 4961f6c307077a469fb89d
+C 1b877a13a70b4573dec34589
+S QUEUED
+Receipt 322a87e88dabaceb81
+Next dd9fa701df69234d9a
+
+ID 129
+P 9c43fa9af66e0ea6cd56bf84
+R 3de83b326bc368611c8d86
+C 1d55e0005fbf37ff239bc694
+S BLOCKED
+Receipt 97199a4582174bee5b
+Next 9ae831691739bf083d
+
+ID 139
+P 362441a88456a3af6fb0d880
+R c9bcc5eef9d7537f9367b3
+C 40bd24b05049aa0c8751666d
+S QUEUED
+Receipt b38d9fc061a72f717f
+Next c9faaccdfa30507911
+
+ID 149
+P 960a24ce77a79d7af45d74b5
+R 7aafd7f6826b5c9f835523
+C 84da02c91c99d33382b40a14
+S BLOCKED
+Receipt f46cc87fbe371a3061
+Next c09bccabd71188afc2
+
+ID 159
+P a7840994fe19e7a4941c326f
+R c49546e79eac30413f6743
+C 6b5d6ce1db94215b5563e207
+S QUEUED
+Receipt 2c5bc91d573cf4b90c
+Next 8032ebca84d950de9a
+
+ID 169
+P 3c45ef91116cbbc30d3befbb
+R ce11690fb1fc08e4000ffe
+C 9065bdb4435e1870c5fa9bd2
+S VERIFYING
+Receipt 37d076a3649de90f42
+Next d394ebca04e376f404
+
+ID 179
+P 5a12e568c6e908b3ea1813d1
+R 3bb4fcdc112900184c9125
+C e0953d73cd0f14111171d21d
+S VERIFYING
+Receipt 6f92a49594f08f2502
+Next d2df58a5342c7d434f
+
+ID 189
+P e95860c1a5020a8d38cf7ea1
+R 73073ff78b83a0316d0837
+C ff948c6614f9b44e4b36801d
+S DONE
+Receipt 081d6ca4dd2f50881b
+Next a4750e6427ee2666ce
+
+ID 199
+P b8e1045e9445ae8f5dd30632
+R 3f8a91bbd7317827431594
+C c9c833ff64d2d3804e90bfce
+S VERIFYING
+Receipt 17dd9555a91bd5aa1f
+Next 1f16431eb89dea869f
+Q d893bce29d3e459124884e8c31
+
+FULL RETAINED EPOCH 9 DATA
+
+ID 10
+P 066795a7374a7501a1efb3a1
+R 9e6927ccf362350a0151d6
+C db4f99143ba180480aa9a945
+S IN_PROGRESS
+Receipt 31577e6413e134b7bb
+Next ca6c4ec1af525a83f8
+Q 4fca811d1656ff7f32e3800976
+
+ID 20
+P 309d55f62f56faffe4c7ca8c
+R 8f41341b9c204cfe71873d
+C 1967e669fa3a8d21b13364ff
+S DONE
+Receipt e7c9d04103c28daa9f
+Next 114269f89798323588
+Q 222cf3cdd27a80cb8c89f4bbaa
+
+ID 30
+P 5290358adee693bafca8f3d7
+R afae3e705308a70dd10603
+C b6db3b2ec034affca8673187
+S DONE
+Receipt bb724ac186f203f4c4
+Next 22b1b236d4c545c91e
+Q 80cb0be980de684f582c6ba2ca
+
+ID 40
+P 48ee4ab5c656d2d2dde850ff
+R 61864886d135e6b554bf56
+C 4fe8ec573fac187e539f39c2
+S DONE
+Receipt 04bcbb412e9f8ce14b
+Next 1112dfc6ceeea854f0
+Q 464b261e6d2d1a8a1ea7eeacbe
+
+ID 50
+P 02f9c1db387dc23374204d9e
+R 0a81ad1cc39f19af818287
+C 676b10ad2f3add50d0d5fa4f
+S VERIFYING
+Receipt 90e308412ab1b08ec8
+Next 3140354647069bad71
+Q 9501d37c6e92e1e1c463890d1a
+
+ID 60
+P 20490d2ddcca0495a11d2e67
+R 4a469d1e216dcd1ffa3cfd
+C b6f414eb47a8e31f02b7c454
+S IN_PROGRESS
+Receipt b69f84dc2a8d45e116
+Next d60c5e798eab8cd0e7
+Q a0031b33d0bb794548eec052a5
+
+ID 70
+P 58ac1bd75e2af17301167f2e
+R eaad5476733fe81ecd34bc
+C ab708a9168f464133eb0f2c4
+S VERIFYING
+Receipt 14296463683150602b
+Next d5eb36c9c0bc3176d3
+Q d67f17b3c6c731f9ddfcd2f285
+
+ID 80
+P 7d6a23d9df5173160054609b
+R 7182d31b5c56cfedb96523
+C 06b8c454539839887b41c418
+S IN_PROGRESS
+Receipt 1d1bc5a56a604794af
+Next e7c010ee0ba14c40ee
+Q f69ca046c82323e4db8d8942b4
+
+ID 90
+P d95f8714f060c8c82a9413c9
+R 15b8fc80fb8249a25c6185
+C c1335b163c7a1958b08f04fa
+S IN_PROGRESS
+Receipt 852cdaffee2e14fb4b
+Next 6482def7bbb0ed03f7
+Q 9281bdec479c2de46c30fc408a
+
+ID 100
+P 1efb5593f60032f9e15c54d3
+R becde873392ba870cd1cad
+C 259e13fdfd21c867d08da472
+S IN_PROGRESS
+Receipt e2646a66e43ec6e298
+Next a8169d6d4effd22d3b
+Q b8ef4c47ac8cbc55be3e78ce90
+
+ID 110
+P a63c5f283061eb8591d47cb0
+R 8022336589e0222a452e4a
+C bf811ad7dec3efa0c9e4b2df
+S BLOCKED
+Receipt 56bafbde7fe39ff756
+Next df10c75377e3474ef2
+Q a27f2cb2160b74a30d2b27e1fb
+
+ID 120
+P d739ce357705afd75d1ff334
+R 98f62cbe3a3b367789205f
+C dd42c01fb399d6ba6a7bcc90
+S IN_PROGRESS
+Receipt 4d199b651ea0e615f8
+Next ff0e3b829e4201e8c5
+Q 09db07e0d0e9cd43599b463b29
+
+ID 130
+P 77e64e29bf63dc47a7f2b975
+R f7b077bd20ec721384b9ac
+C 8cb779b72fc76f242d4a388b
+S BLOCKED
+Receipt 05128f151f13d11888
+Next d1e701ea2004c36cf2
+Q c5919fbe5e97ffb6e72f2eb430
+
+ID 140
+P 7ea0e6ff98e1e71857b447a1
+R 63c23cacccd307c2e0f0b9
+C de7b4719600fac9c4f4e9c8a
+S DONE
+Receipt d7e37693b8610f65f7
+Next 88c0b0ba5dfca0f89f
+Q 3a03f91460043c4703c2ecad74
+
+ID 150
+P 7cf1c6fd0b79b481150661ce
+R 0fe6df2cf9df290489c9af
+C 5465f389573ff2244c58b512
+S IN_PROGRESS
+Receipt 90f87822aa38355ed4
+Next 1633188e56ca9b8576
+Q a9b8a84abda7efdd46a48375f8
+
+ID 160
+P 3d606ded8d9bac58dac39db7
+R 02600c0f4165ae99038e51
+C 162020eed662bdee743a5f85
+S QUEUED
+Receipt b86e71ae8fbdcaac1f
+Next 1ebe0470afc5f16a00
+Q 87fac5d75b219ce1290533f425
+
+ID 170
+P b300d6bd95c6aab390422d02
+R 37e2165853eb9cac3cd2d2
+C 15ff511b37cccb1ea452366f
+S QUEUED
+Receipt 69dc044f5a69843b52
+Next bc11406040475175ae
+Q 1ce689377d298c55a41a4809f1
+
+ID 180
+P 525b5fdc5e6535bb8f7a549e
+R df583eb40955bf9eceef99
+C 27ea8eebad8c514d0a6f25e6
+S IN_PROGRESS
+Receipt 3288bedaf2a1e45ef1
+Next 5c8937722d12943242
+Q d30b4c65892e475abc012d4c40
+
+ID 190
+P 1c2057b4d622bb478370c699
+R 74d1501c4ca601d21defab
+C 72dcbd5148ecca9a61b78bf4
+S QUEUED
+Receipt fc0e7789d1a2af3297
+Next c13517a0fe245b66a4
+Q e7faafce3511ffb5c664759cfc
+
+ID 200
+P 4d7baa393bf58dc4853d5bd1
+R 8ee58a2d926a74b7ee7533
+C 0a8a993e6e89e99b7489d690
+S VERIFYING
+Receipt 2b70a3f4a2c04dfe25
+Next a9ab9886819763d74c
+Q 77ab6bcf158abd44d71c321551
+
+EARLIER-EPOCH ROWS RETAINED BY THE PREVIOUS SUMMARY
+
+These rows are the only complete earlier-epoch rows retained in the available summary. They have the same field semantics as above.
+
+ID 1
+P d997d69e98c795bd3cdf67ba
+R d3ceb456d46a30c02c5687
+C a86891a567ad42cb2bde2a35
+S VERIFYING
+Receipt f5b8a641586784d396
+Next 5a2d6b3fda921def1d
+Q 2958b81c94e99da3b26b3fda00
+
+ID 2
+P 7ad7f030e642dd73d7e5d29b
+R da1d32a4a6e83b8d66d88b
+C d40327b534e8cdf336bcb10a
+S QUEUED
+Receipt 40f38ddc4bdc5d45ef
+Next 2831925392d0bba42b
+Q 24ae23063c44f16eac15cf7685
+
+ID 3
+P 4d5178a1f8605b6c59d26342
+R d140ee9d86debd41629f33
+C b9c1d99958f555021c1e401c
+S VERIFYING
+Receipt ed3e96d3e7780d0885
+Next 09f6ce0c95d41fb356
+Q 4e14b26cc51e3b31253be08567
+
+ID 4
+P 5b3ab3cf4d8407eed6683be0
+R dee4032f2c287defda1087
+C 8847c13b58eb38c4667f75c6
+S DONE
+Receipt 1d3c30bce07b870ae3
+Next c54166c5da345f405e
+Q 354ca98098ef58910061f5f709
+
+ID 5
+P af736063d4327b1ceb3b9478
+R 63fabfe09b52199dfb6f42
+C 806f5ad25d1315e5d011da88
+S DONE
+Receipt 55ccc66d0c5e3e4fc0
+Next d8bb100bf5f7fc3d98
+Q 9b3b2ef8b093a37abc98242ca9
+
+ID 6
+P 0bb8119656e5b7d4fd400d3b
+R 47c6e4bd1d414a4e8360bb
+C 5cd4c98edbda0ead9ed23978
+S DONE
+Receipt d78cb4698939c1e3ad
+Next 0a5e260ed49d38de84
+Q bc90bb17550bd069a0be9e4dfe
+
+ID 7
+P 18e8d68c99770c5da72a4c61
+R b756a00cd52cdf50daad78
+C 291b2926c3cb65808abc470c
+S QUEUED
+Receipt b648351ca8f5391beb
+Next 463d925fee1928d3f1
+Q 727a372a203ab0811772418db3
+
+ID 191
+P f072e2a3552971f74f7de6ef
+R 441221a7af49540d5002be
+C 7663ae2e455d5c29f3429862
+S DONE
+Receipt 1aea6e9bcebf85b00c
+Next 3862481b40b5e06ac8
+Q 19ecdb3cab0b9e918204ed6191
+
+ID 192
+P e57590f17f661f1d302865f9
+R 77e2352bdee49f420a710c
+C cb3f1412b7b853c0b9ac253b
+S IN_PROGRESS
+Receipt 018b415d99c5a6e16e
+Next d35db604ff36cf9faf
+Q ba4f52bd5d4c0276818754f60f
+
+ID 193
+P 7591b0bc10445d089614f6fa
+R 76927790428aa8afaff626
+C 169abe276bd5543c38a1a19a
+S BLOCKED
+Receipt 1fb548e64009d22936
+Next 3d5400077ae72b0576
+Q a4a67e6590657e11bd0a955e88
+
+ID 194
+P ebaf1e90e5b9c2c3deb93e1d
+R 81c7f547a305d96fa5a2e6
+C ac7a36b8e873e23a4adcb623
+S DONE
+Receipt c66929a71855180165
+Next 34afa299d59da8ead5
+Q c7e4c9f0fda9fbcf86bd6478fb
+
+ID 195
+P dc6f2c67df1fc09591786f68
+R 2d4cd29e875d8c2ea5f428
+C eeb7cd559e351d0f75fd1e25
+S VERIFYING
+Receipt 91d1ebd96e72f75bc2
+Next 2741c656771392f5b5
+Q bbb2c54d8ddd2196e0ff0d0ed2
+
+ID 196
+P 55fd0e308c8f92c2186071f0
+R aff806951ef226f9f32cee
+C 2dd291bcf4e3b01c3a33825a
+S QUEUED
+Receipt d4a01e8a0ccfe1e06b
+Next bc26f7a7fb13dace63
+Q 92c4a20f6a5873433bc23c17db
+
+ID 197
+P b37743dde5fa70ae6de3d716
+R 698c33fd09e9b2e3e003e0
+C c31f2180cd969afc29fdaca9
+S BLOCKED
+Receipt bc9e078c88062b7773
+Next 49dd351a2a4b2deed3
+Q b1fb40649a919d327c8ded3490
+
+SUPERSEDED CORRECTIONS
+
+The current context also contains explicitly obsolete correction ledgers for epochs 7–9. They have no active authority. They are retained here only to preserve the full distinction if a later question asks which candidate was superseded. Prefix every suffix below with “obsolete-”; key is corrected-field-3617134-ID.
+
+Epoch 7:
+8 9e55e911baa5e87fc69e
+18 5f4dae35519fdab50c2c
+28 f3f981b1f5b1876f4dcc
+38 6d89f2f59a60bc09b590
+48 64976a711426c4567e44
+58 0228e0adf70a63318ad1
+68 390d172fc6eac9508024
+78 9b8da22074ee1ba0b990
+88 a4097513a0c6c2c82edd
+98 c02e01dd91c9c6a8eebc
+108 14ccc81f834dc0f7c8b9
+118 147a46cb63c17ab09358
+128 88fe262a135edc5e3257
+138 c01a7b3317db2b6306ae
+148 a7919f9a5ee6cce476c2
+158 ff1a8228da241a58e80a
+168 82f6f8accd2e88ae5b5d
+178 0b62aa9be3d31ac9bef5
+188 149b438366ebd23b64e2
+198 dfe6964317aa2fa717a0
+
+Epoch 8:
+9 08a30dcc1361caabbb1b
+19 12dc8d7832619d62cfc2
+29 ff16c6938f7776470a35
+39 9790d195603c6ffb1cfb
+49 a2ffd688b01a6e903722
+59 7896417cfa80105a74b5
+69 e930e7b7db596c7a0687
+79 4cb8d978b8f462ea7a19
+89 57c920247f553a9b86a1
+99 db8b955aa0150dc74301
+109 4ded63f7f74bcbe770c4
+119 2c6b1863cecdb579b39e
+129 a83d654db5f9ddd75606
+139 8b674575cc84eade9e7f
+149 9574665fa2a3492b181e
+159 735b135c069a8d16262e
+169 68e8093cfe2402494ac4
+179 052820d36bf6fb1b3468
+189 8f1c5091c6246f9187bf
+199 3a0a7e7d7d122a31f599
+
+Epoch 9:
+10 ed35ab3f1de65cd4f70e
+20 bce0052214eb9af49ba9
+30 7fa15d9bd5da9bd21f32
+40 b45ea8bf40217106277d
+50 6d328b533e68ba998992
+60 5f03d423f85b67fd6f9f
+70 4f302dd56a3dd7acb170
+80 db22b3198feb6a1b9285
+90 0a9a3b0d1d4d7bbf21aa
+100 1a41ab3dad64d445ecec
+110 e636e7ab9c4677128778
+120 b0a5b9352807d38af853
+130 ea455642f05bef2abc07
+140 de8327642496f0dfa7f2
+150 d0e61be7b3f7bd99ebc4
+160 b9f18127366778ea28fa
+170 20f89de6ea51734fb8d4
+180 bc5e52c7653d5d84519d
+190 b51ff0482c3fc97c3a5c
+200 50afde7a910ca7832277
+
+Communication preferences
+
+Use clear, concise prose. For future tool use, start with a brief commentary update. Avoid unnecessary permission requests. Keep claims tied to available evidence, particularly about earlier tool calls and external persistence. The user’s central requirement is exact data preservation and correct associations, not a speculative interpretation of the opaque values.

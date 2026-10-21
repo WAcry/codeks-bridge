@@ -29,6 +29,8 @@ npm run check
 
 这些测试检查协议和客户端行为；假上游不会验证模型是否理解提示词，也不会验证真实服务的缓存命中率、容量和区域之间的密文兼容性。
 
+压缩后的信息保留与 handoff 质量另有[手动 benchmark](../benchmarks/compaction/README.md)：使用公开合成材料，对比两种文字 prompt、原生压缩和原生压缩后 handoff。它独立于 CI，提供复跑方法、输入、产物和逐题结果；真实模型请求需要显式执行。
+
 Claude 续接边界的回归同时检查生成和下一轮回放：首块 thinking/redacted 的 `continuation_before` 只记录一次，原生载荷不变；连续失败、多个 thinking、关闭摘要显示时仍保持顺序；来源过滤与切回按同一载荷生效；增量工具声明已有边界时不重复插入。正文或工具先于 thinking、没有 thinking，以及没有该字段的既有载荷，继续使用原有失配策略。`test/claude-continuation.test.ts` 检查转换，`test/claude-recovery-e2e.test.ts` 使用真实 codeks 和假上游检查持久化与重试；签名是否被真实上游接受须另行验证，不能由合成签名测试推断。
 
 2026-10-20（America/Los_Angeles），以 `@wacry/codeks@0.163.0-codeks.5` 启用全部客户端测试，286 项通过、0 跳过，类型检查、构建和私有内容检查通过。续接场景覆盖 overload、EOF、连续两次失败及进程重启后的 resume。另复用真实 T1/T2 签名直接请求官方 Sonnet 5.5：恢复原位 `user: Continue.` 后返回 HTTP 200，`input_transformations` 明确为空数组。这验证边界恢复的协议依据；carrier 的生成、保存与重放由真实客户端加本地假上游验证，两类证据分别成立。

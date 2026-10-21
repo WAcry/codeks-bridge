@@ -1,0 +1,66 @@
+## Task and progress
+
+The user has supplied authoritative state for **project `3617033`**, across **epochs 0–9**. Each epoch contains 20 items, covering item IDs **1–200** in total.
+
+For each epoch, the conversation contains:
+
+1. An **AUTHORITATIVE EXACT LEDGER** of parameter keys and values.
+2. **AUTHORITATIVE DIRECTED ROUTES**.
+3. Twenty **authoritative database probe results**, returned by `functions.database_query`.
+4. A **SUPERSEDED CANDIDATES** ledger whose values are explicitly obsolete.
+5. **FINAL AUTHORITATIVE CORRECTIONS**, replacing those obsolete candidates exactly.
+6. An **AUTHORITATIVE WORK CHECKPOINT**, associating each work item with its current state, receipt, and next-action token.
+7. Large amounts of **UNRELATED ARCHIVAL MATERIAL**, explicitly excluded from active state.
+
+All ten epochs have been acknowledged. No implementation, deployment, or work-item execution has been requested or performed. The latest user request is this handoff summary.
+
+## Rules for continuing
+
+- Preserve every authoritative key and value **exactly**, including leading zeroes.
+- Preserve route direction: `route-source -> route-target`. Never reverse an arrow.
+- Use **final corrections**, never `obsolete-*` candidates.
+- Keep each work item's **state, receipt, and next token together**.
+- Ignore all archival notebooks, simulation values, archive padding, and truncated archival fragments.
+- Epochs contain **distinct keys**. Later epochs do not replace earlier epochs' distinct items.
+- Item IDs for epoch `e` are `e + 1 + 10k`, with `k = 0…19`. For example, epoch 0 covers `1,11,…,191`; epoch 9 covers `10,20,…,200`.
+- Key formats:
+  - `parameter-3617033-{id}=value-{hex}`
+  - `route-source-3617033-{id}->route-target-{hex}`
+  - `probe-3617033-{id}=probe-result-{hex}`
+  - `corrected-field-3617033-{id}=final-{hex}`
+  - `work-item-3617033-{id}:{STATE}|receipt=receipt-{hex}|next=next-{hex}`
+
+## Critical source references
+
+The **original authoritative messages and tool outputs in this conversation** are the exact data source for all 200 items. This summary does not reproduce the entire ledger. No separate file or durable database write was created; earlier “recorded,” “applied,” and “archived” acknowledgments refer to conversational tracking.
+
+The available `functions.database_query` tool is **read-only** and accepts `{"project":3617033,"probe":"probe-3617033-{id}"}`. Existing probe outputs are already present for every ID; do not unnecessarily rerun them.
+
+## Latest checkpoint: epoch 9
+
+```text
+work-item-3617033-10:QUEUED|receipt=receipt-67c5220d3567cf3f6b|next=next-23cf3f15295b60ec9a
+work-item-3617033-20:QUEUED|receipt=receipt-4dcb2dc2b7c3e26ea8|next=next-360f58d9e7525262c6
+work-item-3617033-30:QUEUED|receipt=receipt-dd5abf7a5506e29408|next=next-f760b638551b9e84a8
+work-item-3617033-40:BLOCKED|receipt=receipt-e350fec1e543fc78ab|next=next-9e38d8f684fb006c72
+work-item-3617033-50:IN_PROGRESS|receipt=receipt-be28b50a5fe7632e1f|next=next-0fafc42691baebe04f
+work-item-3617033-60:VERIFYING|receipt=receipt-720788a50798b70d8d|next=next-6b47008e81407ccdea
+work-item-3617033-70:VERIFYING|receipt=receipt-01e4e57b8598044db8|next=next-6c4199cb5ed68eb202
+work-item-3617033-80:IN_PROGRESS|receipt=receipt-75a1d8b320ed8cd643|next=next-b59e4c94c9633de275
+work-item-3617033-90:IN_PROGRESS|receipt=receipt-ec35209764980f0c3e|next=next-47e65ccc76d74b2193
+work-item-3617033-100:IN_PROGRESS|receipt=receipt-741892296219973c1d|next=next-da78d62de3a2e9c3cf
+work-item-3617033-110:DONE|receipt=receipt-def61b76402d6943d9|next=next-53b7e8575c0819641c
+work-item-3617033-120:BLOCKED|receipt=receipt-cdb67d8f898925ea50|next=next-ebaae0bd003d30cf4f
+work-item-3617033-130:IN_PROGRESS|receipt=receipt-9ee95c076aa6fd120c|next=next-182a006035c7ca3c57
+work-item-3617033-140:DONE|receipt=receipt-22df9c7076be4fb50c|next=next-bb551dd4b8772f064d
+work-item-3617033-150:BLOCKED|receipt=receipt-2af4030b1832910ef9|next=next-377d8b0e652e237dcd
+work-item-3617033-160:DONE|receipt=receipt-f8207dea0df1c6391a|next=next-6a5c669063e0fb52ce
+work-item-3617033-170:DONE|receipt=receipt-735f074cb8a93aef62|next=next-70fc21c86a653984d6
+work-item-3617033-180:QUEUED|receipt=receipt-768ab16eeaa0cccfff|next=next-5bd1618e91abc93d78
+work-item-3617033-190:QUEUED|receipt=receipt-dc00c9bbcc80de2bf9|next=next-ef07d2b624958ea77c
+work-item-3617033-200:DONE|receipt=receipt-d498f5f3f676771039|next=next-92247864a59022db93
+```
+
+## Next steps
+
+Await the user's next substantive instruction. For any requested lookup or continuation, retrieve the corresponding exact authoritative entries from the conversation, excluding obsolete candidates and archival material. The `next-*` strings are opaque tokens; no action definitions have been provided, so do not infer executable operations or advance work-item states from them.

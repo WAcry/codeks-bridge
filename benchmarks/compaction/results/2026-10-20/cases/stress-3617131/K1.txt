@@ -1,0 +1,62 @@
+## Current progress
+
+The conversation has collected authoritative data for **project `3617131` across epochs `0`–`9`**, covering IDs `1`–`200`. No implementation or task execution has been requested beyond recording these records.
+
+For each epoch, the following were received and acknowledged:
+
+- **Exact ledger:** 20 `parameter-3617131-N=value-…` associations.
+- **Directed routes:** 20 `route-source-3617131-N->route-target-…` associations.
+- **Authoritative probe results:** 20 database results, present in the tool messages.
+- **Superseded candidates:** 20 `corrected-field-3617131-N=obsolete-…` values, explicitly obsolete.
+- **Final corrections:** 20 `corrected-field-3617131-N=final-…` values, replacing the obsolete candidates exactly.
+- **Work checkpoint:** 20 work items, each with its current state, receipt, and next-action token.
+
+Each epoch also included lengthy **unrelated archival material**. The user explicitly instructed that it updates no active data and must be ignored for continuation.
+
+## Rules and decisions to preserve
+
+- Preserve every authoritative key and opaque value **exactly**, including leading zeros.
+- Preserve route direction: source → target.
+- Keep every work item’s **state, receipt, and next action associated with that item**.
+- Use final corrections; never use superseded `obsolete-…` candidates as current values.
+- Epochs contain distinct IDs and are cumulative. Later epochs do **not** replace earlier epochs’ distinct records.
+- Acknowledgments describe conversational recording. There is no evidence of persistent file storage or database writes.
+- Probes were read-only. Their exact results are in the original tool outputs.
+
+## Locating records
+
+Epoch `e` contains IDs:
+
+```text
+N = e + 1 + 10k, where k = 0…19
+```
+
+Thus epoch 0 covers `1,11,…,191`; epoch 9 covers `10,20,…,200`.
+
+For any ID `N`:
+
+```text
+epoch = (N - 1) mod 10
+
+parameter key:  parameter-3617131-N
+route source:   route-source-3617131-N
+probe key:      probe-3617131-N
+correction key: corrected-field-3617131-N
+work item:      work-item-3617131-N
+```
+
+The original user messages headed `AUTHORITATIVE EXACT LEDGER`, `AUTHORITATIVE DIRECTED ROUTES`, `FINAL AUTHORITATIVE CORRECTIONS`, and `AUTHORITATIVE WORK CHECKPOINT`, plus the `AUTHORITATIVE TOOL OUTPUT` messages, are the exact-value references. **This concise handoff does not reproduce all opaque values; retain those original messages for lossless continuation.**
+
+## Exact reference example: ID 200
+
+```text
+parameter-3617131-200=value-8519b2b50fa906bacfda1813
+route-source-3617131-200->route-target-c8961bf2f1303f0ff4ab84
+probe-3617131-200=probe-result-7abf7a8efc8b17d6ab85e917e3
+corrected-field-3617131-200=final-1790c5ab44075d9568429a2b
+work-item-3617131-200:VERIFYING|receipt=receipt-f3f96d0c1fa2831854|next=next-351d532f96158ab084
+```
+
+## Next steps
+
+Await the user’s next substantive instruction. No active work item has been advanced, and opaque `next-…` tokens have no supplied execution semantics. For future lookups or continuation, consult the appropriate authoritative records and ignore all archival padding and obsolete candidates.

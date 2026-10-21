@@ -1,0 +1,64 @@
+## Task and progress
+
+The conversation is building an exact, authoritative record for **project `3617032`**, across **epochs 0–9**. No implementation or execution of work items has been requested. The assistant has acknowledged each supplied ledger and checkpoint.
+
+Each epoch contains 20 records, covering these numeric suffixes:
+
+- Epoch 0: `1, 11, …, 191`
+- Epoch 1: `2, 12, …, 192`
+- …
+- Epoch 9: `10, 20, …, 200`
+
+Together, the epochs cover suffixes **1–200**, each exactly once. Epoch assignment is `(suffix - 1) % 10`. Later epochs introduce different keys; they do not invalidate earlier epochs’ authoritative records.
+
+## Authoritative record types and rules
+
+For each suffix `N`, preserve these associations exactly:
+
+1. `parameter-3617032-N=value-…` from **AUTHORITATIVE EXACT LEDGER**.
+2. `route-source-3617032-N->route-target-…` from **AUTHORITATIVE DIRECTED ROUTES**. Arrows are directional.
+3. `probe-3617032-N=probe-result-…` from **AUTHORITATIVE TOOL OUTPUT**. All 200 probes were run and returned results.
+4. `corrected-field-3617032-N=final-…` from **FINAL AUTHORITATIVE CORRECTIONS**.
+5. `work-item-3617032-N:STATE|receipt=receipt-…|next=next-…` from **AUTHORITATIVE WORK CHECKPOINT**. State, receipt, and next token must remain attached to the same work item.
+
+Every `obsolete-…` correction candidate is explicitly superseded. Use only the corresponding `final-…` value as current.
+
+All **UNRELATED ARCHIVAL MATERIAL** and archive padding are explicitly non-authoritative and must be ignored for active-project continuation. Some archive messages are truncated; this has no effect on active records. Earlier assistant replies saying “Archived epoch …” refer to this unrelated material, **not** retirement of the authoritative epoch records.
+
+## Storage and source of truth
+
+The complete exact values are in the preceding authoritative user messages and database tool outputs. **This handoff does not reproduce the 200 records’ opaque values. Consult those original messages for any exact lookup; do not infer or fabricate missing strings.**
+
+Acknowledgements such as “recorded” or “applied” do not demonstrate external persistence. The only available tool is read-only:
+
+```text
+functions.database_query({"project":3617032,"probe":"probe-3617032-N"})
+```
+
+No database writes, files, or work-item state transitions have been performed.
+
+## Latest authoritative examples
+
+For suffix `200` (epoch 9):
+
+```text
+parameter-3617032-200=value-24c959fb366b1fcf874c362f
+route-source-3617032-200->route-target-ca4efc6bcd4995c7fc01b1
+probe-3617032-200=probe-result-ab19ddd6f5a5d10a1baa41d136
+corrected-field-3617032-200=final-d563e651ba527aaf61e76372
+work-item-3617032-200:BLOCKED|receipt=receipt-ddf5b787aa9d376ba9|next=next-2ae06356453a0114f6
+```
+
+For suffix `1` (epoch 0), still authoritative:
+
+```text
+parameter-3617032-1=value-0d5095aa02c2106c952d79bd
+route-source-3617032-1->route-target-1a9eb5b679e13bd17c88da
+probe-3617032-1=probe-result-9c0a97ca4b976d6d5ccc2ad402
+corrected-field-3617032-1=final-ae6a0b4e70234fb5c35bc3f0
+work-item-3617032-1:IN_PROGRESS|receipt=receipt-de061d8c8a263cd280|next=next-e024b4c4186b3cbd52
+```
+
+## Next steps
+
+Await the next substantive user instruction. If asked to retrieve or continue from these records, use the exact authoritative associations above and in the original messages. The `next-…` fields are opaque tokens, with no supplied executable meaning; do not invent actions or mark work items complete.

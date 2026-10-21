@@ -1,0 +1,71 @@
+## Task and current progress
+
+The conversation has established authoritative data for **project `3617132`**, covering **epochs 0–9** and **200 distinct item suffixes, 1–200**. The user has been supplying data for preservation; no implementation or execution of work-item next actions has been requested.
+
+Each epoch contains 20 entries in each of five active categories:
+
+1. Exact parameters: `parameter-3617132-N=value-…`
+2. Directed routes: `route-source-3617132-N->route-target-…`
+3. Database probes: `probe-3617132-N=probe-result-…`
+4. Final corrections: `corrected-field-3617132-N=final-…`
+5. Work checkpoints: `work-item-3617132-N:STATE|receipt=receipt-…|next=next-…`
+
+All ten epochs have been received and acknowledged. All 200 probe results appear in the tool outputs in the conversation.
+
+## Authority and preservation rules
+
+- Preserve every identifier and value **exactly**, including leading zeros.
+- Routes are **directional**; do not reverse their arrows.
+- Every work item’s state, receipt, and next-action token must remain associated with that exact item.
+- Each epoch’s **FINAL AUTHORITATIVE CORRECTIONS** replaces that epoch’s **SUPERSEDED CANDIDATES**. All `obsolete-…` candidates are obsolete and must never be used as current corrections.
+- Every **UNRELATED ARCHIVAL MATERIAL** block is non-authoritative and updates **nothing** in the active project. Ignore all archive notebooks, simulation values, truncated archive text, and archive padding.
+- Epochs contain different keys. A later epoch does **not** erase earlier epochs’ entries.
+- The suffixes in epoch `e` are `e + 1 + 10k`, for `k = 0…19`. Thus epoch 0 has 1, 11, …, 191; epoch 9 has 10, 20, …, 200.
+
+## Source references and storage limitation
+
+The exact source data is in the original conversation messages labeled:
+
+- `AUTHORITATIVE EXACT LEDGER, epoch E`
+- `AUTHORITATIVE DIRECTED ROUTES, epoch E`
+- Tool outputs beginning `AUTHORITATIVE TOOL OUTPUT probe-3617132-N=…`
+- `FINAL AUTHORITATIVE CORRECTIONS, epoch E`
+- `AUTHORITATIVE WORK CHECKPOINT, epoch E`
+
+**No file, database write, or other durable storage was created.** Prior acknowledgments such as “recorded,” “applied,” and “archived” describe conversational tracking; they are not evidence of external persistence. This concise handoff does not reproduce all 1,000 active records. Exact retrieval requires access to those original messages and tool outputs; do not reconstruct opaque values from patterns or guess them.
+
+The available tool is read-only:
+
+```text
+functions.database_query({"project":3617132,"probe":"probe-3617132-N"})
+```
+
+It can retrieve probes, but there is no evidence it can retrieve the user-supplied parameter, route, correction, or checkpoint ledgers.
+
+## Exact examples for continuity
+
+The last epoch is **epoch 9**. Its final item has:
+
+```text
+parameter-3617132-200=value-e0998c80153d8033e2f43718
+route-source-3617132-200->route-target-aee81b27d50d512539dfac
+probe-3617132-200=probe-result-922449de6e276e3b8523037dfa
+corrected-field-3617132-200=final-b0f9076545761f37b973c95f
+work-item-3617132-200:IN_PROGRESS|receipt=receipt-75c64bb4ac31f2ece6|next=next-1f230fa3da5a7ded63
+```
+
+An earlier item remains current:
+
+```text
+parameter-3617132-1=value-c3eaa0bdb30e6ee717cf6471
+route-source-3617132-1->route-target-78aec3c9415607a675dca8
+probe-3617132-1=probe-result-8aa9870fde4a194f9988f64517
+corrected-field-3617132-1=final-ae2d9813b89b1103a2d9c6fe
+work-item-3617132-1:BLOCKED|receipt=receipt-8a3e7a321a125513fd|next=next-b2ffeef39dd5f756b3
+```
+
+## Next steps
+
+There is **no pending project action** beyond preserving the authoritative data and awaiting the user’s next instruction. The latest project-related message was unrelated epoch 9 archival material; it changed no active state.
+
+If asked to report or continue a particular item, locate its five authoritative records using its suffix and epoch mapping. Treat `next-…` values as opaque identifiers: their operational meaning has not been supplied, and no next action has been executed.
