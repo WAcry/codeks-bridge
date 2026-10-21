@@ -1,0 +1,301 @@
+{
+  "schema_version": 1,
+  "source": "results.json",
+  "selection": {
+    "timing": "post_hoc",
+    "basis": "user_selected_whole_case",
+    "preregistered": false,
+    "statistical_outlier_test": false,
+    "description": "按用户在看到全样本结果后的选择，主报告剔除原生压缩异常短且低分的 stress-3617134；四条路线成对剔除同一案例。其余低分保留。开发任务不剔除。原始产物、全样本统计、诊断与历史结果保持原样。",
+    "excluded_cases": [
+      {
+        "id": "stress-3617134",
+        "reason": "K3 仅 4079 product output tokens，已知事实 15/150；同份 K3 的 K4 为 39/150。此项为用户选择的案例剔除，不代表经统计检验证明异常。"
+      }
+    ],
+    "included_case_ids": [
+      "stress-3617031",
+      "stress-3617032",
+      "stress-3617033",
+      "stress-3617034",
+      "stress-3617131",
+      "stress-3617132",
+      "stress-3617133",
+      "normal-r1",
+      "normal-r2",
+      "normal-r3"
+    ]
+  },
+  "groups": {
+    "stress": {
+      "n": 7,
+      "case_ids": [
+        "stress-3617031",
+        "stress-3617032",
+        "stress-3617033",
+        "stress-3617034",
+        "stress-3617131",
+        "stress-3617132",
+        "stress-3617133"
+      ],
+      "arms": {
+        "K1": {
+          "n": 7,
+          "known": {
+            "correct": 21,
+            "total": 1050,
+            "mean_accuracy": 0.02,
+            "pooled_accuracy": 0.02
+          },
+          "known_perfect_cases": 0,
+          "product_output_tokens": {
+            "mean": 1437.2857142857142,
+            "min": 807,
+            "max": 2814
+          },
+          "replay_input_tokens": {
+            "mean": 1512.2857142857142,
+            "min": 882,
+            "max": 2889
+          }
+        },
+        "K2": {
+          "n": 7,
+          "known": {
+            "correct": 375,
+            "total": 1050,
+            "mean_accuracy": 0.3571428571428572,
+            "pooled_accuracy": 0.35714285714285715
+          },
+          "known_perfect_cases": 2,
+          "product_output_tokens": {
+            "mean": 11415.42857142857,
+            "min": 6783,
+            "max": 22301
+          },
+          "replay_input_tokens": {
+            "mean": 11490.42857142857,
+            "min": 6858,
+            "max": 22376
+          }
+        },
+        "K3": {
+          "n": 7,
+          "known": {
+            "correct": 1050,
+            "total": 1050,
+            "mean_accuracy": 1.0,
+            "pooled_accuracy": 1.0
+          },
+          "known_perfect_cases": 7,
+          "product_output_tokens": {
+            "mean": 18341.285714285714,
+            "min": 17327,
+            "max": 18939
+          },
+          "replay_input_tokens": {
+            "mean": 18343.285714285714,
+            "min": 17329,
+            "max": 18941
+          }
+        },
+        "K4": {
+          "n": 7,
+          "known": {
+            "correct": 1049,
+            "total": 1050,
+            "mean_accuracy": 0.9990476190476191,
+            "pooled_accuracy": 0.9990476190476191
+          },
+          "known_perfect_cases": 6,
+          "product_output_tokens": {
+            "mean": 19019.571428571428,
+            "min": 17633,
+            "max": 20808
+          },
+          "replay_input_tokens": {
+            "mean": 19094.571428571428,
+            "min": 17708,
+            "max": 20883
+          }
+        }
+      },
+      "native_to_handoff": {
+        "pairs": [
+          {
+            "case": "stress-3617031",
+            "known_correct_delta": 0,
+            "known_accuracy_delta": 0,
+            "gained": 0,
+            "lost": 0
+          },
+          {
+            "case": "stress-3617032",
+            "known_correct_delta": 0,
+            "known_accuracy_delta": 0,
+            "gained": 0,
+            "lost": 0
+          },
+          {
+            "case": "stress-3617033",
+            "known_correct_delta": 0,
+            "known_accuracy_delta": 0,
+            "gained": 0,
+            "lost": 0
+          },
+          {
+            "case": "stress-3617034",
+            "known_correct_delta": 0,
+            "known_accuracy_delta": 0,
+            "gained": 0,
+            "lost": 0
+          },
+          {
+            "case": "stress-3617131",
+            "known_correct_delta": -1,
+            "known_accuracy_delta": -0.00666666666666671,
+            "gained": 0,
+            "lost": 1
+          },
+          {
+            "case": "stress-3617132",
+            "known_correct_delta": 0,
+            "known_accuracy_delta": 0,
+            "gained": 0,
+            "lost": 0
+          },
+          {
+            "case": "stress-3617133",
+            "known_correct_delta": 0,
+            "known_accuracy_delta": 0,
+            "gained": 0,
+            "lost": 0
+          }
+        ],
+        "known_correct_delta": -1,
+        "mean_known_accuracy_delta": -0.0009523809523809586,
+        "gained": 0,
+        "lost": 1
+      }
+    },
+    "normal": {
+      "n": 3,
+      "case_ids": [
+        "normal-r1",
+        "normal-r2",
+        "normal-r3"
+      ],
+      "arms": {
+        "K1": {
+          "n": 3,
+          "known": {
+            "correct": 212,
+            "total": 267,
+            "mean_accuracy": 0.794007490636704,
+            "pooled_accuracy": 0.7940074906367042
+          },
+          "known_perfect_cases": 0,
+          "product_output_tokens": {
+            "mean": 2015.0,
+            "min": 1822,
+            "max": 2133
+          },
+          "replay_input_tokens": {
+            "mean": 2092.0,
+            "min": 1899,
+            "max": 2210
+          }
+        },
+        "K2": {
+          "n": 3,
+          "known": {
+            "correct": 262,
+            "total": 267,
+            "mean_accuracy": 0.9812734082397004,
+            "pooled_accuracy": 0.9812734082397003
+          },
+          "known_perfect_cases": 1,
+          "product_output_tokens": {
+            "mean": 6446.666666666667,
+            "min": 5817,
+            "max": 7161
+          },
+          "replay_input_tokens": {
+            "mean": 6523.666666666667,
+            "min": 5894,
+            "max": 7238
+          }
+        },
+        "K3": {
+          "n": 3,
+          "known": {
+            "correct": 232,
+            "total": 267,
+            "mean_accuracy": 0.8689138576779026,
+            "pooled_accuracy": 0.8689138576779026
+          },
+          "known_perfect_cases": 0,
+          "product_output_tokens": {
+            "mean": 2287.3333333333335,
+            "min": 2086,
+            "max": 2395
+          },
+          "replay_input_tokens": {
+            "mean": 2289.3333333333335,
+            "min": 2088,
+            "max": 2397
+          }
+        },
+        "K4": {
+          "n": 3,
+          "known": {
+            "correct": 226,
+            "total": 267,
+            "mean_accuracy": 0.846441947565543,
+            "pooled_accuracy": 0.846441947565543
+          },
+          "known_perfect_cases": 0,
+          "product_output_tokens": {
+            "mean": 3238.3333333333335,
+            "min": 2995,
+            "max": 3450
+          },
+          "replay_input_tokens": {
+            "mean": 3315.3333333333335,
+            "min": 3072,
+            "max": 3527
+          }
+        }
+      },
+      "native_to_handoff": {
+        "pairs": [
+          {
+            "case": "normal-r1",
+            "known_correct_delta": 0,
+            "known_accuracy_delta": 0.0,
+            "gained": 3,
+            "lost": 3
+          },
+          {
+            "case": "normal-r2",
+            "known_correct_delta": -3,
+            "known_accuracy_delta": -0.0337078651685393,
+            "gained": 1,
+            "lost": 4
+          },
+          {
+            "case": "normal-r3",
+            "known_correct_delta": -3,
+            "known_accuracy_delta": -0.0337078651685393,
+            "gained": 3,
+            "lost": 6
+          }
+        ],
+        "known_correct_delta": -6,
+        "mean_known_accuracy_delta": -0.022471910112359533,
+        "gained": 7,
+        "lost": 13
+      }
+    }
+  }
+}

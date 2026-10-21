@@ -55,5 +55,61 @@ for (const sample of record.cases) {
 }
 assert.equal(requestCount, record.completed_requests, 'Completed request count');
 assert.equal(record.failed_requests, 0, 'This record must include only completed requests');
+if (listed.has('report-summary.json')) {
+  const report = await json('report-summary.json');
+  const main = record.cases.filter(sample => sample.experiment === 'main');
+  const arms = ['K1', 'K2', 'K3', 'K4'];
+  const { selection, groups } = report;
+  assert.equal(selection.timing, 'post_hoc');
+  assert.equal(selection.basis, 'user_selected_whole_case');
+  assert.equal(selection.preregistered, false);
+  assert.equal(selection.statistical_outlier_test, false);
+  const excluded = selection.excluded_cases.map(sample => sample.id);
+  assert(selection.excluded_cases.every(sample => typeof sample.reason === 'string' && sample.reason.length));
+  const included = Object.values(groups).flatMap(group => group.case_ids);
+  assert.equal(new Set([...included, ...excluded]).size, main.length, 'Selection must not duplicate cases');
+  assert.deepEqual([...included, ...excluded].sort(), main.map(sample => sample.id).sort(), 'Selection must partition all main cases');
+  assert.deepEqual([...included].sort(), [...selection.included_case_ids].sort(), 'Included case list');
+  const sum = values => values.reduce((total, value) => total + value, 0);
+  const mean = values => sum(values) / values.length;
+  const stats = values => ({ mean: mean(values), min: Math.min(...values), max: Math.max(...values) });
+  for (const [name, group] of Object.entries(groups)) {
+    const samples = group.case_ids.map(id => main.find(sample => sample.id === id));
+    assert(samples.length > 0, `Empty report group: ${name}`);
+    assert.equal(group.n, samples.length, `Sample count: ${name}`);
+    assert.deepEqual(Object.keys(group.arms), arms, `Report arms: ${name}`);
+    const quizFor = (sample, arm) => sample.quizzes.find(quiz => quiz.request === `quiz-${arm}`);
+    for (const sample of samples) {
+      assert.deepEqual(sample.stages.map(stage => stage.request).sort(), arms.map(arm => `generate-${arm}`), `Whole-case generation: ${sample.id}`);
+      assert.deepEqual(sample.quizzes.filter(quiz => /^quiz-K/.test(quiz.request)).map(quiz => quiz.request).sort(), arms.map(arm => `quiz-${arm}`), `Whole-case recovery: ${sample.id}`);
+    }
+    for (const arm of arms) {
+      const quizzes = samples.map(sample => quizFor(sample, arm));
+      const known = quizzes.map(quiz => quiz.score.known);
+      const correct = sum(known.map(score => score.correct)), total = sum(known.map(score => score.total));
+      assert.deepEqual(group.arms[arm], {
+        n: samples.length,
+        known: { correct, total, mean_accuracy: mean(known.map(score => score.accuracy)), pooled_accuracy: correct / total },
+        known_perfect_cases: known.filter(score => score.correct === score.total).length,
+        product_output_tokens: stats(samples.map(sample => sample.stages.find(stage => stage.request === `generate-${arm}`).product_output_tokens)),
+        replay_input_tokens: stats(quizzes.map(quiz => quiz.replay_input_tokens)),
+      }, `Derived report metrics: ${name}/${arm}`);
+    }
+    const pairs = samples.map(sample => {
+      const native = quizFor(sample, 'K3').score, handoff = quizFor(sample, 'K4').score;
+      const answers = score => score.answers.filter(answer => answer.category !== 'unknown');
+      const before = answers(native), after = answers(handoff);
+      assert.deepEqual(before.map(answer => answer.id), after.map(answer => answer.id), `Paired questions: ${sample.id}`);
+      return { case: sample.id, known_correct_delta: handoff.known.correct - native.known.correct,
+        known_accuracy_delta: handoff.known.accuracy - native.known.accuracy,
+        gained: after.filter((answer, index) => answer.correct && !before[index].correct).length,
+        lost: after.filter((answer, index) => !answer.correct && before[index].correct).length };
+    });
+    assert.deepEqual(group.native_to_handoff, { pairs,
+      known_correct_delta: sum(pairs.map(pair => pair.known_correct_delta)),
+      mean_known_accuracy_delta: mean(pairs.map(pair => pair.known_accuracy_delta)),
+      gained: sum(pairs.map(pair => pair.gained)), lost: sum(pairs.map(pair => pair.lost)) }, `Paired report metrics: ${name}`);
+  }
+}
 console.log(JSON.stringify({ verified_files: listed.size, cases: record.cases.length,
   requests: requestCount, raw_quizzes_rescored: quizCount, answers_checked: questionCount }, null, 2));

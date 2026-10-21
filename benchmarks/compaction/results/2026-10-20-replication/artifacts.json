@@ -3,8 +3,13 @@
   "files": [
     {
       "file": "README.md",
-      "sha256": "98f09545929aaba04373653f07bc95087153d1024fb6c52463ab55836dd40328",
-      "bytes": 13749
+      "sha256": "c1742ea5cef83a1caab82bb9023d5ac1c28725c5ca4bcd851b091cb464271bb8",
+      "bytes": 9064
+    },
+    {
+      "file": "all-samples.md",
+      "sha256": "ef9548a3c1aea701af3a420efc5d939ed61a8e4b8308cde2f44b07ed48ffa68c",
+      "bytes": 13973
     },
     {
       "file": "cases/ablation-3617031/legacy-metadata.json",
@@ -797,9 +802,19 @@
       "bytes": 399
     },
     {
-      "file": "quality-vs-size.svg",
+      "file": "quality-vs-size-all.svg",
       "sha256": "78a642613b8d6f235d631b1d533ab729552fca1ad8014341206470d5ca7adb77",
       "bytes": 79050
+    },
+    {
+      "file": "quality-vs-size.svg",
+      "sha256": "fd1dd1516cbfc89ed9266f0c05c2672990988b4cf74433434bc203d47feeb7ca",
+      "bytes": 81584
+    },
+    {
+      "file": "report-summary.json",
+      "sha256": "0019145c6e7ad046e773933af879e0840bae362ad7c42439d2d47c201bcb02f4",
+      "bytes": 8050
     },
     {
       "file": "requests.csv",

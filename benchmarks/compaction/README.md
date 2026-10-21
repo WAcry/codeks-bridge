@@ -86,7 +86,7 @@ node benchmarks/compaction/run.mjs \
 
 ## 历史记录与离线核验
 
-[四路扩大样本与复现实验](results/2026-10-20-replication/README.md)使用八个高密度 seeds、同一开发历史的三次独立生成，并保留工具声明对照与冻结检查点重读。它并列展示产物 output tokens 和回放 input tokens。[历史差异审计](replication-audit.md)解释哪些输入相同、哪些请求参数不同，以及为什么不能把旧批次混合成配对结论。
+[四路扩大样本与复现实验](results/2026-10-20-replication/README.md)实际运行八个高密度 seeds、同一开发历史的三次独立生成，并保留工具声明对照与冻结检查点重读。最终主表按讨论事后剔除一个极端低分的整案例，四路线统一使用七个高密度 seeds；全部原始样本在附录中保留。报告并列展示产物 output tokens 和回放 input tokens。[历史差异审计](replication-audit.md)解释哪些输入相同、哪些请求参数不同，以及为什么不能把旧批次混合成配对结论。
 
 [2026-10-20 的完整五路实测](results/2026-10-20-medium/README.md)使用 GPT-6.1 Sol / medium，保存两份输入、题目与 gold、八份文字产物、全部最终及初步回答、逐题评分和用量。开发任务与高密度状态分别报告；原生密文只保留公开元数据。
 
@@ -140,3 +140,5 @@ benchmarks/compaction/.venv/bin/python benchmarks/compaction/plot-replication.py
 ```
 
 横轴为实际回放 input tokens，纵轴为已知题正确率。高密度 seeds 与开发历史重复分图；箭头连接同一次生成的 K3 与其 K4，不把同一检查点的多次读取当作独立样本。
+
+默认绘制全部样本。给命令增加 `--exclude-case stress-3617134` 可重绘最终报告的七样本主图；同一 case 的四条路线一并剔除，图中注明事后选择。此参数只控制图表，不修改原始结果或生成规则。

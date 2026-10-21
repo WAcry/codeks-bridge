@@ -23,13 +23,16 @@ ARMS = {
 }
 
 
-def load_cases(path):
+def load_cases(path, excluded=()):
     data = json.loads(path.read_text(encoding="utf-8"))
     if data["schema_version"] != 1:
         raise ValueError("Expected results schema version 1")
+    main_ids = {case["id"] for case in data["cases"] if case["experiment"] == "main"}
+    if unknown := set(excluded) - main_ids:
+        raise ValueError(f"Unknown excluded cases: {sorted(unknown)}")
     cohorts = {"stress": [], "normal": []}
     for case in data["cases"]:
-        if case["experiment"] != "main":
+        if case["experiment"] != "main" or case["id"] in excluded:
             continue
         cohort = case["id"].split("-", 1)[0]
         if cohort not in cohorts:
@@ -53,7 +56,7 @@ def load_cases(path):
     return cohorts
 
 
-def plot(cohorts, output):
+def plot(cohorts, output, excluded=()):
     # Fixed font, SVG IDs, and metadata make repeated exports deterministic.
     plt.rcdefaults()
     plt.rcParams.update({
@@ -71,6 +74,9 @@ def plot(cohorts, output):
     fig, axes = plt.subplots(1, 2, figsize=(10.8, 5.1), sharey=True)
     fig.subplots_adjust(left=0.08, right=0.98, bottom=0.28, top=0.79, wspace=0.16)
     fig.suptitle("Compaction quality vs. replay size", fontsize=15, y=0.96)
+    if excluded:
+        fig.text(0.5, 0.89, "Post hoc exclusion, all arms: " + ", ".join(excluded),
+                 ha="center", fontsize=9, color="#555555")
 
     for ax, (cohort, cases) in zip(axes, cohorts.items()):
         for _, points in cases:
@@ -87,7 +93,7 @@ def plot(cohorts, output):
                 color=color, marker=marker, s=58, alpha=0.88,
                 edgecolors="white", linewidths=0.65, zorder=2,
             )
-        title = (f"Stress: {len(cases)} independent seeds" if cohort == "stress"
+        title = (f"Stress: {len(cases)} {'retained' if excluded else 'independent'} seeds" if cohort == "stress"
                  else f"Normal: {len(cases)} repeats of one history")
         ax.set_title(title, fontsize=11, pad=12)
         ax.set_xlabel("Replay input tokens", labelpad=8)
@@ -122,10 +128,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("results", type=Path, help="Public replication results.json")
     parser.add_argument("output", type=Path, help="Output figure (.svg or .png)")
+    parser.add_argument("--exclude-case", action="append", default=[],
+                        help="Omit a whole main-experiment case from every arm; repeat for multiple cases")
     args = parser.parse_args()
     if args.output.suffix.lower() not in {".svg", ".png"}:
         parser.error("Output must have an .svg or .png extension")
-    plot(load_cases(args.results), args.output)
+    plot(load_cases(args.results, args.exclude_case), args.output, args.exclude_case)
 
 
 if __name__ == "__main__":
