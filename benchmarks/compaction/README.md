@@ -1,6 +1,6 @@
 # 压缩与交接 benchmark
 
-这是手动运行的质量实验，不进入 CI，也不影响 bridge 的运行时。材料都是合成数据；不读取本机会话、登录文件或真实项目。目标是比较压缩后可恢复的任务信息，保留可重复的方法和历史证据，供以后换模型重跑。
+这是手动运行的质量实验，不进入 CI，也不影响 bridge 的运行时。材料都是合成数据；不读取本机会话、登录文件或真实项目。目标是比较压缩后可恢复的任务信息，保留可重复的方法、输入和实测产物，供以后换模型重跑。
 
 ## 固定的四条路线
 
@@ -13,7 +13,7 @@
 | K3 | H + `compaction_trigger` | 原生检查点 |
 | K4 | U + **同一份 K3** + [当前 handoff prompt](prompts/handoff.txt) | 文字 |
 
-K2 强调记录所有真实用户消息，基于用户提供的全文，不声称与某个 Claude Code 发布版本逐字相同。核对时发现冻结快照有一处示例占位措辞不同：原文 `[User feedback on the error if any]`，实际为 `[User feedback on the fix, if any]`。本批和此前五路实测均使用后者；保留实测字节，不事后替换。K4 使用当前生产 handoff 的快照，包含 text-only 约束。[manifest.json](prompts/manifest.json) 记录各份 prompt 的来源和 UTF-8 字节 hash；调整生产代码不会自动改变实验文本。
+K2 强调记录所有真实用户消息，基于用户提供的全文，不声称与某个 Claude Code 发布版本逐字相同。核对时发现冻结快照有一处示例占位措辞不同：原文 `[User feedback on the error if any]`，实际为 `[User feedback on the fix, if any]`。实测使用后者；保留实测字节。K4 使用当前生产 handoff 的快照，包含 text-only 约束。[manifest.json](prompts/manifest.json) 记录各份 prompt 的来源和 UTF-8 字节 hash；调整生产代码不会自动改变实验文本。
 
 **四种产物的最终问答全部只使用各自产物，不附带 U、H 或生成过程的 reasoning。** K4 生成时仍使用 U，以复现 bridge 的交接输入。因此 K4 是整个交接流程的测试，不能把它相对 K3 的变化全部归因于密文转明文。
 
@@ -27,13 +27,13 @@ K2 强调记录所有真实用户消息，基于用户提供的全文，不声�
 
 测验固定每类 30 题，加 5 道不存在记录的题。生成压缩产物时不发送测验、标准答案或评分元数据。问答按完整 canonical string 精确匹配；缺字段不等于正确回答 `null`。这适合测量精确信息保留，但不等于编程能力评估，也不能用 150 题全部正确证明 1,000 条记录全部无损。
 
-K4 的 U 由 [retention.py](retention.py) 生成，使用历史 Codex V2 文本用户消息的 64k 近似预算：`ceil(UTF-8 bytes / 4)`，优先保留较新的消息，边界消息保留首尾。它只覆盖合成文本材料，不模拟图片、通知或完整客户端历史策略。截断标记在预算之外，近似 token 预算不能当成精确 tokenizer 上限。
+K4 的 U 由 [retention.py](retention.py) 生成，使用 Codex V2 文本用户消息的 64k 近似预算：`ceil(UTF-8 bytes / 4)`，优先保留较新的消息，边界消息保留首尾。它只覆盖合成文本材料，不模拟图片、通知或完整客户端历史策略。截断标记在预算之外，近似 token 预算不能当成精确 tokenizer 上限。
 
 ### 开发任务 handoff
 
 [normal.json](fixtures/normal.json) 是虚构 TypeScript 上传 CLI 的开发对话，包含 103 个 items、12 条用户消息和 42 对工具调用/结果。代码、路径、输出和操作都是叙事材料；runner 不访问其中的路径，也不执行其中的命令。
 
-材料覆盖设计被替换、提交授权被撤回、旧测试通过后发现新问题、修复仍待执行等状态。原先冻结的 50 项事实保留在 fixture 中。[normal-questions.json](fixtures/normal-questions.json) 将这些事实细化成可核验的问答，包括数值、字段名、权限、最终设计和验证状态，并增加不存在信息的题目。
+材料覆盖设计被替换、提交授权被撤回、旧测试通过后发现新问题、修复仍待执行等状态。材料由代理整理；冻结 fixture 的 description 中“No model ... was used”措辞不准确，该元数据不进入模型请求或评分。[normal-questions.json](fixtures/normal-questions.json) 将这些事实细化成可核验的问答，包括数值、字段名、权限、最终设计和验证状态，并增加不存在信息的题目。
 
 问答要求明确的 JSON 类型和格式；无序集合按题目约定比较，不能用自由文本措辞差异代替事实错误。逐题结果包含预期与实际答案，便于人工复核。它测试从产物恢复工作状态，没有真的让接手 agent 完成后续开发。
 
@@ -71,7 +71,7 @@ node benchmarks/compaction/run.mjs \
 
 原生压缩与所有文字生成分别记 usage。若文字生成意外调用工具、流未成功结束或接口拒绝请求，该运行直接失败并保留记录；不会执行工具、自动换 prompt 或偷偷重试。失败时先调查原因，新的尝试使用新目录，报告中保留失败尝试。
 
-已有完整产物但需要重新测验时，可以给原命令加 `--reuse-products OLD_RUN_DIR`，并指定新的 `--out`。runner 核对产物定义、模型、材料、prompt、参数和题目，原样复用已成功生成的产物，包括同一份 K3；不重新压缩，也不覆盖旧测验。新记录明确标记复用来源，旧生成 usage 不计入这次新增调用。来源必须使用当前四组定义；旧编号的运行目录会明确报错。
+已有完整产物但需要重新测验时，可以给原命令加 `--reuse-products OLD_RUN_DIR`，并指定新的 `--out`。runner 核对产物定义、模型、材料、prompt、参数和题目，原样复用已成功生成的产物，包括同一份 K3；不重新压缩，也不覆盖旧测验。新记录明确标记复用来源，旧生成 usage 不计入这次新增调用。
 
 原始产物保存在 `runs/`（已由 Git 忽略），包含请求体、事件、原生密文、文字、usage、耗时和参数快照；不会保存请求鉴权 headers。不要将运行目录直接提交。公开报告只整理合成文本、去标识化评分和必要数值，原生密文及服务端标识留在本地。
 
@@ -79,56 +79,23 @@ node benchmarks/compaction/run.mjs \
 
 - 分开看已知事实正确率、无答案题是否返回 `null`、各类别错误，以及空历史和完整历史基线。开发题还要复核权限与工作状态，不能仅看总分。
 - native、handoff、quiz 分开计算 usage。问答基线和恢复测验是实验成本，不是产品每次压缩的必需开销。K4 的完整生成成本包含 K3 和 handoff，但共享 K3 的实验总成本只计算它一次。
-- 同时记录产物生成 tokens 和恢复时占用的 input tokens。前者优先取服务端 output item attribution，排除生成 reasoning；后者从测验 input 中扣除新输出 item 的 input framing，再减去同条件空历史基线。原生 item 的 input attribution 可直接交叉核对。文字的 summary prefix 和 framing 可能使两种计数不同，不能把旧报告的 replay input 与新报告的 product output 混为一列。
+- 同时记录产物生成 tokens 和恢复时占用的 input tokens。前者优先取服务端 output item attribution，排除生成 reasoning；后者从测验 input 中扣除新输出 item 的 input framing，再减去同条件空历史基线。原生 item 的 input attribution 可直接交叉核对。文字的 summary prefix 和 framing 可能使两种计数不同，两种口径分别报告。
 - cached input 已包含在 input tokens 中。总 output 通常包含 reasoning。长度只是辅助信息，不能替代质量评分，也不能按密文字节数推断信息量。
 - 每轮只有一份检查点时，150 道答案不是 150 次独立压缩实验。比较稳定性需要固定参数后增加 seed 和独立重复，不在看到坏结果后只保留重跑成绩。
 - 这是质量实验，不模拟完整工作会话的缓存路由。缓存 usage 和耗时可记录，但不能据此断言正常客户端的缓存命中率或通用延迟。
 
-## 历史记录与离线核验
+## 实测记录与离线核验
 
-[四路扩大样本与复现实验](results/2026-10-20-replication/README.md)实际运行八个高密度 seeds、同一开发历史的三次独立生成，并保留工具声明对照与冻结检查点重读。最终主表按讨论事后剔除一个极端低分的整案例，四路线统一使用七个高密度 seeds；全部原始样本在附录中保留。报告并列展示产物 output tokens 和回放 input tokens。[历史差异审计](replication-audit.md)解释哪些输入相同、哪些请求参数不同，以及为什么不能把旧批次混合成配对结论。
+[四路压缩报告](results/2026-10-20/README.md)记录 GPT-6.1 Sol / medium 的八个高密度 seeds 和同一开发历史的三次独立生成。主表按讨论事后剔除一个极端低分的整案例，四路线统一使用七个高密度 seeds；完整八样本和全部原始产物保留在附录。报告并列展示正确率、产物 output tokens 和回放 input tokens。
 
-[2026-10-20 的完整五路实测](results/2026-10-20-medium/README.md)使用 GPT-6.1 Sol / medium，保存两份输入、题目与 gold、八份文字产物、全部最终及初步回答、逐题评分和用量。开发任务与高密度状态分别报告；原生密文只保留公开元数据。
-
-历史报告与冻结文件保留当时的编号。对应关系为：旧 K1 → 当前 K1（Codex），旧 K3 → 当前 K2（Claude Code 式），旧 K4 → 当前 K3（原生），旧 K5 → 当前 K4（handoff）；旧 K2 的 bridge 标准 prompt 及其结果仅属于历史记录。
-
-当前 runner 读取 `builtin.txt`、`claude-code.txt`、`handoff.txt`，以及共同的 `base-instructions.txt` 和 `summary-prefix.txt`。`standard.txt`、`minimal.txt`、`detailed.txt`、`handoff-user-v1.txt` 是历史实测快照：后三份各在开发与高密度材料上成功生成一次，使用 GPT-6.1 Sol / xhigh；`standard.txt` 参与旧 xhigh 对照及 2026-10-20 五路 medium 实验。已逐字核对原始请求和成功响应；这些历史候选不参与当前四路统计。
-
-[历史受控状态实验](historical-controlled.md) 和 [历史 handoff 对照](historical-handoff.md) 保留之前的测量与限制。它们使用的 effort、prompt、恢复时是否附带 U 等条件不同，不能合并成当前四条路线的统一排名。
-
-本地假上游检查 runner 的实验隔离和数据处理，不消耗模型额度，也不加入 `npm test` 或发布工作流：
+本地假上游检查 runner 的实验隔离和数据处理；公开记录核验器检查文件 hash，并从原始回答和题目重算分数。两者都不调用模型：
 
 ```sh
 node --test benchmarks/compaction/offline-test.mjs
+node benchmarks/compaction/verify-record.mjs benchmarks/compaction/results/2026-10-20
 ```
-
-四路公开记录可用 `node benchmarks/compaction/verify-record.mjs benchmarks/compaction/results/2026-10-20-replication` 离线核验完整文件 hash，并从原始回答和题目重算分数。
 
 生成器改编自公开 MIT 项目 `algal/pi-openai-server-compaction`，完整许可在源文件内；Codex prompt 和文本保留算法的归属见仓库 [NOTICE](../../NOTICE)。
-
-## 单独核对工具声明与读取设置
-
-`native-tool-ablation.mjs` 对同一份高密度材料生成两份原生检查点：一份使用历史请求设置（没有工具声明、`medium/all_turns`、`verbosity: low`），另一份只在开头加入工具声明。两份产物都使用当前闭卷 reader 测验。请求头按环境配置统一提供，因此这是历史生成 body 的复现，不声称完全还原过去的服务端或传输状态。
-
-```sh
-node benchmarks/compaction/native-tool-ablation.mjs \
-  --fixture benchmarks/compaction/runs/fixtures/stress.json \
-  --model gpt-6.1-sol --out benchmarks/compaction/runs/tool-ablation
-```
-
-默认只查看计划；执行同样需要环境中的 URL、headers 和 `--execute`。每个 seed 四次请求，条件顺序按 seed 奇偶交替；不会执行工具或自动重试。
-
-`read-native.mjs` 只重读已有原生 item，不重新压缩。`--checkpoint` 接收原生 `{type: "compaction", id, encrypted_content}` JSON，`--reader current` 使用当前闭卷设置，`--reader historical` 使用旧版无工具声明、`auto`、`verbosity: low` 的设置。后者没有声明可执行工具，但与当前设置不是单一变量差异。
-
-```sh
-node benchmarks/compaction/read-native.mjs \
-  --fixture benchmarks/compaction/runs/fixtures/stress.json \
-  --checkpoint benchmarks/compaction/runs/native-item.json \
-  --reader current --model gpt-6.1-sol \
-  --out benchmarks/compaction/runs/native-reread
-```
-
-真实原生 item 保留在私有运行目录。公开元数据不能用于这个命令。工具声明实验的离线检查使用 `node --test benchmarks/compaction/native-tool-ablation-test.mjs`，独立于 CI。
 
 ## 重绘已记录的结果
 
@@ -136,8 +103,8 @@ node benchmarks/compaction/read-native.mjs \
 
 ```sh
 benchmarks/compaction/.venv/bin/python -m pip install -r benchmarks/compaction/requirements-plot.txt
-benchmarks/compaction/.venv/bin/python benchmarks/compaction/plot-replication.py \
-  benchmarks/compaction/results/2026-10-20-replication/results.json \
+benchmarks/compaction/.venv/bin/python benchmarks/compaction/plot.py \
+  benchmarks/compaction/results/2026-10-20/results.json \
   benchmarks/compaction/runs/quality-vs-size.svg
 ```
 

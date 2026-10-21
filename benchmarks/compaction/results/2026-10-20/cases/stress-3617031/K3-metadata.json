@@ -1,0 +1,9 @@
+{
+  "type": "compaction",
+  "ciphertext_characters": 151672,
+  "replayable": false,
+  "source": {
+    "case": "stress-3617031",
+    "arm": "K3"
+  }
+}

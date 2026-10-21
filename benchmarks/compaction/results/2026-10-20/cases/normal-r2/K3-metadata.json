@@ -1,0 +1,9 @@
+{
+  "type": "compaction",
+  "ciphertext_characters": 32268,
+  "replayable": false,
+  "source": {
+    "case": "normal-r2",
+    "arm": "K3"
+  }
+}

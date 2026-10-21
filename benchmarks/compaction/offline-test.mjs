@@ -408,7 +408,7 @@ for (const mismatch of ['fixture', 'model', 'definitions', 'prompt', 'prefix', '
     if (mismatch === 'model') args.push('--model', 'other-model');
     if (mismatch === 'definitions') {
       const manifest = await json(join(state.out, 'manifest.json'));
-      manifest.definitions.K2.prompt = 'standard';
+      manifest.definitions.K2.prompt = 'different-prompt';
       await writeFile(join(state.out, 'manifest.json'), JSON.stringify(manifest));
     }
     if (mismatch === 'prefix') await writeFile(join(state.root, 'instructions.txt'), 'Different instructions.');

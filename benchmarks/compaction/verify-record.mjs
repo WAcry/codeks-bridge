@@ -40,9 +40,7 @@ assert.deepEqual((await files()).filter(name => name !== 'artifacts.json').sort(
 const record = await json('results.json');
 let quizCount = 0, questionCount = 0, requestCount = 0;
 for (const sample of record.cases) {
-  // Auxiliary cases share the main case's questions for the same seed.
-  const questionsRef = sample.questions ?? record.cases.find(candidate =>
-    candidate.experiment === 'main' && candidate.seed === sample.seed)?.questions;
+  const questionsRef = sample.questions;
   assert(questionsRef, `Missing question source: ${sample.id}`);
   const questions = (await json(questionsRef.file)).questions;
   for (const quiz of sample.quizzes) {
@@ -57,7 +55,7 @@ assert.equal(requestCount, record.completed_requests, 'Completed request count')
 assert.equal(record.failed_requests, 0, 'This record must include only completed requests');
 if (listed.has('report-summary.json')) {
   const report = await json('report-summary.json');
-  const main = record.cases.filter(sample => sample.experiment === 'main');
+  const main = record.cases;
   const arms = ['K1', 'K2', 'K3', 'K4'];
   const { selection, groups } = report;
   assert.equal(selection.timing, 'post_hoc');

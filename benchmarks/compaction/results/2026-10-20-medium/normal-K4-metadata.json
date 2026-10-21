@@ -1,7 +1,0 @@
-{
-  "type": "compaction",
-  "ciphertext_characters": 24204,
-  "replayable": false,
-  "note": "The native checkpoint and real service identifiers are retained locally. This public metadata is not a replayable checkpoint.",
-  "same_checkpoint_used_for_K5_generation_and_K4_quiz": true
-}
