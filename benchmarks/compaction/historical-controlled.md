@@ -1,6 +1,6 @@
 # 历史受控实验：2026 年 10 月
 
-这是既有实验的归档补充，不是当前两份 fixture、K1–K5 五种产物的新跑分。受控对比在 2026-10-17 完成，handoff 对比在 2026-10-19 完成，日期均为 `America/Los_Angeles`。本次整理未调用模型。
+这是既有实验的归档补充，与 2026-10-20 的五路批次及后续四路复现实验分别记录。受控对比在 2026-10-17 完成，handoff 对比在 2026-10-19 完成，日期均为 `America/Los_Angeles`。本次整理未调用模型。
 
 [标量结果](results/2026-10-controlled.json)保留每个 seed/repeat 的分数、token 用量、控制组和提示词 SHA256。它从归档的 `report.md`、`four-way-report.md`、`handoff-restatement-report.md` 及对应分数/指标文件提取，并核对汇总分母与均值。公开数据不含原始请求、响应标识、逐 item attribution、密文或认证信息；这些标量可复算表格，不能单独重放原来的模型调用。
 

@@ -92,6 +92,8 @@ node benchmarks/compaction/run.mjs \
 
 历史报告与冻结文件保留当时的编号。对应关系为：旧 K1 → 当前 K1（Codex），旧 K3 → 当前 K2（Claude Code 式），旧 K4 → 当前 K3（原生），旧 K5 → 当前 K4（handoff）；旧 K2 的 bridge 标准 prompt 及其结果仅属于历史记录。
 
+当前 runner 读取 `builtin.txt`、`claude-code.txt`、`handoff.txt`，以及共同的 `base-instructions.txt` 和 `summary-prefix.txt`。`standard.txt`、`minimal.txt`、`detailed.txt`、`handoff-user-v1.txt` 是历史实测快照：后三份各在开发与高密度材料上成功生成一次，使用 GPT-6.1 Sol / xhigh；`standard.txt` 参与旧 xhigh 对照及 2026-10-20 五路 medium 实验。已逐字核对原始请求和成功响应；这些历史候选不参与当前四路统计。
+
 [历史受控状态实验](historical-controlled.md) 和 [历史 handoff 对照](historical-handoff.md) 保留之前的测量与限制。它们使用的 effort、prompt、恢复时是否附带 U 等条件不同，不能合并成当前四条路线的统一排名。
 
 本地假上游检查 runner 的实验隔离和数据处理，不消耗模型额度，也不加入 `npm test` 或发布工作流：
