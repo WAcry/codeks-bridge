@@ -1,0 +1,105 @@
+{
+  "model": "claude-opus-5-5",
+  "effort": "medium",
+  "base_model": "Claude",
+  "base_sha256": "5322a61da7b36d35b685b314c932b2e50ee02d019f514491810ee54278010c0e",
+  "prompt_sha256": "2ce9019d2ea8ff6a70f204bf3ab731f09cc0e2f3869f4a67dea655db021ad0a7",
+  "summary_prefix_sha256": "e9b088e794a6bb9082ac053fcc760bd818d7e720ee4bcdc72c6e480de7b7cb0e",
+  "original_gpt_base_sha256": "e1bdd4f8f0df4b20f4a0ffc8a861ce819df45325d8cecdfb92e80379cf8d142e",
+  "groups": [
+    "normal",
+    "stress-3617031",
+    "stress-3617032",
+    "stress-3617033",
+    "stress-3617034",
+    "stress-3617131",
+    "stress-3617132",
+    "stress-3617133",
+    "stress-3617134"
+  ],
+  "cache": "5m default ephemeral; fixed H boundary; full-control message_start unlocks K2",
+  "max_tokens": 128000,
+  "full_control_tool_choice": "auto",
+  "generation_tool_choice": "auto",
+  "quiz_and_empty_tool_choice": "none",
+  "groups_concurrency": 2,
+  "normal_generations_concurrency": 3,
+  "source_commit": "f86b5141a018fd0077696938c2baed4d7dafcf78",
+  "no_automatic_retries": true,
+  "date": "2026-10-20 18:23:23 GMT−7",
+  "repository": "https://github.com/WAcry/codeks-bridge",
+  "inputs": [
+    {
+      "file": "benchmarks/compaction/results/2026-10-20/fixtures/normal.json",
+      "sha256": "ba268d8f12656449b968d73863d19d0ca2a7247ea7b2e18339a3275511700463",
+      "bytes": 143862
+    },
+    {
+      "file": "benchmarks/compaction/results/2026-10-20/fixtures/normal-questions.json",
+      "sha256": "c7e581abc84808329b1225663086a8e16a78766dda851e9b425ae191512fc3e3",
+      "bytes": 69211
+    },
+    {
+      "file": "benchmarks/compaction/results/2026-10-20/fixtures/stress-3617031.json",
+      "sha256": "f6f5717c8fe2795950da3b95362a5c13fa701a4794878785e8e03e54b6e57c57",
+      "bytes": 1129938
+    },
+    {
+      "file": "benchmarks/compaction/results/2026-10-20/fixtures/stress-3617032.json",
+      "sha256": "f815ef0aa39da99de45a9525576c39fa27aaa3cebffde26def8c63590c80e23c",
+      "bytes": 1130019
+    },
+    {
+      "file": "benchmarks/compaction/results/2026-10-20/fixtures/stress-3617033.json",
+      "sha256": "ec445417764fc05362f507524ea39daad5e044c9af1e6d6ec385462bfe368286",
+      "bytes": 1130314
+    },
+    {
+      "file": "benchmarks/compaction/results/2026-10-20/fixtures/stress-3617034.json",
+      "sha256": "ef290e074a4d36297e8b681c10f7b6da0dd7d3a252425b04b69c9342612a5d24",
+      "bytes": 1129759
+    },
+    {
+      "file": "benchmarks/compaction/results/2026-10-20/fixtures/stress-3617131.json",
+      "sha256": "049ebbc9cac1ebc9b219caf09b8db15ac4d7c3268304de10a105632ba57ea6ca",
+      "bytes": 1129514
+    },
+    {
+      "file": "benchmarks/compaction/results/2026-10-20/fixtures/stress-3617132.json",
+      "sha256": "02dbadd19a5cab0a20f49bc53eb29cb132035c2f644eea4dee9b3e4d94009f2e",
+      "bytes": 1129365
+    },
+    {
+      "file": "benchmarks/compaction/results/2026-10-20/fixtures/stress-3617133.json",
+      "sha256": "c5abb6c2f37d4c9c6649c130bf21ad76be0869ac569a5abe76ed6b276f7e663c",
+      "bytes": 1129818
+    },
+    {
+      "file": "benchmarks/compaction/results/2026-10-20/fixtures/stress-3617134.json",
+      "sha256": "2056132f9c450567685167aec9fed9e99b762eb3823981e13065d1bfc54848c0",
+      "bytes": 1129265
+    }
+  ],
+  "actual_transport": "native Anthropic Messages using buildAnthropicRequest from source_commit; ephemeral cache markers replaced with default 5m markers",
+  "retry": "One byte-identical quiz retry after overloaded_error; no generation retries; raw failure preserved",
+  "product_tokens": "generation output_tokens minus output_tokens_details.thinking_tokens; count_tokens retained only as diagnostic",
+  "scoring": "Original exact JSON score plus separately reported exact answer score after removing a sole outer Markdown JSON fence. No other normalization.",
+  "source_record": "2026-10-20",
+  "prompts": {
+    "base_instructions": {
+      "file": "prompts/base-instructions.txt",
+      "bytes": 21780,
+      "sha256": "5322a61da7b36d35b685b314c932b2e50ee02d019f514491810ee54278010c0e"
+    },
+    "compaction": {
+      "file": "../2026-10-20/prompts/claude-code.txt",
+      "bytes": 6369,
+      "sha256": "2ce9019d2ea8ff6a70f204bf3ab731f09cc0e2f3869f4a67dea655db021ad0a7"
+    },
+    "summary_prefix": {
+      "file": "../2026-10-20/prompts/summary-prefix.txt",
+      "bytes": 399,
+      "sha256": "e9b088e794a6bb9082ac053fcc760bd818d7e720ee4bcdc72c6e480de7b7cb0e"
+    }
+  }
+}

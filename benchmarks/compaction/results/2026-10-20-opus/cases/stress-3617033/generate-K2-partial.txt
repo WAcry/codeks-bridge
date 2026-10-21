@@ -1,0 +1,41 @@
+<analysis>
+The conversation is a long state-recording session for project 3617033. Across epochs 0–9, the user sent the same sequence of messages in each epoch:
+
+1. an authoritative exact ledger of parameters;
+2. authoritative directed routes;
+3. authoritative probe results, which I gathered by calling database_query(project=3617033, probe=probe-3617033-N);
+4. superseded candidates, which are all obsolete and should be ignored;
+5. final authoritative corrections, which replace those candidates;
+6. an authoritative work checkpoint, each with a state, receipt, and next action;
+7. unrelated archival material, which I was told to ignore.
+
+There were no files, no code, and no errors. Epoch k covers indices k+1, k+11, ..., k+191, which adds up to indices 1–200 over the ten epochs. Every value has to be kept exactly as given. The user never asked for a final deliverable, so I have only been recording and acknowledging. The obsolete candidate values and the archive notebook values are excluded from active state.
+</analysis>
+
+<summary>
+1. **Primary request and intent**
+
+   The user wants me to record and keep, exactly as given, the authoritative state for project 3617033 across epochs 0–9. That state has five parts:
+   - parameter ledgers ("Preserve every key and value exactly")
+   - directed routes ("Every arrow is directional and current")
+   - probe results from database_query
+   - final corrections, which replace the superseded candidates exactly
+   - work checkpoints ("Each state, receipt, and next action is current and must remain associated with its work item")
+
+   Two kinds of input must be left out of active state. The "SUPERSEDED CANDIDATES" values are all obsolete. The "UNRELATED ARCHIVAL MATERIAL" notebooks are non-authoritative, and the user said to ignore them for continuing the active project. No final task or deliverable has been requested yet.
+
+2. **Key technical concepts**
+
+   - The data is grouped into epochs; epoch k covers indices k+1+10j, for j = 0 to 19.
+   - Probes are run with database_query(project=3617033, probe="probe-3617033-N"), which is read-only.
+   - When a candidate is superseded, the final correction replaces it.
+   - Archival distractor material is ignored.
+
+3. **Files and code sections**
+
+   No files were read or edited. The active state below uses these shorthands; every key carries the 3617033 prefix shown here:
+   - P N = parameter-3617033-N = value-…
+   - R N = route-source-3617033-N -> route-target-…
+   - Q N = probe-3617033-N = probe-result-…
+   - C N = corrected-field-3617033-N = final-…
+   - W N = work-item-3617033-N :

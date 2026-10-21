@@ -1,0 +1,32 @@
+<analysis>
+The session is a state-tracking exercise for project 3617131. It ran over ten epochs (0–9). Each epoch followed the same sequence:
+
+1. The user supplied an authoritative exact ledger of 20 keys, all with the same index offset: epoch e covers indices e+1, e+11, …, e+191.
+2. The user supplied 20 authoritative directed routes.
+3. I ran 20 database_query probes, with project=3617131 and probe=probe-3617131-N, and recorded the authoritative tool outputs.
+4. The user supplied superseded candidates for corrected-field keys. These are all obsolete and must not be used.
+5. The user supplied final authoritative corrections that replace those candidates.
+6. The user supplied an authoritative work checkpoint giving each item's state, receipt and next action.
+7. The user supplied unrelated archival material, which I was told to ignore. It changes no active state.
+
+Each time, I replied with a short acknowledgment. There were no errors, no files and no code. No security constraints were stated beyond keeping values exact and ignoring archive and obsolete values. The current request is a text-only summary with no tool calls.
+
+To keep the summary compact, I write values without their repeated prefixes and spell out the full prefixes once. Every value must be reproduced exactly.
+</analysis>
+
+<summary>
+1. Primary Request and Intent:
+   The user is building authoritative state for project 3617131 over epochs 0–9. My job is to record each item exactly and keep it current:
+   - The exact ledger: "Preserve every key and value exactly."
+   - Directed routes: "Every arrow is directional and current."
+   - Probe results from the database_query tool.
+   - Final corrections, which replace the superseded candidates.
+   - Work checkpoints: "Each state, receipt, and next action is current and must remain associated with its work item."
+   
+   Superseded candidates (the obsolete-… values) are all obsolete. Unrelated archival material, made up of "Archive notebook e-n" simulation values, must be ignored for active-project continuation. It updates no key, route, tool result, correction or checkpoint. The latest instruction is to produce this summary as text only, with no tool calls.
+
+2. Key Technical Concepts:
+   - Authoritative and obsolete data have to be kept apart. Final corrections override the superseded candidates, and archive material is discarded.
+   - Routes are directional (source → target).
+   - Probes use `database_query(project=3617131, probe="probe-3617131-N")` and return `probe-3617131-N=probe-result-…`.
+   - Epoch e uses indices N = e+1+10k for k = 0..19, which gives 1–200
