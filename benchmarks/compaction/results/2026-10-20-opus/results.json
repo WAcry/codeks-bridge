@@ -7327,7 +7327,12 @@
           "thinking_tokens": 168
         }
       },
-      "observed_start_input_tokens": 318756
+      "observed_start_input_tokens": 318756,
+      "stop_details": {
+        "type": "refusal",
+        "category": "cyber",
+        "explanation": "This request triggered restrictions on violative cyber content and was blocked under Anthropic's Usage Policy. To learn more, see https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback."
+      }
     },
     {
       "case": "stress-3617034",
@@ -7495,7 +7500,12 @@
           "thinking_tokens": 22765
         }
       },
-      "observed_start_input_tokens": 318605
+      "observed_start_input_tokens": 318605,
+      "stop_details": {
+        "type": "refusal",
+        "category": "cyber",
+        "explanation": "This request triggered restrictions on violative cyber content and was blocked under Anthropic's Usage Policy. To learn more, see https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback."
+      }
     },
     {
       "case": "stress-3617132",

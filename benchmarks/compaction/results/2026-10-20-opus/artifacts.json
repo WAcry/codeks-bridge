@@ -3,8 +3,8 @@
   "files": [
     {
       "file": "README.md",
-      "bytes": 12612,
-      "sha256": "246038ff8192cf19204005be49e627c2cbeb63589905d27dca71a121c3b21b22"
+      "bytes": 13453,
+      "sha256": "c78df197ba9458b7229ce9a648e0fe6e2355f9256eed9aa653fb487b8790a64a"
     },
     {
       "file": "cases/normal-r1/K2.txt",
@@ -213,8 +213,8 @@
     },
     {
       "file": "results.json",
-      "bytes": 207873,
-      "sha256": "f616df72974844f4a664d8024d5bc306ec13f3f58cc0eca92d1dd19fb2f2b673"
+      "bytes": 208515,
+      "sha256": "7af08c51353afff70a66d66d6529bad82eb2594d952704718a0e44d021da3e56"
     }
   ]
 }
