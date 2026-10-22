@@ -4,6 +4,22 @@ import { SUMMARY_PREFIX } from "./prompts.ts";
 import { translateToolHistory } from "./tool-history.ts";
 import type { ResolvedModel, ResponsesRequest } from "./types.ts";
 
+/** Raw Responses state items; decoded bridge reasoning uses an internal type. */
+export function isOpaqueStateItem(item: Record<string, any>): boolean {
+  return ["reasoning", "compaction", "compaction_summary"].includes(item.type);
+}
+
+/** Reject explicit policy violations before even an auxiliary handoff can run. */
+export function rejectUnrecognizedState(input: ResponsesRequest["input"], route: ResolvedModel): void {
+  if (route.replay.unrecognized !== "error" || !Array.isArray(input)) return;
+  for (const item of input) {
+    if (!item || !isOpaqueStateItem(item)) continue;
+    const carrier = item.type === "reasoning"
+      ? decodeReasoning(item.encrypted_content) : decodeCompaction(item.encrypted_content);
+    if (!carrier) throw new BridgeError(`Unrecognized ${item.type} history item; replay.unrecognized is set to error`);
+  }
+}
+
 /** Replay policy for decoded state. The inspector reports the same decisions. */
 export function replaysReasoning(carrier: StatePayload, route: ResolvedModel): boolean {
   return route.replay.reasoning.has(carrier.source.id) && carrier.format === route.profile.reasoning_format;
@@ -21,8 +37,12 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
   }
   if (input === undefined) return [];
   if (!Array.isArray(input)) throw new BridgeError("input must be a string or an array of items");
+  rejectUnrecognizedState(input, route);
 
   const result: Record<string, any>[] = [];
+  const unrecognized = (item: Record<string, any>) => {
+    if (route.replay.unrecognized === "passthrough") result.push(item);
+  };
   for (const original of input) {
     if (!original || typeof original !== "object" || Array.isArray(original)) {
       throw new BridgeError("Each input item must be an object");
@@ -36,7 +56,8 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
     }
     if (item.type === "reasoning") {
       const carrier = decodeReasoning(item.encrypted_content);
-      if (carrier && replaysReasoning(carrier, route)) {
+      if (!carrier) unrecognized(item);
+      else if (replaysReasoning(carrier, route)) {
         result.push({ type: "bridge_reasoning", state: carrier, summary: item.summary ?? [] });
       }
       continue;
@@ -65,10 +86,13 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
     if (item.type === "compaction" || item.type === "compaction_summary") {
       const carrier = decodeCompaction(item.encrypted_content);
       if (!carrier) {
-        throw new BridgeError("This compaction item has no portable summary or handoff recipe; use history created through this bridge");
+        unrecognized(item);
+        continue;
       }
       if (restoresNativeCompaction(carrier, route)) {
-        result.push(carrier.native!.data as Record<string, any>);
+        const native = carrier.native!.data as Record<string, any>;
+        if (route.profile.api === "responses") delete native.id;
+        result.push(native);
       } else {
         if (!carrier.summary) throw new BridgeError("Deferred compaction summary has not been materialized");
         result.push({

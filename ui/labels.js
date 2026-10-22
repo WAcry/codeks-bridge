@@ -14,10 +14,10 @@ export const KIND_LABEL = { turn: '轮次', compaction: '压缩', invalid: '无�
 export const OUTCOME_LABEL = { active: '进行中', completed: '完成', incomplete: '未完成', failed: '失败', error: '错误', aborted: '中止' };
 export const END_LABEL = { active: '传输中', complete: '完整', cancelled: '已取消', error: '出错', unread: '终止事件后停止读取' };
 
-const DECISION = { replay: '回放', drop: '丢弃', native: '恢复原生', summary: '文字摘要', handoff: '按需文字交接', reject: '拒绝', output: '输出' };
-const DECISION_CLASS = { replay: 'ok', native: 'ok', drop: 'warn', summary: 'warn', handoff: 'warn', reject: 'bad', output: 'info' };
+const DECISION = { replay: '回放', passthrough: '原样透传', drop: '丢弃', native: '恢复原生', summary: '文字摘要', handoff: '按需文字交接', reject: '拒绝', output: '输出' };
+const DECISION_CLASS = { replay: 'ok', passthrough: 'info', native: 'ok', drop: 'warn', summary: 'warn', handoff: 'warn', reject: 'bad', output: 'info' };
 // Verb shown before the reason text, per decision.
-const VERB = { replay: '回放', drop: '丢弃', reject: '拒绝', summary: '改用文字摘要', handoff: '获取文字交接', native: '恢复原生压缩' };
+const VERB = { replay: '回放', passthrough: '原样透传', drop: '丢弃', reject: '拒绝', summary: '改用文字摘要', handoff: '获取文字交接', native: '恢复原生压缩' };
 
 const REASON = {
   reasoning: {
@@ -25,8 +25,7 @@ const REASON = {
     allowed_source: '来源在 replay 白名单内',
     source_not_allowed: '来源未在 replay 白名单',
     format_mismatch: '载荷格式与目标不匹配',
-    not_bridge_state: '不是 bridge 载荷（无 cxbr1 前缀）',
-    malformed: 'bridge 载荷损坏，无法解码',
+    unrecognized_state: '无法识别为 bridge reasoning 载荷，按 replay.unrecognized 处理',
   },
   compaction: {
     native_restored: '',
@@ -34,8 +33,7 @@ const REASON = {
     native_replay_disabled: '目标关闭了 native_replay',
     source_not_allowed: '来源未在原生压缩白名单',
     format_mismatch: '原生格式与目标不匹配',
-    not_bridge_state: '不是 bridge 检查点（无 cxbc1 前缀）',
-    malformed: 'bridge 检查点损坏，无法解码',
+    unrecognized_state: '无法识别为 bridge 压缩检查点，按 replay.unrecognized 处理',
   },
 };
 

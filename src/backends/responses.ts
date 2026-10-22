@@ -1,6 +1,6 @@
 import { encodeReasoning } from "../carrier.ts";
 import { BridgeError, ResponsesIncompleteError, responsesStreamError } from "../errors.ts";
-import { prepareHistory } from "../history.ts";
+import { isOpaqueStateItem, prepareHistory } from "../history.ts";
 import { reasoningEffort } from "../profiles.ts";
 import { parseJsonSse } from "../sse.ts";
 import { upstreamFetch } from "../upstream.ts";
@@ -15,7 +15,8 @@ export function responsesBody({ request, route, compacting }: BackendContext): R
   const input = prepareHistory(request.input, route).map((item) => {
     // An assistant message id can reference a reasoning item that was filtered
     // during a model switch or an agent fork. Full content needs neither id.
-    delete item.id;
+    // Unrecognized state has no bridge provenance: forward its complete item.
+    if (!isOpaqueStateItem(item)) delete item.id;
     if (item.type === "bridge_reasoning") {
       if (typeof item.state.data !== "string") throw new BridgeError("Invalid Responses reasoning data.");
       return { type: "reasoning", summary: item.summary, encrypted_content: item.state.data };

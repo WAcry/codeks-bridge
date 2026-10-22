@@ -80,7 +80,7 @@
 | `max_output_tokens` | 覆盖目录的默认回答输出预算；请求中的显式值优先于模型配置 |
 | `input_modalities` | 可选，覆盖条目中的 `text`/`image` 能力声明 |
 | `reasoning` | 默认 effort 及其到原生值的映射 |
-| `replay` | 分别允许哪些来源的 reasoning、原生压缩 |
+| `replay` | reasoning、原生压缩的允许来源，以及未识别历史状态的处理方式 |
 | `compaction` | 压缩方式、执行模型，以及本目标是否接收原生压缩 |
 | `options` | 原生请求参数，覆盖上游级 options |
 | `adapters` | 当前模型的桥接行为；逐字段覆盖上游级同名 adapter 设置 |
@@ -221,11 +221,31 @@ Claude 的 `native_replay` 仍默认为 `false`：委托生成不会让 Claude �
 }
 ```
 
-自身状态默认允许恢复；两份列表增加其他允许来源，关系有方向且不传递。若也要接受 A 的 reasoning，把 A 加入 B 的 `reasoning_from`。这个例子的 B 自己只生成文字摘要，但仍可读取 A 的原生检查点：生成和恢复是独立能力。设置 `native_replay: false` 则所有压缩都使用文字表示，包括自身生成的检查点。
+bridge 能识别的自身状态默认允许恢复；两份列表增加其他允许来源，关系有方向且不传递。若也要接受 A 的 reasoning，把 A 加入 B 的 `reasoning_from`。这个例子的 B 自己只生成文字摘要，但仍可读取 A 的原生检查点：生成和恢复是独立能力。设置 `native_replay: false` 则已识别的压缩都使用文字表示，包括自身生成的检查点。
 
 引用按连接、实际模型和 adapter 解析为来源身份，不绑定显示别名。加载配置时检查来源是否存在、源与目标的格式标识是否一致；每条请求恢复时再检查实际载荷。bridge 不探测密文是否被上游接受。上游拒绝被允许的状态时直接报错，不删掉状态再试。详见 [reasoning](reasoning.md) 和[压缩](compaction.md)。
 
 连接身份包含 upstream ID 和去掉末尾斜杠的 URL，来源身份再包含 adapter 与实际模型。密钥、header 和 options 不参与身份。如果同一 URL 通过 header 或凭据切换到不兼容区域，使用不同 upstream ID；改显示别名不影响已保存状态。
+
+### 未识别的历史状态
+
+历史会话可能带有其他工具或旧版本保存的状态。模型级 `replay.unrecognized` 统一处理 `encrypted_content` 无法解码为相应 bridge carrier 的 `reasoning`、`compaction` 和 `compaction_summary` 项，包括未知前缀、缺少载荷或无法解析的封装：
+
+| 值 | 行为 |
+| --- | --- |
+| `passthrough`（默认） | 保留整项及原始字段，交给上游解释 |
+| `drop` | 仅从本次出站历史中过滤这些项 |
+| `error` | 在发送上游请求前报错 |
+
+例如，在需要明确拒绝此类历史的模型中配置：
+
+```json
+{ "replay": { "unrecognized": "error" } }
+```
+
+GPT 将透传项保留在 Responses `input` 中，包括其 `id`；Claude/DeepSeek 将原项放入 assistant 消息的 content 数组，不把未知密文猜解为 thinking 或文字。这保留了原始数据，但不保证跨协议或跨模型兼容，上游可以拒绝；bridge 不自动重试或改用其他策略。
+
+这些项没有可确认的来源与复述配方，因此不套用来源允许列表、不创建来源身份，也不触发按需复述。能解码的 bridge carrier 仍遵循原有来源、格式和压缩表示规则。三个选项都不改写客户端已保存的历史；`drop` 会减少本次请求的 reasoning 上下文，丢弃压缩检查点还可能失去早期对话的唯一表示。普通请求取工作模型的策略，委托压缩取实际执行模型的策略。
 
 ## 客户端目录
 

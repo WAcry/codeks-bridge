@@ -10,7 +10,7 @@
 
 随后浅层合并上游和模型 `options`，后者覆盖前者，也可覆盖推导出的普通参数。最后由 bridge 固定 `model`、`input`、`tools`、`store: false`、`stream: true`，`include` 至少包含 `reasoning.encrypted_content`。上游状态由完整历史承载，不依赖服务器保存的会话。
 
-历史 reasoning 按允许来源选择，将 `responses.reasoning.v1` 的 data 还原为原生密文；原生压缩按独立策略选择。每条输入项移除顶层 `id`，工具配对的 `call_id` 保留，避免引用已过滤的 reasoning。图片、普通消息、工具结果和明文 agent message 保留原格式。[状态规则](reasoning.md)
+bridge 能识别的历史 reasoning 按允许来源选择，将 `responses.reasoning.v1` 的 data 还原为原生密文；原生压缩按独立策略选择。未识别状态由 `replay.unrecognized` 决定处理方式，默认保留整项，包括其 `id`。其余输入项移除顶层 `id`，工具配对的 `call_id` 保留，避免引用已过滤的 reasoning。图片、普通消息、工具结果和明文 agent message 保留原格式。[状态规则](reasoning.md)
 
 ## 流与工具交付
 

@@ -97,20 +97,18 @@ codeks-bridge serve --config /absolute/path/bridge.json --capture
 | reasoning | `replay` | `allowed_source` | 来自配置允许的其他目标，本次回放 |
 | reasoning | `drop` | `source_not_allowed` | 来源不在当前目标的允许列表，本次请求中过滤 |
 | reasoning | `drop` | `format_mismatch` | 来源允许，但载荷格式与当前 adapter 不同 |
-| reasoning | `drop` | `not_bridge_state` | 不是 bridge 封装的状态，例如直接来自其他 provider 的密文 |
-| reasoning | `reject` | `malformed` | 有 bridge 前缀但无法解码，bridge 会拒绝请求 |
+| reasoning / compaction | `passthrough` / `drop` / `reject` | `unrecognized_state` | 无法解码为 bridge carrier，按 `replay.unrecognized` 透传、过滤或拒绝 |
 | compaction | `native` | `native_restored` | 恢复原生加密检查点 |
 | compaction | `summary` | `no_native` | 检查点只有文字摘要 |
 | compaction | `summary` / `handoff` | `native_replay_disabled` | 当前目标关闭了原生恢复 |
 | compaction | `summary` / `handoff` | `source_not_allowed` | 原生检查点来源不在允许列表 |
 | compaction | `summary` / `handoff` | `format_mismatch` | 原生检查点格式与当前 adapter 不同 |
-| compaction | `reject` | `not_bridge_state` | 不是 bridge 生成的压缩项，bridge 会拒绝请求 |
 
 `summary` 表示直接使用载荷中已有的文字，`handoff` 表示先取得文字交接：可以复用本地缓存，也可以向原来源生成。只有实际发起辅助请求时，上游调用列表才出现 `handoff`；这条状态标注本身不表示发生了额外 HTTP 请求。
 
 响应侧标注 bridge 新生成的 reasoning 与压缩项（决定为 `output`）。流式响应指向 `response.output_item.done` 事件里的 `/item`，非流式响应指向 `/output/k`。只有文字摘要的压缩项没有原生部分，来源和格式为空；`native` 检查点的来源和格式取原生部分。
 
-每条标注附来源别名、部署名、adapter、来源指纹、载荷格式和解码后的 carrier。`cxbr1:` 与 `cxbc1:` 只是编码，解码后可以看到文字 reasoning、压缩摘要和原生载荷；GPT 原生 `encrypted_content` 本身仍是密文，只能看到原样字符串。
+已识别载荷的标注附来源别名、部署名、adapter、来源指纹、载荷格式和解码后的 carrier；未识别状态不补造这些信息。`compaction_summary` 与 `compaction` 使用相同的压缩状态判断。`cxbr1:` 与 `cxbc1:` 只是编码，解码后可以看到文字 reasoning、压缩摘要和原生载荷；GPT 原生 `encrypted_content` 本身仍是密文，只能看到原样字符串。
 
 ## Claude 服务端输入处理
 

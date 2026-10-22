@@ -1,4 +1,3 @@
-import { BridgeError } from "./errors.ts";
 import type { ResponsesRequest, StateOrigin } from "./types.ts";
 
 // Versioned, self-contained state stored in the client's encrypted_content field.
@@ -66,10 +65,8 @@ export function encodeReasoning(state: StatePayload): string {
 }
 
 export function decodeReasoning(value: unknown): StatePayload | undefined {
-  if (typeof value !== "string" || !value.startsWith(REASONING_PREFIX)) return undefined;
   const decoded = decode(value, REASONING_PREFIX);
-  if (!statePayload(decoded)) throw new BridgeError("Malformed bridge reasoning state envelope");
-  return decoded;
+  return statePayload(decoded) ? decoded : undefined;
 }
 
 export function encodeCompaction(carrier: CompactionCarrier): string {

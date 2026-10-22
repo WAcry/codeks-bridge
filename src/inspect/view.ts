@@ -1,7 +1,7 @@
 // JSON views of captured exchanges. Bodies stay complete; the UI decides how
 // much to show. Annotations use the same replay rules as prepareHistory.
 import type { ServerResponse } from "node:http";
-import { decodeCompaction, decodeReasoning, type CompactionCarrier, type StatePayload } from "../carrier.ts";
+import { decodeCompaction, decodeReasoning, type CompactionCarrier } from "../carrier.ts";
 import { resolveModel } from "../config.ts";
 import { replaysReasoning, restoresNativeCompaction } from "../history.ts";
 import type { ResolvedModel, StateOrigin } from "../types.ts";
@@ -17,7 +17,7 @@ export interface Annotation {
   pointer: string;
   event?: number;
   kind: "reasoning" | "compaction";
-  decision: "replay" | "drop" | "native" | "summary" | "handoff" | "reject" | "output";
+  decision: "replay" | "passthrough" | "drop" | "native" | "summary" | "handoff" | "reject" | "output";
   reason: string;
   source: { aliases: string[]; model: string; adapter: string; origin_id: string } | null;
   format: string | null;
@@ -201,7 +201,10 @@ function routeView(inspector: Inspector, route: ResolvedModel, responsesLite: bo
     native_compaction_format: route.profile.native_compaction_format ?? null,
     compaction_mode: route.compaction.mode,
     native_replay: route.compaction.native_replay,
-    replay: { reasoning_from: names(route.replay.reasoning), native_compaction_from: names(route.replay.native_compaction) },
+    replay: {
+      reasoning_from: names(route.replay.reasoning), native_compaction_from: names(route.replay.native_compaction),
+      unrecognized: route.replay.unrecognized,
+    },
     responses_lite: responsesLite ?? false,
   };
 }
@@ -223,10 +226,8 @@ function messageView(message: Message | undefined) {
 
 function reasoningInput(inspector: Inspector, route: ResolvedModel, item: any, pointer: string): Annotation {
   const base = { target: "client.request" as const, pointer, kind: "reasoning" as const };
-  let carrier: StatePayload | undefined;
-  try { carrier = decodeReasoning(item.encrypted_content); }
-  catch { return { ...base, decision: "reject", reason: "malformed", source: null, format: null, decoded: null }; }
-  if (!carrier) return { ...base, decision: "drop", reason: "not_bridge_state", source: null, format: null, decoded: null };
+  const carrier = decodeReasoning(item.encrypted_content);
+  if (!carrier) return unrecognizedInput(base, route);
   const replay = replaysReasoning(carrier, route);
   const reason = replay
     ? carrier.source.id === route.origin.id ? "same_source" : "allowed_source"
@@ -237,7 +238,7 @@ function reasoningInput(inspector: Inspector, route: ResolvedModel, item: any, p
 function compactionInput(inspector: Inspector, route: ResolvedModel, item: any, pointer: string): Annotation {
   const base = { target: "client.request" as const, pointer, kind: "compaction" as const };
   const carrier: CompactionCarrier | undefined = decodeCompaction(item.encrypted_content);
-  if (!carrier) return { ...base, decision: "reject", reason: "not_bridge_state", source: null, format: null, decoded: null };
+  if (!carrier) return unrecognizedInput(base, route);
   const native = carrier.native;
   const restored = restoresNativeCompaction(carrier, route);
   const reason = restored ? "native_restored"
@@ -250,10 +251,16 @@ function compactionInput(inspector: Inspector, route: ResolvedModel, item: any, 
   };
 }
 
+function unrecognizedInput(base: Pick<Annotation, "target" | "pointer" | "kind">, route: ResolvedModel): Annotation {
+  return {
+    ...base, decision: route.replay.unrecognized === "error" ? "reject" : route.replay.unrecognized,
+    reason: "unrecognized_state", source: null, format: null, decoded: null,
+  };
+}
+
 function outputNote(inspector: Inspector, item: any, target: Pick<Annotation, "target" | "pointer" | "event">): Annotation | undefined {
   if (item?.type === "reasoning") {
-    let carrier: StatePayload | undefined;
-    try { carrier = decodeReasoning(item.encrypted_content); } catch { return undefined; }
+    const carrier = decodeReasoning(item.encrypted_content);
     if (!carrier) return undefined;
     return { ...target, kind: "reasoning", decision: "output", reason: "output", source: source(inspector, carrier.source), format: carrier.format, decoded: carrier };
   }
