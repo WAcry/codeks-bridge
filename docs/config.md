@@ -90,7 +90,7 @@
 
 `expose` 控制目录展示，不改变别名的路由、来源身份或访问权限。隐藏模型仍可用于压缩、handoff 和状态复用，显式按别名发送请求也仍可调用；inspector 保留其诊断记录。`config-snippet` 选择首个公开别名作为默认模型；全部隐藏时目录为空，该命令明确报错。
 
-不设置窗口时，原条目的两个窗口字段各自保留。当前 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；Opus 5.5、Sonnet 5.5 和 DeepSeek Flash 的两个字段均为 `1000000`。压缩阈值沿用模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 必须提供 `max_tokens`，对应目录外层默认预算为 `128000`；GPT 和 DeepSeek 使用请求、模型配置或上游提供的默认值。原生 options 也可调整预算，实际限制由部署端点裁决。
+不设置窗口时，原条目的两个窗口字段各自保留。当前 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；Opus 5.5 和 Sonnet 5.5 为 `context_window: 400000`、`max_context_window: 1000000`；DeepSeek Flash 的两个字段均为 `1000000`。压缩阈值沿用模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 必须提供 `max_tokens`，对应目录外层默认预算为 `128000`；GPT 和 DeepSeek 使用请求、模型配置或上游提供的默认值。原生 options 也可调整预算，实际限制由部署端点裁决。
 
 请求先由 adapter 转换，再浅层合并 `upstream.options`、`model.options`；后者优先，嵌套对象整体替换。例如模型 `options.output_config` 会替换推导值和上游同名对象。由此可以显式调整 thinking budget、原生 effort 或端点专有字段。
 

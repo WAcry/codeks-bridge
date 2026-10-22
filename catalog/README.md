@@ -32,7 +32,7 @@
 
 Claude 和 DeepSeek 从 GPT-6.1 Sol 的完整条目开始，只做各自 JSON 中列出的修改：底层模型与展示信息、工作窗口、reasoning 档位，以及当前 adapter 尚未转换的参数和 GPT 专属的服务展示信息。提示词仅将首句的 `based on GPT-6` 换成 `based on Claude` 或 `based on DeepSeek`；`You are Codex`、`As Codex` 和其余客户端指令保留。`default_reasoning_summary` 保持源条目的 `none`，由用户在 codeks 中选择摘要展示方式。
 
-预算默认值遵循与 GPT-6.1 Sol 模板对齐的维护原则：仅保留模板已有字段，或为上游必填参数补充默认值；公布的能力上限本身不要求新增默认配置。窗口字段沿用模板结构：三个第三方条目的 `context_window` 与 `max_context_window` 均为 `1000000`。压缩阈值保留模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 要求 `max_tokens`，因此两个 Claude 条目提供 `128000` 默认预算；GPT 和 DeepSeek 的输出预算由请求、用户配置或上游默认值决定。
+预算默认值遵循与 GPT-6.1 Sol 模板对齐的维护原则：仅保留模板已有字段，或为上游必填参数补充默认值；公布的能力上限本身不要求新增默认配置。窗口字段沿用模板结构：按用户选择，两个 Claude 条目的默认 `context_window` 为 `400000`，`max_context_window` 保留 `1000000`；DeepSeek Flash 的两个字段均为 `1000000`。压缩阈值保留模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 要求 `max_tokens`，因此两个 Claude 条目提供 `128000` 默认预算；GPT 和 DeepSeek 的输出预算由请求、用户配置或上游默认值决定。
 
 依据：[Claude 模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[Messages 必填参数](https://platform.claude.com/docs/en/api/messages/create)、[DeepSeek 模型规格](https://api-docs.deepseek.com/quick_start/pricing/)。这些是第三方精调的依据，`source` 仍记录 Codex 模板来源。
 
