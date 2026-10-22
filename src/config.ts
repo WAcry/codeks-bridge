@@ -28,6 +28,7 @@ export function validateConfig(value: unknown): BridgeConfig {
   if (value.host !== undefined && (typeof value.host !== "string" || !value.host)) fail("host must be a string");
   if (value.port !== undefined && (!Number.isInteger(value.port) || value.port < 0 || value.port > 65535)) fail("port must be 0..65535");
   if (value.token_env !== undefined && (typeof value.token_env !== "string" || !value.token_env)) fail("token_env must name an environment variable");
+  if (value.request_max_mib !== undefined && (!Number.isSafeInteger(value.request_max_mib) || value.request_max_mib <= 0 || !Number.isSafeInteger(value.request_max_mib * 1024 * 1024))) fail("request_max_mib must be a positive integer with a safe byte count");
   if (value.compaction_cache_dir !== undefined && (typeof value.compaction_cache_dir !== "string" || !value.compaction_cache_dir.trim())) fail("compaction_cache_dir must be a nonempty path");
   if (value.inspect !== undefined) {
     const inspect = value.inspect;

@@ -19,6 +19,7 @@ export interface ToolEntry {
   namespace?: string;
   description: string;
   parameters: Record<string, unknown>;
+  strict?: boolean;
 }
 
 export interface ToolSet {
@@ -141,6 +142,7 @@ export function buildToolSet(tools: unknown[] | undefined): ToolSet {
       // Lite updates contain only changed members. Replace that definition
       // without losing siblings or changing its established upstream name.
       Object.assign(previous, entry);
+      if (entry.strict === undefined) delete previous.strict;
       return previous;
     }
     let flatName = baseFlatName(entry.namespace, entry.name);
@@ -165,6 +167,7 @@ export function buildToolSet(tools: unknown[] | undefined): ToolSet {
         namespace,
         description: String(tool.description ?? ""),
         parameters: objectSchema(tool.parameters),
+        ...(typeof tool.strict === "boolean" ? { strict: tool.strict } : {}),
       })];
     } else if (tool.type === "custom") {
       return [add({

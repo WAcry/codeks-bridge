@@ -14,6 +14,16 @@ const config = () => validateConfig({
   models: { first: { upstream: "a", catalog: "deepseek-flash", model: "deployment-a", context_window: 100000 } },
 });
 
+test("request body limits accept omitted or positive MiB values and reject unsafe byte counts", () => {
+  assert.equal(config().request_max_mib, undefined);
+  for (const limit of [1, 64, 128]) {
+    assert.equal(validateConfig({ ...config(), request_max_mib: limit }).request_max_mib, limit);
+  }
+  for (const limit of [null, "64", 0, -1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER, 2 ** 33]) {
+    assert.throws(() => validateConfig({ ...config(), request_max_mib: limit }), /request_max_mib/);
+  }
+});
+
 test("state provenance survives alias and policy changes but distinguishes actual targets", () => {
   const c = config();
   c.models.alias = { ...c.models.first };

@@ -3,7 +3,7 @@ import { once } from "node:events";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { createServer, request as httpRequest, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { gzipSync } from "node:zlib";
 import test, { type TestContext } from "node:test";
@@ -184,6 +184,59 @@ test("oversized HTTP catalogs fail explicitly while static catalogs and inferenc
   assert.match((await responseJson(response)).error.message, /model_catalog_json/);
   assert.equal((await fetch(`${f.url}/health`)).status, 200);
   assert.equal((await post(f.url, { model: "preset-0", input: "Hello" })).status, 200);
+});
+
+test("configured request limits count UTF-8 bytes and accept the exact boundary", async t => {
+  const f = await fixture(t, (_body, _req, res) => nativeSuccess(res, [message("Accepted")]), { request_max_mib: 1 });
+  const maxBytes = 1024 * 1024;
+  const base = JSON.stringify({ model: "gpt", input: "截图" });
+  const body = (bytes: number) => base.slice(0, -2) + "x".repeat(bytes - Buffer.byteLength(base)) + base.slice(-2);
+  for (const size of [maxBytes - 1, maxBytes, maxBytes + 1]) {
+    const raw = body(size);
+    assert.equal(Buffer.byteLength(raw), size);
+    assert(raw.length < maxBytes, "Character count alone would incorrectly accept the oversized body");
+    const response = await post(f.url, {}, { body: raw });
+    assert.equal(response.status, size > maxBytes ? 413 : 200);
+    const result = await response.json() as any;
+    if (size > maxBytes) {
+      assert.equal(result.error.code, "invalid_prompt");
+      assert.equal(result.error.message, "Request exceeds 1 MiB");
+      assert.equal(response.headers.get("connection"), "close");
+    }
+  }
+  assert.equal(f.seen.length, 2);
+  // Omitting the setting restores the larger default rather than reusing a prior server's limit.
+  delete f.config.request_max_mib;
+  await f.restart();
+  assert.equal((await post(f.url, {}, { body: body(maxBytes + 1) })).status, 200);
+  assert.equal(f.seen.length, 3);
+});
+
+test("chunked oversized uploads receive HTTP 413 before the client finishes the body", { timeout: 5000 }, async t => {
+  const f = await fixture(t, (_body, _req, res) => nativeSuccess(res, []), { request_max_mib: 1 });
+  let connectionClosed!: () => void;
+  const closed = new Promise<void>(resolve => { connectionClosed = resolve; });
+  const response = await new Promise<{ status: number; headers: IncomingMessage["headers"]; body: string }>((resolve, reject) => {
+    const request = httpRequest(`${f.url}/v1/responses`, { method: "POST", headers: { "content-type": "application/json" } }, async res => {
+      try {
+        let body = "";
+        for await (const chunk of res) body += chunk;
+        resolve({ status: res.statusCode!, headers: res.headers, body });
+      } catch (error) { reject(error); }
+    });
+    t.after(() => request.destroy());
+    request.on("error", reject);
+    request.on("close", connectionClosed);
+    request.write('{"model":"gpt","input":"');
+    request.write("x".repeat(1024 * 1024));
+    // Deliberately leave the chunked request open: the limit must stop reading now.
+  });
+  assert.equal(response.status, 413);
+  assert.equal(response.headers.connection, "close");
+  assert.equal(JSON.parse(response.body).error.message, "Request exceeds 1 MiB");
+  await closed;
+  assert.equal(f.seen.length, 0);
+  assert.equal((await fetch(`${f.url}/health`)).status, 200);
 });
 
 test("native success retains response metadata and upstream diagnostic request IDs", async (t) => {

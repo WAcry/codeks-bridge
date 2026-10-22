@@ -25,7 +25,7 @@ export interface Annotation {
 }
 
 /** Splits timed text into SSE events. An event takes the time of the part that completed it. */
-export function sseEvents(parts: readonly Part[]): SseRecord[] {
+export function sseEvents(parts: readonly Part[], finished = true): SseRecord[] {
   const events: SseRecord[] = [];
   let event: string | null = null;
   let data: string[] = [];
@@ -59,9 +59,11 @@ export function sseEvents(parts: readonly Part[]): SseRecord[] {
     }
     buffer = buffer.slice(start);
   }
-  if (buffer.endsWith("\r")) buffer = buffer.slice(0, -1);
-  if (buffer) line(buffer, t);
-  line("", t);
+  if (finished) {
+    if (buffer.endsWith("\r")) buffer = buffer.slice(0, -1);
+    if (buffer) line(buffer, t);
+    line("", t);
+  }
   return events;
 }
 
@@ -217,7 +219,7 @@ function messageView(message: Message | undefined) {
     end: message.end,
     error: message.error ?? null,
     body: { text: message.text(), bytes: message.bytes },
-    events: isSse(message) ? sseEvents(message.parts) : null,
+    events: isSse(message) ? sseEvents(message.parts, message.end !== "active") : null,
   };
 }
 

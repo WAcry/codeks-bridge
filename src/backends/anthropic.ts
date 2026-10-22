@@ -234,6 +234,7 @@ export const runAnthropic: Backend = async (context, writer) => {
   let started = false;
   let finalUsage = false;
   let stopReason: string | undefined;
+  let stopEvent: Block | undefined;
   let stopped = false;
   for await (const { json: event } of parseJsonSse(response.body)) {
     if (event.type === "error") throw upstreamError(undefined, event, response.headers);
@@ -289,7 +290,10 @@ export const runAnthropic: Backend = async (context, writer) => {
       } else if (block.value.type === "text") writer.closeMessage();
       blocks.delete(event.index);
     } else if (event.type === "message_delta") {
-      stopReason = event.delta?.stop_reason ?? stopReason;
+      if (event.delta?.stop_reason != null) {
+        stopReason = event.delta.stop_reason;
+        stopEvent = event;
+      }
       validateUsage(event.usage, ["output_tokens"]);
       finalUsage = true;
       rawUsage = { ...rawUsage, ...event.usage };
@@ -301,8 +305,15 @@ export const runAnthropic: Backend = async (context, writer) => {
   if (stopReason === "model_context_window_exceeded") {
     throw new BridgeError("Messages reached the model context window before completing the response.", "context_length_exceeded");
   }
-  if (stopReason === "max_tokens" || stopReason === "refusal") {
-    throw new BridgeError(stopReason === "max_tokens" ? "Messages reached max_tokens before completing the response." : "Messages refused the request.");
+  if (stopReason === "refusal") {
+    const details = stopEvent?.delta?.stop_details;
+    const diagnostic = [details?.category, details?.explanation]
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+    throw new BridgeError(`Messages refused the request.${diagnostic.length ? ` ${diagnostic.join(": ")}` : ""}`,
+      "invalid_prompt", 400, undefined, { upstream: { body: stopEvent } });
+  }
+  if (stopReason === "max_tokens") {
+    throw new BridgeError("Messages reached max_tokens before completing the response.");
   }
   if (!["end_turn", "stop_sequence", "tool_use", "pause_turn"].includes(stopReason)) {
     throw new BridgeError(`Unsupported Messages stop reason: ${stopReason}.`);

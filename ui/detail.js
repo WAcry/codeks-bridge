@@ -8,6 +8,7 @@ import { diffView } from './diff.js';
 import { annChip, annDetail, annIndex, callLabel, decisionClass, decisionText, END_LABEL, INPUT_TRANSFORMATION_LABEL, KIND_LABEL, KIND_TEXT, OUTCOME_LABEL, reasonText, sourceText } from './labels.js';
 import { OUTCOME_CLASS, threadKey, byNewest } from './list.js';
 import { exportDoc } from './api.js';
+import { responseLatency } from './latency.js';
 
 const RAW_LIMIT = 200_000;
 const VIEW_STATES = 80;
@@ -402,7 +403,7 @@ export class DetailView {
       else {
         put(out, h('span', { class: `chip ${respClass(r)}` }, `${r.status ?? '–'} ${r.status_text ?? ''}`.trim()),
           h('span', { class: `chip ${r.end === 'active' ? 'info' : 'dim'}`, title: `end: ${r.end}` }, END_LABEL[r.end] ?? r.end ?? '–'),
-          r.headers_ms != null ? h('span', { class: 'dim', title: '自请求开始到响应头的时间' }, `首包 ${fmtDur(r.headers_ms)}`) : null,
+          r.headers_ms != null ? h('span', { class: 'dim', title: '自请求开始到响应头的时间' }, `响应头 ${fmtDur(r.headers_ms)}`) : null,
           r.ended_ms != null ? h('span', { class: 'dim', title: '自请求开始到结束的时间' }, `结束 ${fmtDur(r.ended_ms)}`) : null,
           r.events ? h('span', { class: 'dim' }, `${fmtInt(r.events.length)} 事件`) : h('span', { class: 'dim' }, '非 SSE'),
           r.error ? h('span', { class: 'chip bad', title: r.error }, oneLine(`错误：${r.error}`, 80)) : null);
@@ -476,10 +477,11 @@ export class DetailView {
     const box = h('div', { class: 'overview' });
     put(box, h('h4', null, '路由'), d.route ? fieldsTable(d.route, ROUTE_HINTS) : h('div', { class: 'dim' }, '没有路由信息（请求无法解析或路由失败）'));
     put(box, h('h4', null, '时间线'), this.timeline());
+    put(box, h('h4', null, '流式内容延迟'), this.latency());
     const keys = callKeys(d.upstream);
     if (d.upstream?.length) {
       put(box, h('h4', null, `上游调用（${d.upstream.length}）`), h('table', { class: 'calls' },
-        h('thead', null, h('tr', null, ['标签', '请求', '状态', '结束', '开始', '首包', '结束于', '请求大小', '响应大小', '错误'].map((x) => h('th', null, x)))),
+        h('thead', null, h('tr', null, ['标签', '请求', '状态', '结束', '开始', '响应头于', '结束于', '请求大小', '响应大小', '错误'].map((x) => h('th', null, x)))),
         h('tbody', null, d.upstream.map((c, i) => {
           const r = c.response;
           const tr = h('tr', { class: 'clickable', title: '打开该调用的上游响应', onclick: () => this.open(`upres:${keys[i]}`) },
@@ -525,13 +527,30 @@ export class DetailView {
       const bar = h('span', { class: `tl-bar ${r.cls}` });
       bar.style.left = pct(r.start);
       bar.style.width = pct(Math.max(end - r.start, total / 400));
-      const mark = r.head != null ? h('span', { class: 'tl-head', title: `首包 ${fmtDur(r.head)}` }) : null;
+      const mark = r.head != null ? h('span', { class: 'tl-head', title: `响应头 ${fmtDur(r.head)}` }) : null;
       if (mark) mark.style.left = pct(r.head);
       return h('div', { class: 'tl-row clickable', onclick: () => this.open(r.key) },
         h('span', { class: 'tl-label' }, r.label),
         h('span', { class: 'tl-track' }, bar, mark),
         h('span', { class: 'tl-num mono' }, `${fmtDur(r.start)} → ${r.head != null ? fmtDur(r.head) : '–'} → ${r.end != null ? fmtDur(r.end) : d.active ? '…' : '–'}`));
-    }), h('div', { class: 'dim tl-axis' }, `0 → ${fmtDur(total)}（开始 → 首包 → 结束，相对请求开始）`));
+    }), h('div', { class: 'dim tl-axis' }, `0 → ${fmtDur(total)}（开始 → 响应头 → 结束，相对请求开始）`));
+  }
+
+  latency() {
+    const d = this.detail;
+    const rows = (d.upstream ?? []).map(c => ({
+      label: `${callLabel(c.label)} → bridge`,
+      value: responseLatency(c.response, c.started_ms),
+    }));
+    rows.push({ label: 'bridge → codeks', value: responseLatency(d.client?.response, 0, true) });
+    return h('div', null,
+      h('div', { class: 'note' }, '上游从各自调用开始计时；写回 codeks 从客户端请求开始计时，包含前置 handoff。只计文字、reasoning 或工具内容，响应头和 keepalive 不计。这里是到达或写出时间，不是模型生成或 TUI 渲染时间。'),
+      h('table', { class: 'calls' },
+        h('thead', null, h('tr', null, ['方向', '首内容', '首文字', '首 reasoning', '首工具'].map(x => h('th', null, x)))),
+        h('tbody', null, rows.map(({ label, value }) => h('tr', null,
+          h('td', null, label),
+          ['content_ms', 'text_ms', 'reasoning_ms', 'tool_ms'].map(key => h('td', { class: 'mono' }, value?.[key] != null ? fmtDur(value[key]) : '—')))))),
+      h('div', { class: 'dim' }, '— 表示未观测到或无法测量；JSON 响应和缺少时间戳的导入不估算。上游 reasoning 可包含不透明载荷；写回 codeks 仅计可见摘要。工具以首次名称或参数为准，压缩密文不计入这些指标。'));
   }
 
   // ---------- annotations ----------
