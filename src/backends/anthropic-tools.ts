@@ -6,10 +6,14 @@ export interface AnthropicToolDefinition {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
+  strict?: boolean;
 }
 
 function definition(tool: ToolEntry): AnthropicToolDefinition {
-  return { name: tool.flatName, description: tool.description, input_schema: tool.parameters };
+  return {
+    name: tool.flatName, description: tool.description, input_schema: tool.parameters,
+    ...(tool.strict === undefined ? {} : { strict: tool.strict }),
+  };
 }
 
 /** Keep later definitions at their original conversation boundary. */

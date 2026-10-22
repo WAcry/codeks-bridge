@@ -46,12 +46,15 @@
 | `host` | 默认 `127.0.0.1` |
 | `port` | 默认 `8787`；程序集成测试可用 `0` 分配端口 |
 | `token_env` | 保存 bridge 入口 Bearer token 的环境变量名称 |
+| `request_max_mib` | `POST /v1/responses` 请求体上限，单位 MiB，默认 `64`；必须是正整数且换算后的字节数可安全表示 |
 | `compaction_cache_dir` | 按需复述缓存目录；默认 `$XDG_CACHE_HOME/codeks-bridge/compaction`，未设置 XDG 时为 `~/.cache/codeks-bridge/compaction` |
 | `upstreams` | 上游连接配置表 |
 | `models` | 模型别名表，是否进入客户端目录由各自的 `expose` 控制 |
 | `inspect` | 可选；`capture` 决定启动时是否捕获，`max_mib` 是内存软上限，见[调试检查器](inspect.md) |
 
-监听非 loopback 地址时必须配置 `token_env`，客户端也要设置同一个变量。它是 bridge 入口鉴权，不是上游 API key。HTTP 请求体最多 64 MiB，包含所有图片编码；入口没有 CORS。携带 `Origin` 的请求必须使用配置好的 bridge token，即使监听 loopback 也一样，避免网页的简单 POST 在无法读取响应时仍触发上游调用。没有 `Origin` 的 codeks 请求保持原行为。`GET /health`、`GET /v1/models` 和 `POST /v1/responses` 使用同一鉴权。`/inspect/` 页面与接口使用[自己的规则](inspect.md#访问与鉴权)。
+监听非 loopback 地址时必须配置 `token_env`，客户端也要设置同一个变量。它是 bridge 入口鉴权，不是上游 API key。入口没有 CORS。携带 `Origin` 的请求必须使用配置好的 bridge token，即使监听 loopback 也一样，避免网页的简单 POST 在无法读取响应时仍触发上游调用。没有 `Origin` 的 codeks 请求保持原行为。`GET /health`、`GET /v1/models` 和 `POST /v1/responses` 使用同一鉴权。`/inspect/` 页面与接口使用[自己的规则](inspect.md#访问与鉴权)。
+
+请求体上限按实际收到的字节计算，包含 JSON 和图片编码，不按字符数或声明的 `Content-Length` 判断。恰好达到上限的请求可接受，超限立即返回 HTTP 413 并关闭连接，不调用上游。长截图历史可以显式提高 `request_max_mib`，例如 `128`；保留默认值可限制完整缓冲与 JSON 解析的内存开销，这个上限不等于模型 token 窗口。
 
 ## 上游连接
 

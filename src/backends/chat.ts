@@ -155,7 +155,10 @@ export function buildChatRequest(context: BackendContext, dialect: ChatDialect):
   });
   body.stream_options = { ...body.stream_options, include_usage: true };
   if (tools.entries.length) body.tools = tools.entries.map((tool) => ({
-    type: "function", function: { name: tool.flatName, description: tool.description, parameters: tool.parameters },
+    type: "function", function: {
+      name: tool.flatName, description: tool.description, parameters: tool.parameters,
+      ...(tool.strict === undefined ? {} : { strict: tool.strict }),
+    },
   }));
   else delete body.tools;
   if (context.compacting) {

@@ -49,6 +49,10 @@ Messages 对不符合端点格式的 call ID 采用确定性映射，并添加�
 
 根 schema 的 `$ref`、`$defs`、`allOf`、`anyOf`、`oneOf` 及其他约束均保留；缺少根 `type` 时补为 `object`，已有类型不覆盖，由上游判断是否支持。codeks 可以发送没有根 `type` 的引用或组合 schema，不能因此把参数清空。未提供参数 schema 时使用空对象定义；显式提供非对象 schema 值则报错，不在 bridge 内解析引用或删减约束。
 
+普通函数显式给出的 `strict: true` 或 `strict: false` 原样保留：Messages 放在工具定义顶层，Chat 放在 `function` 内；省略时不添加默认值。Lite 同名更新替换完整定义，因此新定义省略 `strict` 时也不继承旧值；Claude inline 的早先版本保持不变。custom 工具的 JSON 外壳不因此自动启用 strict。
+
+[Claude strict tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/strict-tool-use) 与 [DeepSeek strict mode](https://api-docs.deepseek.com/guides/tool_calls/#strict-mode-beta) 各有支持的 schema 范围；DeepSeek 官方文档还要求 beta 端点及所有函数都设为 `strict: true`。bridge 只转换调用方明确提供的字段，不切换端点、不改其他工具或删减 schema 来满足 strict。需要该能力时由用户配置支持的端点，上游不接受则保留错误。
+
 codeks V2 多代理工具的 task/message 是明文，历史中的 `agent_message` 对 Messages/Chat 转成 user 消息，保留 author、recipient 和内容顺序。它不会成为模型 reasoning。不能解密的工具或 agent message 会明确报错。
 
 ## 结果与范围

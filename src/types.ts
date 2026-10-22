@@ -40,6 +40,7 @@ export interface BridgeConfig {
   host?: string;
   port?: number;
   token_env?: string;
+  request_max_mib?: number;
   compaction_cache_dir?: string;
   /** Debug capture for the /inspect/ page. */
   inspect?: { capture?: boolean; max_mib?: number };

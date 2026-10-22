@@ -92,4 +92,6 @@ input 为 `input_tokens + cache_read_input_tokens + cache_creation_input_tokens`
 
 HTTP 与流内错误经共享层分类，同时保留上游原始错误体；未完整结束的流返回错误。bridge 不改参数重试，容量与限流退避由 codeks 决定。[错误结构](responses-stream.md)
 
+`stop_reason: "refusal"` 保持不可重试的 `invalid_prompt`。若上游提供 `stop_details.category` 或 `explanation`，错误消息附上这些原文，便于直接在 codeks 看到拒绝原因；未提供时保留通用提示，不猜测分类。完整的终止 `message_delta` 放入 `error.upstream.body`，包含未知字段及上游 usage，便于诊断，不计入普通成功响应的 usage。工具后缀仍整体丢弃，不因保留详情而交付工具或自动重试。
+
 实现与测试：[`src/backends/anthropic.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/backends/anthropic.ts)、[`test/anthropic.test.ts`](https://github.com/WAcry/codeks-bridge/blob/main/test/anthropic.test.ts)。协议参考：[thinking](https://platform.claude.com/docs/en/build-with-claude/thinking)、[结构化输出](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)、[缓存](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)。

@@ -12,6 +12,8 @@ import { Inspector, type Exchange } from "../src/inspect/capture.ts";
 import { sseEvents } from "../src/inspect/view.ts";
 import type { BridgeConfig } from "../src/types.ts";
 
+const { responseLatency } = await import(new URL("../ui/latency.js", import.meta.url).href);
+
 type Handler = (body: any, req: IncomingMessage, res: ServerResponse) => unknown;
 
 async function listen(server: Server): Promise<string> {
@@ -137,6 +139,13 @@ test("capture keeps all four stages byte for byte and redacts only credential he
   assert.equal(detail.outcome, "completed");
   assert.equal(detail.preview, "Hi");
   assert.deepEqual(detail.upstream_calls, [{ label: "main", status: 200, end: "complete" }]);
+  const call = detail.upstream[0];
+  const upstreamLatency = responseLatency(call.response, call.started_ms);
+  const clientLatency = responseLatency(detail.client.response, 0, true);
+  assert.ok(upstreamLatency.reasoning_ms >= 0);
+  assert.ok(upstreamLatency.text_ms >= 0);
+  assert.equal(upstreamLatency.tool_ms, null);
+  assert.ok(clientLatency.text_ms >= call.started_ms + upstreamLatency.text_ms - 0.1);
 });
 
 test("native compaction and on-demand handoffs have accurate labels and replay annotations", async (t) => {
@@ -168,6 +177,7 @@ test("native compaction and on-demand handoffs have accurate labels and replay a
   const compaction = await latest(f.url);
   assert.equal(compaction.kind, "compaction");
   assert.deepEqual(compaction.upstream.map((call: any) => call.label), ["native"]);
+  assert.equal(responseLatency(compaction.upstream[0].response, compaction.upstream[0].started_ms).content_ms, null);
   const output = compaction.annotations.find((note: any) => note.target === "client.response");
   assert.equal(output.kind, "compaction");
   assert.equal(output.decoded.summary, undefined);
@@ -209,6 +219,8 @@ test("summary compaction is captured as one text call and reports its portable o
   assert.deepEqual(detail.upstream.map((call: any) => call.label), ["summary"]);
   assert.equal(detail.annotations[0].decoded.summary, "Portable summary");
   assert.equal(detail.annotations[0].decoded.native, undefined);
+  assert.ok(responseLatency(detail.upstream[0].response, detail.upstream[0].started_ms).text_ms >= 0);
+  assert.equal(responseLatency(detail.client.response, 0), null);
   await (await post(f.url, { model: "gpt", input: body.output })).text();
   const replay = await latest(f.url);
   assert.equal(replay.annotations[0].decision, "summary");

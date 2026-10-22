@@ -16,7 +16,6 @@ import { forwardResponseHeaders, incomingHeaders, type HeaderRecord } from "./he
 import type { AdapterId, Backend, BridgeConfig, ResponsesRequest } from "./types.ts";
 
 const BACKENDS: Record<AdapterId, Backend> = { "gpt-responses": runResponses, "claude-messages": runAnthropic, "deepseek-chat": runDeepSeek };
-const MAX_BODY_BYTES = 64 * 1024 * 1024;
 function json(res: ServerResponse, status: number, body: unknown, headers: HeaderRecord = {}): void {
   for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
   if (!res.hasHeader("cache-control")) res.setHeader("cache-control", "no-store");
@@ -27,12 +26,14 @@ function upstreamHttpFailure(res: ServerResponse, error: UpstreamHttpError): voi
   res.writeHead(error.status, forwardResponseHeaders(error.headers, false));
   res.end(error.body);
 }
-async function readRequest(req: IncomingMessage, exchange?: Exchange): Promise<ResponsesRequest> {
+async function readRequest(req: IncomingMessage, maxMiB: number, exchange?: Exchange): Promise<ResponsesRequest> {
+  const maxBytes = maxMiB * 1024 * 1024;
   let size = 0;
   const chunks: Buffer[] = [];
-  for await (const chunk of req) {
+  // Keep the socket alive long enough to deliver HTTP 413, then close it.
+  for await (const chunk of req.iterator({ destroyOnReturn: false })) {
     size += chunk.length;
-    if (size > MAX_BODY_BYTES) throw new BridgeError("Request exceeds 64 MiB", "invalid_prompt", 413);
+    if (size > maxBytes) throw new BridgeError(`Request exceeds ${maxMiB} MiB`, "invalid_prompt", 413, { connection: "close" });
     chunks.push(chunk);
   }
   const text = Buffer.concat(chunks).toString("utf8");
@@ -100,7 +101,7 @@ export function createBridgeServer(value: BridgeConfig): Server {
       }
       res.setHeader("x-models-etag", catalogEtag);
       const exchange = inspector.begin(req, res);
-      const request = await readRequest(req, exchange);
+      const request = await readRequest(req, config.request_max_mib ?? 64, exchange);
       const caller = resolveModel(config, request.model);
       const compacting = isCompactionRequest(request);
       // Restore history for the actual consumer before materializing any handoffs.
