@@ -101,7 +101,7 @@ export function createBridgeServer(value: BridgeConfig): Server {
       }
       res.setHeader("x-models-etag", catalogEtag);
       const exchange = inspector.begin(req, res);
-      const request = await readRequest(req, config.request_max_mib ?? 64, exchange);
+      const request = await readRequest(req, config.request_max_mib ?? 512, exchange);
       const caller = resolveModel(config, request.model);
       const compacting = isCompactionRequest(request);
       // Restore history for the actual consumer before materializing any handoffs.
