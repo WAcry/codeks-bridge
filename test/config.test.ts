@@ -361,10 +361,10 @@ test("client snippets use the HTTP catalog by default and permit a static catalo
 
 test("third-party defaults retain the Codex role and provide model-specific Ultra and budgets", () => {
   const template = getCatalogEntry("gpt-6.1-sol").model;
-  for (const [key, vendor, ultra, output] of [
-    ["claude-opus-5-5", "Claude", "xhigh", 128000],
-    ["claude-sonnet-5-5", "Claude", "max", 128000],
-    ["deepseek-flash", "DeepSeek", "max", undefined],
+  for (const [key, vendor, ultra, output, contextWindow] of [
+    ["claude-opus-5-5", "Claude", "xhigh", 128000, 400000],
+    ["claude-sonnet-5-5", "Claude", "max", 128000, 400000],
+    ["deepseek-flash", "DeepSeek", "max", undefined, 1000000],
   ] as const) {
     const c = validateConfig({ upstreams: { a: { base_url: "https://example.com/v1" } }, models: {
       selected: { catalog: key, upstream: "a", model: "deployment" },
@@ -374,7 +374,7 @@ test("third-party defaults retain the Codex role and provide model-specific Ultr
     expectedMessages.instructions_template = expectedMessages.instructions_template.replace("based on GPT-6", `based on ${vendor}`);
     assert.deepEqual(info.model_messages, expectedMessages);
     assert.equal(info.default_reasoning_summary, template.default_reasoning_summary);
-    assert.equal(info.context_window, 1000000);
+    assert.equal(info.context_window, contextWindow);
     assert.equal(info.max_context_window, 1000000);
     assert.equal(info.multi_agent_reasoning_effort, ultra);
     assert(info.supported_reasoning_levels.some((level: any) => level.effort === "ultra"));
