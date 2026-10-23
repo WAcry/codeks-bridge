@@ -6,7 +6,7 @@
 
 ## 安装和使用
 
-需要 Node.js ≥ 22.18 和已安装的 codeks。
+需要 Node.js ≥ 20.19 和已安装的 codeks。
 
 ```sh
 npm install -g @wacry/codeks-bridge
@@ -38,4 +38,4 @@ codeks-bridge config-snippet --config /absolute/path/bridge.json
 
 `serve` 加 `--capture` 后打开日志里的 `/inspect/` 地址，可以逐条查看 codeks 请求、发往上游的请求、上游原始响应和写回 codeks 的响应，以及 reasoning 与压缩状态的回放决定。记录只在内存中，也可以在页面上开关捕获、清空或导出。详见[调试检查器](docs/inspect.md)。
 
-[配置与模型目录](docs/config.md) · [整体设计](docs/design.md) · [Reasoning](docs/reasoning.md) · [压缩](docs/compaction.md) · [工具](docs/tools.md) · [调试检查器](docs/inspect.md) · [验证](docs/testing.md) · [发布](docs/releasing.md)
+[配置与模型目录](docs/config.md) · [嵌入现有服务](docs/embedding.md) · [整体设计](docs/design.md) · [Reasoning](docs/reasoning.md) · [压缩](docs/compaction.md) · [工具](docs/tools.md) · [调试检查器](docs/inspect.md) · [验证](docs/testing.md) · [发布](docs/releasing.md)

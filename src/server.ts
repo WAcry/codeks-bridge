@@ -13,7 +13,7 @@ import { CompactionHandoffStore } from "./compaction-handoff.ts";
 import { Inspector, type Exchange } from "./inspect/capture.ts";
 import { isInspectorPath, serveInspector } from "./inspect/http.ts";
 import { forwardResponseHeaders, incomingHeaders, type HeaderRecord } from "./headers.ts";
-import type { AdapterId, Backend, BridgeConfig, ResponsesRequest } from "./types.ts";
+import type { AdapterId, Backend, BridgeConfig, BridgeServerOptions, ResponsesRequest } from "./types.ts";
 
 const BACKENDS: Record<AdapterId, Backend> = { "gpt-responses": runResponses, "claude-messages": runAnthropic, "deepseek-chat": runDeepSeek };
 function json(res: ServerResponse, status: number, body: unknown, headers: HeaderRecord = {}): void {
@@ -59,7 +59,7 @@ function authenticated(req: IncomingMessage, token: string | undefined): boolean
 }
 
 /** Creates a server without opening a socket, so callers control its lifecycle. */
-export function createBridgeServer(value: BridgeConfig): Server {
+export function createBridgeServer(value: BridgeConfig, options: BridgeServerOptions = {}): Server {
   const config = validateConfig(value);
   const compactions = new CompactionHandoffStore(config, BACKENDS);
   const catalog = JSON.stringify(buildCatalog(config));
@@ -101,7 +101,9 @@ export function createBridgeServer(value: BridgeConfig): Server {
       }
       res.setHeader("x-models-etag", catalogEtag);
       const exchange = inspector.begin(req, res);
-      const request = await readRequest(req, config.request_max_mib ?? 512, exchange);
+      const original = await readRequest(req, config.request_max_mib ?? 512, exchange);
+      const requestHeaders = incomingHeaders(req.headers);
+      const request = await options.transformRequest?.(original, { headers: requestHeaders }) ?? original;
       const caller = resolveModel(config, request.model);
       const compacting = isCompactionRequest(request);
       // Restore history for the actual consumer before materializing any handoffs.
@@ -116,7 +118,10 @@ export function createBridgeServer(value: BridgeConfig): Server {
       exchange?.routed(route, responsesLite);
       const backend = BACKENDS[route.profile.id];
       const streaming = request.stream === true;
-      writer = new ResponseWriter(streaming ? res : { write() {} }, { model: request.model, showSummary: reasoningSummaryRequested(request) });
+      writer = new ResponseWriter(streaming ? res : { write() {} }, {
+        model: request.model, showSummary: reasoningSummaryRequested(request),
+        onEvent: options.onResponseEvent ? event => options.onResponseEvent!(request, event) : undefined,
+      });
       if (streaming) startStream = () => {
         if (res.headersSent || controller.signal.aborted) return;
         if (!res.hasHeader("cache-control")) res.setHeader("cache-control", "no-cache");
@@ -127,7 +132,7 @@ export function createBridgeServer(value: BridgeConfig): Server {
         keepalive = setInterval(() => writer?.keepalive(), 15_000).unref();
       };
       else writer.start();
-      const context = { request: executionRequest, route, signal: controller.signal, requestHeaders: incomingHeaders(req.headers), responsesLite, onAccepted: (headers?: Headers) => {
+      const context = { request: executionRequest, route, signal: controller.signal, requestHeaders, fetch: options.fetch, responsesLite, onAccepted: (headers?: Headers) => {
         for (const [name, value] of Object.entries(headers ? forwardResponseHeaders(headers) : {})) res.setHeader(name, value);
         startStream?.();
       } };

@@ -228,7 +228,7 @@ function validateUsage(value: any, required: string[]): void {
 
 export const runAnthropic: Backend = async (context, writer) => {
   const { body, tools, betas, continuationBefore } = buildAnthropicRequest(context);
-  const response = await upstreamFetch(context.route, "/messages", body, context.signal, context.requestHeaders, { "anthropic-beta": betas });
+  const response = await upstreamFetch(context.route, "/messages", body, context.signal, context.requestHeaders, { "anthropic-beta": betas }, context.fetch);
   context.onAccepted?.(response.headers);
   if (!response.body) throw new BridgeError("Messages returned an empty stream.", "upstream_error", 502);
   const blocks = new Map<number, { value: Block; json: string; continuationBefore?: string }>();

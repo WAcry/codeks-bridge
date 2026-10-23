@@ -76,6 +76,7 @@ export class CompactionHandoffStore {
       const result = await collectHandoff({
         request: { ...request, model: route.slug }, route, signal,
         requestHeaders: context.requestHeaders,
+        fetch: context.fetch,
         responsesLite: carrier.handoff!.responsesLite,
       }, this.backends[route.profile.id]);
       signal.throwIfAborted();

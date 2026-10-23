@@ -4,7 +4,7 @@ import { captureUpstream } from "./inspect/capture.ts";
 import type { ResolvedModel } from "./types.ts";
 
 /** base_url includes any API version prefix; path is appended, never resolved from /. */
-export async function upstreamFetch(route: ResolvedModel, path: string, body: unknown, signal: AbortSignal, requestHeaders?: Headers, protocolHeaders?: Record<string, string | string[]>): Promise<Response> {
+export async function upstreamFetch(route: ResolvedModel, path: string, body: unknown, signal: AbortSignal, requestHeaders?: Headers, protocolHeaders?: Record<string, string | string[]>, fetch: typeof globalThis.fetch = globalThis.fetch): Promise<Response> {
   const url = route.upstream.base_url.replace(/\/+$/, "") + "/" + path.replace(/^\/+/, "");
   const headers = await upstreamHeaders(route.upstream, route.profile.api, signal, requestHeaders);
   for (const [name, value] of Object.entries(protocolHeaders ?? {})) {
@@ -18,24 +18,28 @@ export async function upstreamFetch(route: ResolvedModel, path: string, body: un
   const call = captureUpstream(url, headers, payload);
   const idle = new AbortController();
   const combined = AbortSignal.any([signal, idle.signal]);
-  const timeoutMs = route.upstream.stream_idle_timeout_ms ?? 300_000;
-  let timer: NodeJS.Timeout;
-  const reset = () => {
+  const timeoutMs = route.upstream.stream_idle_timeout_ms === undefined ? 300_000 : route.upstream.stream_idle_timeout_ms;
+  let timer: NodeJS.Timeout | undefined;
+  const reset = (duration = timeoutMs) => {
     clearTimeout(timer);
-    timer = setTimeout(() => idle.abort(new BridgeError("Upstream stream timed out", "stream_error", 504)), timeoutMs).unref();
+    timer = undefined;
+    if (duration === null) return;
+    timer = setTimeout(() => idle.abort(new BridgeError("Upstream stream timed out", "stream_error", 504)), duration).unref();
   };
-  reset();
+  const headersTimeout = route.upstream.headers_timeout_ms === undefined ? timeoutMs : route.upstream.headers_timeout_ms;
+  if (headersTimeout !== null) reset(headersTimeout);
   let response: Response;
   try {
     response = await fetch(url, { method: "POST", headers, body: payload, signal: combined, redirect: "error" });
   } catch (error) {
-    clearTimeout(timer!);
+    clearTimeout(timer);
     call?.failed(combined.aborted ? combined.reason : error);
     if (combined.aborted) throw combined.reason;
     throw transportError(error);
   }
-  // Downstream keepalives do not count as upstream progress. Time out both the
-  // wait for headers and an idle response body, including a stalled error body.
+  // Downstream keepalives do not count as upstream progress. The body timer
+  // starts after headers, including when the header wait has no deadline.
+  reset();
   call?.received(response);
   if (response.body) {
     const reader = response.body.getReader();
@@ -58,7 +62,7 @@ export async function upstreamFetch(route: ResolvedModel, path: string, body: un
         await reader.cancel(reason);
       },
     }), { status: response.status, statusText: response.statusText, headers: response.headers });
-  } else { clearTimeout(timer!); call?.done("complete"); }
+  } else { clearTimeout(timer); call?.done("complete"); }
   if (!response.ok) {
     const text = await response.text();
     if (combined.aborted) throw combined.reason;

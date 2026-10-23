@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveModel } from "../src/config.ts";
+import { setTimeout as delay } from "node:timers/promises";
+import { resolveModel, validateConfig } from "../src/config.ts";
 import { BridgeError, responsesStreamError, transportError, upstreamError, UpstreamHttpError } from "../src/errors.ts";
 import { upstreamFetch } from "../src/upstream.ts";
 
@@ -120,4 +121,43 @@ test("an unsupported context parameter remains a request error, not a full conte
   const error = upstreamError(400, { error: { type: "invalid_request_error", message: "Unrecognized request argument: context_window" } });
   assert.equal(error.code, "invalid_prompt");
   assert.equal(error.status, 400);
+});
+
+test("header and body deadlines can be disabled independently for an embedded transport", async () => {
+  const transport: typeof fetch = async (_url, init) => {
+    const signal = init!.signal!;
+    await delay(30, undefined, { signal });
+    return new Response(new ReadableStream({
+      start(controller) {
+        void delay(30, undefined, { signal }).then(() => {
+          controller.enqueue(new TextEncoder().encode("Complete"));
+          controller.close();
+        }, error => controller.error(error));
+      },
+    }));
+  };
+  const selected = route();
+  selected.upstream.stream_idle_timeout_ms = 10;
+  selected.upstream.headers_timeout_ms = null;
+  const response = await upstreamFetch(selected, "responses", {}, new AbortController().signal, undefined, undefined, transport);
+  await assert.rejects(response.text(), /Upstream stream timed out/);
+
+  selected.upstream.stream_idle_timeout_ms = null;
+  const unlimited = await upstreamFetch(selected, "responses", {}, new AbortController().signal, undefined, undefined, transport);
+  assert.equal(await unlimited.text(), "Complete");
+
+  selected.upstream.headers_timeout_ms = 10;
+  await assert.rejects(upstreamFetch(selected, "responses", {}, new AbortController().signal, undefined, undefined, transport), /Upstream stream timed out/);
+});
+
+test("connection timeout settings accept null and reject invalid durations", () => {
+  for (const field of ["headers_timeout_ms", "stream_idle_timeout_ms"]) {
+    const configuration = { upstreams: { remote: { base_url: "https://example.com", [field]: null } }, models: {
+      test: { upstream: "remote", model: "synthetic", catalog: "gpt-6.1-sol" },
+    } };
+    assert.doesNotThrow(() => validateConfig(configuration));
+    for (const value of [0, -1, false, "30", 1.5]) {
+      assert.throws(() => validateConfig({ ...configuration, upstreams: { remote: { ...configuration.upstreams.remote, [field]: value } } }), /timeout_ms/);
+    }
+  }
 });

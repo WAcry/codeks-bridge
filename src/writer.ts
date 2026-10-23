@@ -94,12 +94,14 @@ export class ResponseWriter {
   private nativeEnd: Record<string, any> | undefined;
   private started = false;
   private finished = false;
+  private onEvent?: (event: Record<string, any>) => void;
 
-  constructor(sink: Sink, opts: { model: string; showSummary?: boolean; responseId?: string }) {
+  constructor(sink: Sink, opts: { model: string; showSummary?: boolean; responseId?: string; onEvent?: (event: Record<string, any>) => void }) {
     this.sink = sink;
     this.model = opts.model;
     this.showSummary = opts.showSummary ?? true;
     this.id = opts.responseId ?? newId("resp");
+    this.onEvent = opts.onEvent;
   }
 
   get responseId(): string { return this.id; }
@@ -119,7 +121,14 @@ export class ResponseWriter {
   }
 
   private write(event: Record<string, any>, native = false): void {
-    this.sink.write(formatSse(native ? event : { sequence_number: this.seq++, ...event }));
+    const emitted = native ? event : { sequence_number: this.seq++, ...event };
+    this.sink.write(formatSse(emitted));
+    try { this.onEvent?.(emitted); }
+    catch (error) {
+      // The request's failure event must not re-enter a failed observer.
+      this.onEvent = undefined;
+      throw error;
+    }
   }
 
   private send(event: Record<string, any>, native = false): void {
