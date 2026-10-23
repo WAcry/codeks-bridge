@@ -124,6 +124,107 @@ test("an observer failure ends its request without re-entering the failed callba
   assert.equal(observations, 1);
 });
 
+test("an observer failure on acceptance cancels the unconsumed upstream body", { timeout: 5000 }, async t => {
+  let signal: AbortSignal | undefined;
+  let upstreamAborted!: () => void;
+  const aborted = new Promise<void>(resolve => { upstreamAborted = resolve; });
+  let observations = 0;
+  const configuration = config();
+  configuration.upstreams.synthetic.headers_timeout_ms = null;
+  configuration.upstreams.synthetic.stream_idle_timeout_ms = null;
+  const post = await start(t, {
+    async fetch(_url, init) {
+      signal = init!.signal!;
+      return new Response(new ReadableStream({ start(controller) {
+        signal!.addEventListener("abort", () => {
+          controller.error(signal!.reason);
+          upstreamAborted();
+        }, { once: true });
+      } }), { headers: { "content-type": "text/event-stream" } });
+    },
+    onResponseEvent(_request, event) {
+      observations++;
+      assert.equal(event.type, "response.created");
+      throw new Error("Synthetic acceptance observer failure");
+    },
+  }, configuration);
+  const response = await post({ model: "claude", input: "Hello", stream: true });
+  const events = eventList(await response.text());
+  assert.equal(events.at(-1).type, "response.failed");
+  assert.match(events.at(-1).response.error.message, /Synthetic acceptance observer failure/);
+  await aborted;
+  assert.equal(signal?.aborted, true);
+  assert.equal(observations, 1);
+});
+
+test("HTTP heartbeats bypass the observer while the upstream remains active", { timeout: 5000 }, async t => {
+  const originalInterval = globalThis.setInterval;
+  t.mock.method(globalThis, "setInterval", (callback: any, delay: any, ...args: any[]) => originalInterval(callback, delay === 15_000 ? 5 : delay, ...args));
+  let finish!: () => void;
+  const events: any[] = [];
+  const post = await start(t, {
+    async fetch() {
+      return new Response(new ReadableStream({ start(controller) {
+        finish = () => {
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: "response.completed", response: completed([]) })}\n\n`));
+          controller.close();
+        };
+      } }), { headers: { "content-type": "text/event-stream" } });
+    },
+    onResponseEvent(_request, event) {
+      assert.notEqual(event.type, "keepalive", "Transport heartbeats must not enter the observer");
+      events.push(event);
+    },
+  });
+  const response = await post({ model: "gpt", input: "Hello", stream: true });
+  const reader = response.body!.getReader();
+  let text = "";
+  while (!text.includes('"type":"keepalive"')) {
+    const chunk = await reader.read();
+    assert.equal(chunk.done, false);
+    text += new TextDecoder().decode(chunk.value);
+  }
+  finish();
+  for (;;) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    text += new TextDecoder().decode(chunk.value);
+  }
+  const frames = eventList(text);
+  assert(frames.some(event => event.type === "keepalive"));
+  assert.deepEqual(events, frames.filter(event => event.type !== "keepalive"));
+  assert.equal(events.at(-1).type, "response.completed");
+});
+
+for (const terminal of ["failed", "incomplete"] as const) {
+  test(`an observer throwing on HTTP response.${terminal} closes only that request`, { timeout: 5000 }, async t => {
+    let requests = 0;
+    let observations = 0;
+    const post = await start(t, {
+      async fetch() {
+        if (++requests > 1) return nativeResponse([message("Still available")]);
+        return sse([{ type: `response.${terminal}`, response: {
+          id: "resp_synthetic", status: terminal, output: [],
+          ...(terminal === "failed" ? { error: { code: "server_is_overloaded", message: "Busy" } }
+            : { incomplete_details: { reason: "interrupted" } }),
+        } }]);
+      },
+      onResponseEvent(_request, event) {
+        if (event.type === `response.${terminal}`) {
+          observations++;
+          throw new Error("Synthetic terminal observer failure");
+        }
+      },
+    });
+    await assert.rejects(async () => (await post({ model: "gpt", input: "Hello", stream: true })).text(), /fetch failed|terminated|socket/i);
+    assert.equal(observations, 1);
+    const response = await post({ model: "gpt", input: "Try again" });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json() as any).output[0].content[0].text, "Still available");
+    assert.equal(requests, 2, "The bridge must not retry the failed request");
+  });
+}
+
 test("translated adapters use the injected fetch and expose only Responses events", async t => {
   for (const model of ["claude", "flash"]) {
     const events: any[] = [];

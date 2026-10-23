@@ -182,8 +182,8 @@ export class ResponseWriter {
   /** An event that codeks ignores but that resets its stream idle timer. */
   keepalive(): void {
     if (!this.started || this.finished) return;
-    // Heartbeats bypass an ordered suffix while the upstream is still working.
-    this.write({ type: "keepalive" }, this.native);
+    // Transport heartbeats bypass both the ordered suffix and the observer.
+    this.sink.write(formatSse({ ...(!this.native ? { sequence_number: this.seq++ } : {}), type: "keepalive" }));
   }
 
   /** Native Responses events retain their own ids, envelopes and metadata. */

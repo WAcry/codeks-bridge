@@ -182,7 +182,13 @@ export function createBridgeServer(value: BridgeConfig, options: BridgeServerOpt
       else json(res, error.status, { error: payload }, error.headers);
     } finally {
       if (keepalive) clearInterval(keepalive);
+      // A hook can fail after acceptance but before the backend reads the body.
+      controller.abort();
       res.off("close", abort);
     }
+  }).catch(() => {
+    // Failure delivery can itself throw, including from a terminal observer.
+    // Close only this response; never leave the async request unhandled.
+    res.destroy();
   }));
 }
