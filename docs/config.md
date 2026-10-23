@@ -64,7 +64,8 @@
 | `api_key_env` | API key 环境变量名称 |
 | `api_key_command` | 与 `api_key_env` 二选一；argv 数组，程序 stdout 返回当前凭据 |
 | `auth_header` | 覆盖鉴权 header 名；默认 GPT/DeepSeek 用 `authorization: Bearer …`，Claude 用 `x-api-key` |
-| `stream_idle_timeout_ms` | 等待上游 headers 或后续字节的最长空闲时间，默认 300000 ms |
+| `headers_timeout_ms` | 等待上游响应头的最长时间；省略时沿用 `stream_idle_timeout_ms`，`null` 表示禁用 |
+| `stream_idle_timeout_ms` | 收到上游响应头后，等待下一批字节的最长空闲时间，默认 300000 ms；`null` 表示禁用 |
 | `headers` | 静态 header，覆盖同名客户端 header，例如 API 版本 |
 | `options` | 原生请求参数，覆盖 adapter 推导出的参数 |
 | `adapters` | 按 adapter ID 分组的桥接行为；供使用该连接的模型继承 |

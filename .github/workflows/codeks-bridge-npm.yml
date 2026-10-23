@@ -55,7 +55,15 @@ jobs:
       - name: Smoke-test the package
         env:
           TARBALL: ${{ steps.pack.outputs.tarball }}
-        run: node scripts/package-smoke.ts "$TARBALL"
+        run: node scripts/package-smoke.mjs "$TARBALL"
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 20.19.0
+          package-manager-cache: false
+      - name: Smoke-test the minimum supported runtime
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: node scripts/package-smoke.mjs "$TARBALL"
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: npm-package

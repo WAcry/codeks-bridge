@@ -44,7 +44,8 @@ export function validateConfig(value: unknown): BridgeConfig {
     if (up.api_key_env !== undefined && (typeof up.api_key_env !== "string" || !up.api_key_env)) fail(`upstream ${name}: invalid api_key_env`);
     if (up.api_key_env && up.api_key_command) fail(`upstream ${name}: choose api_key_env or api_key_command`);
     if (up.api_key_command !== undefined && (!Array.isArray(up.api_key_command) || !up.api_key_command.length || up.api_key_command.some((arg: unknown) => typeof arg !== "string"))) fail(`upstream ${name}: api_key_command must be a nonempty argv array`);
-    if (up.stream_idle_timeout_ms !== undefined && (!Number.isSafeInteger(up.stream_idle_timeout_ms) || up.stream_idle_timeout_ms <= 0)) fail(`upstream ${name}: invalid stream_idle_timeout_ms`);
+    if (up.stream_idle_timeout_ms !== undefined && up.stream_idle_timeout_ms !== null && (!Number.isSafeInteger(up.stream_idle_timeout_ms) || up.stream_idle_timeout_ms <= 0)) fail(`upstream ${name}: invalid stream_idle_timeout_ms`);
+    if (up.headers_timeout_ms !== undefined && up.headers_timeout_ms !== null && (!Number.isSafeInteger(up.headers_timeout_ms) || up.headers_timeout_ms <= 0)) fail(`upstream ${name}: invalid headers_timeout_ms`);
     if (up.auth_header !== undefined && (typeof up.auth_header !== "string" || !/^[\w-]+$/.test(up.auth_header))) fail(`upstream ${name}: invalid auth_header`);
     if (up.headers !== undefined && (!object(up.headers) || Object.values(up.headers).some(v => typeof v !== "string" || /[\r\n]/.test(v)))) fail(`upstream ${name}: invalid headers`);
     if (up.options !== undefined && !object(up.options)) fail(`upstream ${name}: options must be an object`);

@@ -1,6 +1,6 @@
 {
   "name": "@wacry/codeks-bridge",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Configurable local Responses API bridge for codeks with GPT, Claude Messages, and DeepSeek Chat adapters.",
   "license": "Apache-2.0",
   "author": "David Zhang",
@@ -31,7 +31,7 @@
     "NOTICE"
   ],
   "engines": {
-    "node": ">=22.18"
+    "node": ">=20.19"
   },
   "scripts": {
     "prepack": "npm run build",

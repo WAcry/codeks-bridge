@@ -4,7 +4,7 @@
 
 ## 日常验证
 
-GitHub Actions 工作流 `codeks-bridge-npm.yml` 只手动触发，不在每次提交时运行。默认 `publish=false`：安装开发依赖、类型检查、测试、构建、公开信息检查，再生成并安装测试 npm tarball。工作流保存实际测试过的 tarball，发布步骤直接使用同一份文件。
+GitHub Actions 工作流 `codeks-bridge-npm.yml` 只手动触发，不在每次提交时运行。默认 `publish=false`：安装开发依赖、类型检查、测试、构建、公开信息检查，再生成 npm tarball，并在 Node.js 24 和最低运行时 20.19 上安装验证公开 API、类型、CLI、嵌入请求与 UI 资源。工作流保存实际测试过的 tarball，发布步骤直接使用同一份文件。
 
 ```sh
 gh workflow run codeks-bridge-npm.yml --ref main

@@ -92,7 +92,7 @@ function completedUsage(response: Record<string, any>): Usage {
 export const runResponses: Backend = async (context, writer) => {
   writer.useNativeResponses();
   const response = await upstreamFetch(context.route, "/responses", responsesBody(context), context.signal, context.requestHeaders,
-    context.responsesLite ? { "x-openai-internal-codex-responses-lite": "true" } : undefined);
+    context.responsesLite ? { "x-openai-internal-codex-responses-lite": "true" } : undefined, context.fetch);
   context.onAccepted?.(response.headers);
   const states = new Map<number, { item: Record<string, any>; added: boolean; done: boolean }>();
   const phases = new Map<number, string>();

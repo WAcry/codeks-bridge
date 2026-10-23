@@ -17,7 +17,9 @@ export interface UpstreamConfig {
   /** An argv array. The command writes a short-lived credential to stdout. */
   api_key_command?: string[];
   auth_header?: string;
-  stream_idle_timeout_ms?: number;
+  /** Defaults to stream_idle_timeout_ms; null disables the wait-for-headers timer. */
+  headers_timeout_ms?: number | null;
+  stream_idle_timeout_ms?: number | null;
   headers?: Record<string, string>;
   options?: Record<string, unknown>;
   adapters?: AdapterConfig;
@@ -86,12 +88,22 @@ export interface ResponsesRequest {
   stream?: boolean;
   [key: string]: any;
 }
+export interface BridgeServerOptions {
+  /** Used by every upstream call, including compaction and handoffs. */
+  fetch?: typeof globalThis.fetch;
+  /** Runs once before routing. Return a replacement or change the request in place. */
+  transformRequest?: (request: ResponsesRequest, context: { headers: Headers }) =>
+    ResponsesRequest | void | Promise<ResponsesRequest | void>;
+  /** Observes committed client response events, including non-streaming responses. */
+  onResponseEvent?: (request: ResponsesRequest, event: Record<string, any>) => void;
+}
 export interface BackendContext {
   request: ResponsesRequest;
   route: ResolvedModel;
   signal: AbortSignal;
   /** Client metadata; transport framing and credentials are replaced upstream. */
   requestHeaders?: Headers;
+  fetch?: typeof globalThis.fetch;
   compacting?: boolean;
   /** Transport mode received from the client, including tool-free Lite requests. */
   responsesLite?: boolean;

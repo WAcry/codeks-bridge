@@ -8,7 +8,7 @@ import { pathToFileURL } from "node:url";
 import { once } from "node:events";
 
 const [argument, ...extra] = process.argv.slice(2);
-assert(argument && extra.length === 0, "Usage: node scripts/package-smoke.ts /path/to/package.tgz");
+assert(argument && extra.length === 0, "Usage: node scripts/package-smoke.mjs /path/to/package.tgz");
 const tarball = resolve(argument);
 assert((await stat(tarball)).isFile(), "Package tarball must be a file");
 const directory = await mkdtemp(join(tmpdir(), "codeks-bridge-package-"));
@@ -56,9 +56,16 @@ const config = {
 const configPath = join(directory, "bridge.json");
 await writeFile(configPath, JSON.stringify(config), { mode: 0o600 });
 const consumerPath = join(directory, "consumer.mts");
-await writeFile(consumerPath, `import { createBridgeServer, type BridgeConfig } from "@wacry/codeks-bridge";
+await writeFile(consumerPath, `import { createBridgeServer, type BridgeConfig, type BridgeServerOptions, type ResponsesRequest } from "@wacry/codeks-bridge";
 const config: BridgeConfig = ${JSON.stringify(config)};
-const server = createBridgeServer(config);
+const options: BridgeServerOptions = {
+  fetch: globalThis.fetch,
+  async transformRequest(request: ResponsesRequest, { headers }) {
+    return { ...request, model: headers.get("x-example-model") ?? request.model };
+  },
+  onResponseEvent(request, event) { console.log(request.model, event.type); },
+};
+const server = createBridgeServer(config, options);
 server.close();
 `);
 const development = createRequire(import.meta.url);
@@ -68,39 +75,78 @@ execFileSync(process.execPath, [
   "--typeRoots", dirname(dirname(development.resolve("@types/node/package.json"))), consumerPath,
 ], { cwd: directory, stdio: "inherit", timeout: 30_000 });
 const cli = join(root, metadata.bin["codeks-bridge"]);
-const command = (...args: string[]) => execFileSync(process.execPath, [cli, ...args], {
+const command = (...args) => execFileSync(process.execPath, [cli, ...args], {
   cwd: directory, encoding: "utf8", timeout: 30_000,
 });
 assert.match(command("--help"), /Usage: codeks-bridge/);
 const catalog = JSON.parse(command("catalog", "--config", configPath));
-assert.deepEqual(catalog.models.map((model: any) => model.slug), ["gpt", "claude", "flash"]);
+assert.deepEqual(catalog.models.map((model) => model.slug), ["gpt", "claude", "flash"]);
 for (const model of catalog.models) {
   assert(model.model_messages.instructions_template.length > 100, `Missing instructions for ${model.slug}`);
 }
 assert.match(command("config-snippet", "--config", configPath), /remote_compaction = "v2"/);
 
-const server = bridge.createBridgeServer(await bridge.loadConfig(configPath));
+const events = [];
+let upstreamRequests = 0;
+const server = bridge.createBridgeServer(await bridge.loadConfig(configPath), {
+  async transformRequest(request, { headers }) {
+    return { ...request, model: headers.get("x-example-model") ?? request.model };
+  },
+  async fetch(_url, init) {
+    upstreamRequests++;
+    const body = JSON.parse(init.body);
+    assert.equal(body.model, "synthetic-gpt");
+    assert.equal(body.input[0].content[0].text, "Hello");
+    return Response.json({
+      id: "resp_synthetic", status: "completed",
+      output: [{ type: "function_call", id: "fc_synthetic", call_id: "call_synthetic", name: "read", arguments: "{}" }],
+      usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+    });
+  },
+  onResponseEvent(request, event) {
+    assert.equal(request.model, "gpt");
+    events.push(event);
+  },
+});
 try {
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const address = server.address();
   assert(address && typeof address === "object");
   const base = `http://127.0.0.1:${address.port}`;
-  const get = async (path: string) => {
+  const get = async (path) => {
     const response = await fetch(new URL(path, base), { signal: AbortSignal.timeout(10_000) });
     assert.equal(response.status, 200, `GET ${path}`);
     return response;
   };
   assert.deepEqual(await (await get("/health")).json(), { status: "ok" });
   assert.deepEqual(await (await get("/v1/models")).json(), catalog);
-  const state: any = await (await get("/inspect/api/state")).json();
+  const state = await (await get("/inspect/api/state")).json();
   assert.equal(state.capturing, false);
+
+  for (const stream of [false, true]) {
+    events.length = 0;
+    const response = await fetch(new URL("/v1/responses", base), {
+      method: "POST", headers: { "content-type": "application/json", "x-example-model": "gpt" },
+      body: JSON.stringify({ model: "replaced-by-host", input: "Hello", stream }),
+    });
+    assert.equal(response.status, 200);
+    if (stream) {
+      const frames = (await response.text()).split("\n\n").filter(Boolean).map(frame => JSON.parse(frame.slice(6)));
+      assert.deepEqual(frames, events);
+    } else {
+      assert.deepEqual(await response.json(), events.at(-1).response);
+    }
+    assert.equal(events.at(-1).type, "response.completed");
+    assert.equal(events.filter(event => event.type === "response.output_item.done").length, 1);
+  }
+  assert.equal(upstreamRequests, 2);
 
   // Follow the installed page's local module graph to catch omitted UI assets.
   const pending = [new URL("/inspect/", base)];
-  const visited = new Set<string>();
+  const visited = new Set();
   while (pending.length) {
-    const url = pending.pop()!;
+    const url = pending.pop();
     if (visited.has(url.href)) continue;
     visited.add(url.href);
     assert.equal(url.origin, base);
@@ -118,8 +164,8 @@ try {
     for (const reference of references) pending.push(new URL(reference, url));
   }
   assert(visited.size >= 4, "Inspector page must load its script, stylesheet, and icon");
-  console.log(`Verified ${metadata.name}@${metadata.version}: exports, consumer types, CLI, catalog, HTTP server, and ${visited.size} inspector assets`);
+  console.log(`Verified ${metadata.name}@${metadata.version} on ${process.version}: exports, consumer types, CLI, catalog, embedded SSE/JSON, and ${visited.size} inspector assets`);
 } finally {
   server.closeAllConnections();
-  await new Promise<void>((resolve, reject) => server.close((error: Error | undefined) => error ? reject(error) : resolve()));
+  await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
 }
