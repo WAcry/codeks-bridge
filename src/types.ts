@@ -2,6 +2,7 @@ import type { ResponseWriter, Usage } from "./writer.ts";
 
 export type Api = "responses" | "anthropic" | "chat";
 export type AdapterId = "gpt-responses" | "claude-messages" | "deepseek-chat";
+export type UnrecognizedStatePolicy = "passthrough" | "drop" | "error";
 export interface ClaudeMessagesOptions {
   tool_updates: "inline" | "top_level";
   thinking_mismatch: "drop_block" | "error" | "upstream_default";
@@ -31,7 +32,7 @@ export interface ModelConfig {
   max_output_tokens?: number;
   input_modalities?: ("text" | "image")[];
   reasoning?: { default_effort?: string; effort_map?: Record<string, string> };
-  replay?: { reasoning_from?: string[]; native_compaction_from?: string[] };
+  replay?: { reasoning_from?: string[]; native_compaction_from?: string[]; unrecognized?: UnrecognizedStatePolicy };
   compaction?: { mode?: "summary" | "native"; model?: string; native_replay?: boolean };
   options?: Record<string, unknown>;
   adapters?: AdapterConfig;
@@ -72,7 +73,7 @@ export interface ResolvedModel {
   upstream: UpstreamConfig;
   profile: ModelProfile;
   origin: StateOrigin;
-  replay: { reasoning: ReadonlySet<string>; native_compaction: ReadonlySet<string> };
+  replay: { reasoning: ReadonlySet<string>; native_compaction: ReadonlySet<string>; unrecognized: UnrecognizedStatePolicy };
   compaction: { mode: "summary" | "native"; native_replay: boolean };
 }
 export interface ResponsesRequest {

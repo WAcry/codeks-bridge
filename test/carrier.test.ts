@@ -26,7 +26,7 @@ test("versioned envelopes preserve source facts and raw structured payloads thro
   assert.deepEqual(decodeCompaction(stored), checkpoint);
 });
 
-test("damaged reasoning envelopes fail; unrelated payloads are not decoded", () => {
+test("unrecognized or damaged reasoning envelopes are not decoded", () => {
   for (const value of [undefined, "native-ciphertext"]) assert.equal(decodeReasoning(value), undefined);
   for (const value of [
     "cxbr1:invalid-json",
@@ -34,7 +34,7 @@ test("damaged reasoning envelopes fail; unrelated payloads are not decoded", () 
     encoded("cxbr1:", { source: { ...source, model: "" }, format: "reasoning.text.v1", data: "text" }),
     encoded("cxbr1:", { source, data: "text" }),
     encoded("cxbr1:", { source, format: "reasoning.text.v1" }),
-  ]) assert.throws(() => decodeReasoning(value), /Malformed bridge reasoning/);
+  ]) assert.equal(decodeReasoning(value), undefined);
 });
 
 test("compaction requires a summary or a complete deferred handoff", () => {

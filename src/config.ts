@@ -71,6 +71,9 @@ export function validateConfig(value: unknown): BridgeConfig {
     if (!Object.hasOwn(profile.effort_map, profile.default_effort)) fail(`model ${slug}: default_effort must appear in effort_map`);
     if (model.replay !== undefined) {
       if (!object(model.replay)) fail(`model ${slug}: replay must be an object`);
+      if (model.replay.unrecognized !== undefined && !["passthrough", "drop", "error"].includes(model.replay.unrecognized)) {
+        fail(`model ${slug}: replay.unrecognized must be passthrough, drop, or error`);
+      }
       for (const field of ["reasoning_from", "native_compaction_from"]) {
         if (model.replay[field] !== undefined && !strings(model.replay[field])) fail(`model ${slug}: ${field} must list source model aliases`);
       }
@@ -113,7 +116,10 @@ export function resolveModel(config: BridgeConfig, slug: string): ResolvedModel 
   const allowed = (names: string[] = []) => new Set([source.id, ...names.map(name => origin(config, config.models[name]).id)]);
   return {
     slug, config: model, upstream: config.upstreams[model.upstream], profile, origin: source,
-    replay: { reasoning: allowed(model.replay?.reasoning_from), native_compaction: allowed(model.replay?.native_compaction_from) },
+    replay: {
+      reasoning: allowed(model.replay?.reasoning_from), native_compaction: allowed(model.replay?.native_compaction_from),
+      unrecognized: model.replay?.unrecognized ?? "passthrough",
+    },
     compaction: {
       mode: model.compaction?.mode ?? (profile.native_compaction_format ? "native" : "summary"),
       native_replay: model.compaction?.native_replay ?? !!profile.native_compaction_format,

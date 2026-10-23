@@ -23,6 +23,7 @@ function reasoning(route: ResolvedModel, data = `cipher-${route.slug}`) {
   };
 }
 const native = { type: "compaction", id: "cmp_synthetic", encrypted_content: "native-cipher" };
+const restoredNative = { type: "compaction", encrypted_content: "native-cipher" };
 function checkpoint(route: ResolvedModel) {
   return { type: "compaction", encrypted_content: encodeCompaction({
     summary: "Keep the violet flag.",
@@ -40,7 +41,7 @@ test("replay permissions are directional, nontransitive, and independent for rea
   const input = [reasoning(a), checkpoint(a)];
   assert.equal(prepareHistory(input, b)[0].type, "bridge_reasoning");
   assert.equal(prepareHistory(input, b)[1].type, "message");
-  assert.deepEqual(prepareHistory(input, c), [native]);
+  assert.deepEqual(prepareHistory(input, c), [restoredNative]);
   assert.equal(prepareHistory([reasoning(b)], a).length, 0);
   assert.equal(prepareHistory([reasoning(b)], c).length, 1);
 });
@@ -61,7 +62,7 @@ test("changing policy selects existing saved history without rewriting it", () =
   assert.equal(selected[0].type, "bridge_reasoning");
   assert.equal(selected[0].state.data, "cipher-a");
   assert.deepEqual(selected[0].summary, savedReasoning.summary);
-  assert.deepEqual(selected[2], native);
+  assert.deepEqual(selected[2], restoredNative);
   selected[0].state.source.model = "modified copy";
   selected[2].encrypted_content = "modified copy";
   assert.deepEqual(input, original);
@@ -94,16 +95,13 @@ test("native replay can be disabled independently from compaction generation", (
   assert(!JSON.stringify(selected).includes("native-cipher"));
 });
 
-test("portable summaries and string input normalize to user messages; unknown reasoning is filtered", () => {
+test("portable summaries and string input normalize to user messages", () => {
   const item = { type: "compaction", encrypted_content: encodeCompaction({ summary: "A portable checkpoint." }) };
   assert.match(prepareHistory([item], defaults.a)[0].content[0].text, /A portable checkpoint/);
   assert.deepEqual(prepareHistory("Hello", defaults.a), [{ type: "message", role: "user", content: [{ type: "input_text", text: "Hello" }] }]);
-  assert.deepEqual(prepareHistory([{ type: "reasoning", encrypted_content: "unattributed-cipher" }], defaults.a), []);
-  assert.throws(() => prepareHistory([{ type: "reasoning", encrypted_content: "cxbr1:broken" }], defaults.a), /Malformed bridge reasoning/);
 });
 
-test("unattributed compaction and stored references fail instead of losing history", () => {
-  assert.throws(() => prepareHistory([{ type: "compaction", encrypted_content: "unknown" }], defaults.a), /portable summary/);
+test("stored references and internal reasoning inputs remain unsupported", () => {
   assert.throws(() => prepareHistory([{ type: "item_reference", id: "msg_stored" }], defaults.a), /complete conversation/);
   assert.throws(() => prepareHistory([{ type: "bridge_reasoning", state: { data: "unselected" } }], defaults.a), /Internal reasoning/);
 });
@@ -113,7 +111,7 @@ test("deferred checkpoints replay natively but require materialization before te
     native: { source: defaults.a.origin, format: defaults.a.profile.native_compaction_format!, data: native },
     handoff: { prefix: [], parameters: { model: "a" }, responsesLite: true },
   }) };
-  assert.deepEqual(prepareHistory([deferred], defaults.a), [native]);
+  assert.deepEqual(prepareHistory([deferred], defaults.a), [restoredNative]);
   assert.throws(() => prepareHistory([deferred], defaults.claude), /not been materialized/);
 });
 

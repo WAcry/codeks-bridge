@@ -7,7 +7,7 @@ import { collectHandoff, handoffRequest } from "./compaction.ts";
 import { splitCompactionPrefix } from "./compaction-history.ts";
 import { resolveModel } from "./config.ts";
 import { BridgeError } from "./errors.ts";
-import { restoresNativeCompaction } from "./history.ts";
+import { rejectUnrecognizedState, restoresNativeCompaction } from "./history.ts";
 import type { AdapterId, Backend, BackendContext, BridgeConfig, ResolvedModel, ResponsesRequest } from "./types.ts";
 
 function waitForTurn(previous: Promise<void>, signal: AbortSignal): Promise<void> {
@@ -97,6 +97,7 @@ export class CompactionHandoffStore {
 
   /** Only checkpoint predecessors enter the export; later work stays on the target. */
   async materialize(context: BackendContext): Promise<ResponsesRequest> {
+    rejectUnrecognizedState(context.request.input, context.route);
     if (!Array.isArray(context.request.input)) return context.request;
     let changed = false;
     const input = context.request.input;

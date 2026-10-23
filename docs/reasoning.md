@@ -1,6 +1,6 @@
 # Reasoning 与状态复用
 
-Reasoning 默认只恢复给产生它的目标，配置可以允许其他来源。是否允许复用和如何解码是两件事：来源策略由 `replay.reasoning_from` 决定，载荷的 `format` 告诉 adapter 如何还原内容。
+bridge 能识别的 reasoning 默认只恢复给产生它的目标，配置可以允许其他来源。是否允许复用和如何解码是两件事：来源策略由 `replay.reasoning_from` 决定，载荷的 `format` 告诉 adapter 如何还原内容。无法识别的历史状态默认原样透传，详见[未识别的历史状态](config.md#未识别的历史状态)。
 
 ## 显示与推理分开
 
@@ -61,7 +61,7 @@ B 可以接收自身及 A 的 reasoning；A 不会因此接收 B。A 接受 C �
 
 加载配置检查引用存在且源与目标的格式标识一致。两个 GPT 模型的 reasoning、同一 DeepSeek 模型的不同部署均可配置复用；每次请求恢复实际载荷，上游是否真正接受，交给实际请求验证。失败按上游错误返回，不删掉 reasoning 再发送。
 
-`prepareHistory` 每次复制输入，恢复来源允许且格式匹配的 carrier，其他 reasoning 只在本次请求中过滤。普通消息、工具调用、结果和图片继续保留。没有来源包装的 reasoning 不归属到当前目标。
+`prepareHistory` 每次复制输入，恢复来源允许且格式匹配的 carrier，其他已识别 carrier 只在本次请求中过滤。普通消息、工具调用、结果和图片继续保留。无法解码为 bridge carrier 的 reasoning 由 `replay.unrecognized` 决定透传、过滤或报错，不猜测来源，也不归属到当前目标。
 
 例如默认 A → B → A 时，B 不接收 A 的 reasoning，切回 A 后仍可恢复。若后来配置 B 接受 A，无需重写历史，后续请求即可使用其中 A 的载荷。被新的压缩检查点取代的旧历史则不再可恢复。
 
@@ -69,6 +69,6 @@ B 可以接收自身及 A 的 reasoning；A 不会因此接收 B。A 接受 C �
 
 codeks 的明文 `agent_message` 在 GPT Responses 中保持原格式；Claude/DeepSeek 将其转成 user 消息，在内容开头标明 author、recipient，后面保留文本和图片。它不是 reasoning，不受 reasoning 来源列表控制。
 
-GPT 出站请求移除 item 顶层 `id`，保留工具配对的 `call_id`，使用 `store: false`。这样消息不会继续通过服务器 item ID 引用已过滤的 reasoning。请求必须包含完整历史，不能只带 `item_reference` 或 `previous_response_id`。
+GPT 出站请求使用 `store: false`，除原样透传的未识别状态项外，移除 item 顶层 `id`，保留工具配对的 `call_id`。这样普通消息不会继续通过服务器 item ID 引用已过滤的 reasoning；未识别状态的原始字段由上游解释。请求必须包含完整历史，不能只带 `item_reference` 或 `previous_response_id`。
 
 压缩另用 `cxbc1:`，有独立的允许来源，保存文字摘要或按需复述配方。详见[压缩](compaction.md)。

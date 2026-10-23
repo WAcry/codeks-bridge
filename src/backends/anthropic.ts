@@ -1,7 +1,7 @@
 import { encodeReasoning } from "../carrier.ts";
 import { resolveClaudeOptions } from "../adapter-options.ts";
 import { BridgeError, upstreamError } from "../errors.ts";
-import { prepareHistory } from "../history.ts";
+import { isOpaqueStateItem, prepareHistory } from "../history.ts";
 import { reasoningEffort, reasoningSummaryRequested } from "../profiles.ts";
 import { parseJsonSse } from "../sse.ts";
 import { safeCallId } from "../tools.ts";
@@ -108,6 +108,9 @@ export function buildAnthropicRequest(context: BackendContext): {
       additions.push(...item.tools.map((definition: Block) => ({
         type: "tool_addition", tool: { type: "tool_definition", definition },
       })));
+    } else if (isOpaqueStateItem(item)) {
+      // Keep unknown state opaque. The endpoint decides whether it accepts it.
+      append("assistant", [item]);
     } else if (item.type === "bridge_reasoning") {
       const block = item.state.data;
       if (!block || !["thinking", "redacted_thinking"].includes(block.type)) {

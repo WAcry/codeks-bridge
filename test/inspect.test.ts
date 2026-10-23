@@ -201,11 +201,36 @@ test("native compaction and on-demand handoffs have accurate labels and replay a
       .map((note: any) => [note.pointer, note.decision, note.reason]);
   }
   assert.deepEqual(decisions, {
-    gpt: [["/input/0", "native", "native_restored"], ["/input/1", "replay", "same_source"], ["/input/2", "drop", "not_bridge_state"]],
-    "gpt-region": [["/input/0", "handoff", "source_not_allowed"], ["/input/1", "replay", "allowed_source"], ["/input/2", "drop", "not_bridge_state"]],
-    claude: [["/input/0", "handoff", "native_replay_disabled"], ["/input/1", "drop", "source_not_allowed"], ["/input/2", "drop", "not_bridge_state"]],
+    gpt: [["/input/0", "native", "native_restored"], ["/input/1", "replay", "same_source"], ["/input/2", "passthrough", "unrecognized_state"]],
+    "gpt-region": [["/input/0", "handoff", "source_not_allowed"], ["/input/1", "replay", "allowed_source"], ["/input/2", "passthrough", "unrecognized_state"]],
+    claude: [["/input/0", "handoff", "native_replay_disabled"], ["/input/1", "drop", "source_not_allowed"], ["/input/2", "passthrough", "unrecognized_state"]],
   });
   assert.deepEqual(calls, { gpt: ["main"], "gpt-region": ["handoff", "main"], claude: ["main"] });
+});
+
+test("unrecognized state annotations match the configured outbound policy", async (t) => {
+  for (const policy of ["passthrough", "drop", "error"] as const) {
+    const f = await fixture(t, (_body, _req, res) => nativeSuccess(res, [message("Done")]), config => {
+      config.models.gpt.replay = { unrecognized: policy };
+    });
+    const input = [
+      { type: "reasoning", id: "rs_external", encrypted_content: "cxbr1:unreadable" },
+      { type: "compaction", id: "cmp_external", encrypted_content: "external-checkpoint" },
+    ];
+    const response = await post(f.url, { model: "gpt", input });
+    assert.equal(response.status, policy === "error" ? 400 : 200);
+    await response.text();
+    const detail = await latest(f.url);
+    assert.equal(detail.route.replay.unrecognized, policy);
+    assert.deepEqual(detail.annotations.filter((note: any) => note.target === "client.request")
+      .map((note: any) => [note.kind, note.decision, note.reason]), [
+      ["reasoning", policy === "error" ? "reject" : policy, "unrecognized_state"],
+      ["compaction", policy === "error" ? "reject" : policy, "unrecognized_state"],
+    ]);
+    if (policy === "error") assert.equal(f.seen.length, 0);
+    else assert.deepEqual(JSON.parse(f.seen[0].text).input, policy === "drop" ? [] : input);
+    assert.deepEqual(JSON.parse(detail.client.request.body.text).input, input);
+  }
 });
 
 test("summary compaction is captured as one text call and reports its portable output", async (t) => {

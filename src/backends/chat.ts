@@ -1,6 +1,6 @@
 import { encodeReasoning } from "../carrier.ts";
 import { BridgeError, transportError, upstreamError } from "../errors.ts";
-import { prepareHistory } from "../history.ts";
+import { isOpaqueStateItem, prepareHistory } from "../history.ts";
 import { parseJsonSse } from "../sse.ts";
 import { buildToolSet, normalizeToolDeclarations } from "../tools.ts";
 import type { ToolSet } from "../tools.ts";
@@ -60,7 +60,13 @@ function convertHistory(context: BackendContext, tools: ToolSet, reasoningField:
   if (context.request.instructions) messages.push({ role: "system", content: context.request.instructions });
 
   for (const item of prepareHistory(context.request.input, context.route)) {
-    if (item.type === "bridge_reasoning") {
+    if (isOpaqueStateItem(item)) {
+      flushImages();
+      // Do not invent a text or reasoning_content interpretation for opaque data.
+      const a = getAssistant();
+      if (typeof a.content === "string") a.content = a.content ? [{ type: "text", text: a.content }] : [];
+      a.content.push(item);
+    } else if (item.type === "bridge_reasoning") {
       flushImages();
       // A reasoning item starts the next assistant response, even if the
       // previous response ended without a tool or user message.
@@ -74,7 +80,8 @@ function convertHistory(context: BackendContext, tools: ToolSet, reasoningField:
         if (parts.some((p) => p.type !== "text")) throw new BridgeError("Chat assistant history cannot contain images.");
         const a = getAssistant();
         const text = messageContent(parts) as string;
-        a.content += (a.content && text ? "\n" : "") + text;
+        if (Array.isArray(a.content)) a.content.push(...parts);
+        else a.content += (a.content && text ? "\n" : "") + text;
       } else {
         flushAssistant();
         flushImages();
