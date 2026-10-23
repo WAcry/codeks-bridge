@@ -1,0 +1,137 @@
+# Opus 5.5 / medium：K2 压缩实验
+
+运行时间：2026-10-20 18:23–18:50，America/Los_Angeles。模型为 `claude-opus-5-5`，`thinking.type=adaptive`、`output_config.effort=medium`。本轮只生成和测试 **K2：完整历史 + Claude Code 式详细摘要 prompt**，生成与读摘要答题都由 Opus 完成。
+
+## 结果
+
+| 材料 | 成功生成并答题 | 内容正确率 | 平均 K tokens | 平均回放增加的 input tokens |
+| --- | ---: | ---: | ---: | ---: |
+| 高密度状态保留 | 6 / 8 次 | **900 / 900，100%** | **25,664.2** | 25,760.2 |
+| 开发任务 handoff | 3 / 3 次 | **204 / 267，76.40%** | **5,300.7** | 5,396.7 |
+
+**高密度的 100% 是六个完成样本的条件成绩。** 另两个 seed 的生成返回 `stop_reason=refusal`，均带有 `stop_details.category=cyber`，没有产生完整 K2，也没有问答；没有重跑或按低分剔除。如果把这两个失败各计为 150 个未交付答案，整批交付成绩为 **900 / 1,200 = 75%**。这是可用性口径，不能称为两个完整摘要答错了 300 题。
+
+六份高密度答题都包了完整的 Markdown `json` 代码围栏。原评分器只接受裸 JSON，因此严格格式成绩是 **0 / 900**。上表的内容成绩只移除了这一层完整外部围栏，仍按原题逐值精确比较；没有修改答案、补值、模糊匹配或再次请求模型。两种评分均保留，不能把格式错误说成遗忘，也不能把内容成绩说成严格 JSON 契约通过。开发答题本来就是裸 JSON，两种口径一致。
+
+### 逐样本
+
+| 样本 | K2 内容正确数 | K tokens | 回放 input 增量 | 结果 |
+| --- | ---: | ---: | ---: | --- |
+| stress-3617031 | 150 / 150 | 23,981 | 24,077 | 成功 |
+| stress-3617032 | 150 / 150 | 27,560 | 27,656 | 成功 |
+| stress-3617033 | — | — | — | 生成以 refusal 终止 |
+| stress-3617034 | 150 / 150 | 27,136 | 27,232 | 成功 |
+| stress-3617131 | — | — | — | 生成以 refusal 终止 |
+| stress-3617132 | 150 / 150 | 25,160 | 25,256 | 成功 |
+| stress-3617133 | 150 / 150 | 24,715 | 24,811 | 答题流 overload；原请求重试一次成功 |
+| stress-3617134 | 150 / 150 | 25,433 | 25,529 | 成功 |
+| normal-r1 | 72 / 89 | 6,384 | 6,480 | 成功 |
+| normal-r2 | 69 / 89 | 5,477 | 5,573 | 成功 |
+| normal-r3 | 63 / 89 | 4,041 | 4,137 | 成功 |
+
+完成的九次 K2 闭卷问答，对不存在事实的题均返回正确的 `null`：高密度 30/30，开发 12/12。
+
+## 与上轮 GPT K2 比较
+
+输入材料、K2 prompt 字节和题目不变。基础指令只把 `based on GPT-6.` 改为 `based on Claude.`，与仓库中的 Opus 目录模板一致。GPT 数字来自[上一批记录](../2026-10-20/README.md)，没有新增 GPT 请求。
+
+| 口径 | Opus 5.5 / medium | GPT-6.1 Sol / medium |
+| --- | ---: | ---: |
+| 高密度，匹配 Opus 完成的同六个 seed | **900/900，100%** | 360/900，40% |
+| 高密度，全部八个 seed，未交付计零 | 900/1,200，75% | 390/1,200，32.5% |
+| 开发材料，三次独立摘要 | 204/267，76.40% | **262/267，98.13%** |
+
+这是“该模型生成 + 该模型读取”的整条路线比较，不能独立估计压缩者或读者的能力。Claude 的高密度内容分进行了明确披露的围栏处理；同六个 GPT K2 答案均不需要此处理。不同模型各自的 medium 也不代表相等的推理计算量。
+
+原生 token 的 tokenizer 不同，不能直接把 Claude 的 25,664 与 GPT 的数字看成相同长度单位。为比较文本篇幅，另用同一离线 `o200k_base` 计数：
+
+| 完成样本 | Opus K2 平均长度 | GPT 同样本 K2 平均长度 |
+| --- | ---: | ---: |
+| 高密度同六个 seed | 21,798.0 | 12,040.3 |
+| 开发三次 | 3,363.3 | 6,442.7 |
+
+这张表是统一 tokenizer 的文本估计，不是各服务端的计费或上下文 usage。数据见 [lengths.json](lengths.json)。
+
+### 信息保留的差异
+
+高密度成功样本能保留被抽考的精确值、方向关系、工具结果、后续纠正和任务状态。前两份 K2 使用了可逆短记号：说明公共前缀，再列出每条记录的尾部。独立按其说明还原，均能解析 1,000 条记录，并恢复全部 150 个抽考事实；模型问答也全部正确。这不证明任意更大材料都能无损保留。
+
+开发场景的差距有明确的摘要遗漏证据。三份 Opus K2 都保留了权限、安全要求、review 项、下一步和当前工作状态：对应类别合计分别为 9/9、9/9、30/30、15/15、12/12。最终禁止提交、尚未执行 R1/R2/R3 修复、最后读取 `src/retry.ts` 等状态都正确。
+
+但部分实现细节没有写入 K：
+
+- Q087：保存了 chunk 的 1/16 MiB 上下界数值，未保留 `minimum_chunk_bytes` / `maximum_chunk_bytes` 字段名。
+- Q014 的 r1：保存了 SHA-256、size、纳秒 mtime 的概念，未保留精确的 `mtimeNs` 属性名。
+- Q029：三份都遗漏 etag 必须为非空字符串的约束。
+- Q057/Q058：三份都未明确保存恢复计数中已完成 receipt / saved parts 与 `resumed_bytes` 的归属。
+- Q040/Q041、Q030/Q053：旧 probe 的精确数字和 8/12 条 focused tests 数量未保留。这些历史记录通常可以重新读取或运行得到。
+
+63 个错误答案都有答题项，内容为 `null` 或至少含一个 `null`，没有发现完整非空但错误的断言。不能把全部遗漏都说成低价值信息：API 字段名和计数规则有实际实现价值。实验没有继续执行开发任务，因此也不能直接推断真实接续一定失败。
+
+## 缓存
+
+所有 `cache_control` 都是 `{"type":"ephemeral"}`，没有设置 1h TTL，即使用默认 **5 分钟**。本轮替换的是实验请求中的缓存标记，未修改生产 bridge 的配置或实现。
+
+先发完整历史答题对照，使用它建立真实历史缓存。收到 `message_start` 后，立即发同一个历史前缀的 K2 生成；两者保留相同 tools、system、thinking 和 `tool_choice:auto`，仅末尾测验 / 压缩指令不同。实际发包已深比较，去除最后指令后完全一致。缓存断点放在完整 H 的末尾，不包含测验或摘要指令。
+
+| K2 生成请求 | 总 input tokens | cached input tokens | 命中率 |
+| --- | ---: | ---: | ---: |
+| 高密度八次，含两次 refusal | 2,549,420 | 2,533,420 | **99.37%** |
+| 开发三次 | 161,721 | 155,721 | **96.29%** |
+| 合计十一回 | 2,711,141 | 2,689,141 | **99.19%** |
+
+首次写入仍然收费：不能拿这个生成命中率当成整批运行的命中率。完整历史对照是有评分价值的预热；压缩产物首次变成后续输入时，K 本身仍需首次写入。没有额外发送纯预热请求来抬高数字。
+
+实际共发出 **39 个 Messages 请求**：11 次生成、9 次完整历史对照、9 次空历史对照、9 次首次 K2 问答及 1 次同请求重试。38 次有终止 usage；1 次 overload 只有开头用量，没有最终输出用量。
+
+| 有终止 usage 的 38 次请求 | tokens |
+| --- | ---: |
+| 总输入（已包括缓存读写） | 5,738,827 |
+| 普通未缓存输入 | 166,987 |
+| 缓存读取 | 2,857,009 |
+| 5 分钟缓存写入 | 2,714,831 |
+| 1 小时缓存写入 | **0** |
+| 总输出（包含 thinking） | 389,311 |
+| 其中服务端报告的 thinking | 133,744 |
+
+另一次中断答题已报告输入 37,228 tokens，未包含在上表；最终输出 usage 缺失，所以不能给出精确的完整账单。没有按未知价格换算费用。`cached` 是输入的组成部分，不能再次加到总 input 上。
+
+## 长度计量
+
+主表的 **K tokens = 生成 `output_tokens` − 服务端报告的 `output_tokens_details.thinking_tokens`**，包含 K2 文字中的 `<analysis>` 和 `<summary>`，不含模型内部 thinking。回放 input 增量则是同题 K2 请求的总输入减空历史请求的总输入。九份成功产物均满足“回放增量 = K tokens + 96”；这 96 是本次 summary prefix / 消息包装的实测差，不能用作通用常量。
+
+额外调用的 `/messages/count_tokens` 在这条路径上低估了独立 K 长度。例如开发 r1 给出减空框架后 4,051，而实际原生输出为 6,384、回放增量为 6,480。没有用这个估计替代实际 usage；它保留在 [results.json](results.json) 的 `count_endpoint_estimate` 中作为诊断。单靠计数端点 HTTP 200，不能确定其使用了与实际推理相同的 tokenizer。
+
+## 对照、异常与实验边界
+
+- 完整历史对照：八份高密度全部 150/150，开发 89/89。高密度其中六份也有外层围栏，严格 JSON 成绩只有 300/1,200，去围栏内容成绩为 1,200/1,200。
+- 空历史对照：九次都未形成合法答题 JSON；六次只表示要查找资料，三次没有文字输出。它们不能当作有效的“全部回答不知道”对照，未知题行为也不能从这些响应推断。空对照的输入 usage 仍可用于计算回放增量。
+- `stress-3617033` / `stress-3617131`：生成在正常摘要文字中途以 `refusal` 截止，原始 `message_delta.delta.stop_details` 均给出 `type=refusal`、`category=cyber`，解释为触发网络安全政策限制。完整详情保留在 `results.json` 的两条 attempt 中。材料是合成状态记录；结合中断前的正常摘要，疑似分类器误判，但具体触发文本和内部判定过程未知，不能归因于 K2 prompt 本身。此前只读取 stop_reason，漏读 stop_details，导致初稿错误地写成“服务端没有说明原因”；此处依据原始事件更正，没有重新调用模型。[官方说明](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback)将该类别定义为分类器判定的网络安全风险，同时说明正常工作也可能触发；[流式说明](https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/handle-streaming-refusals)明确该详情随 message_delta 返回。
+- `stress-3617133` 首次答题出现 `overloaded_error`。只重试了已经生成的同一 K2；两个请求 body 的 SHA-256 一致，成功答案用于内容评分，原失败留在 `attempts`。
+- runner 曾因三次空对照的空文字断言而把关联案例标为失败；本报告从完整保留的生成、答题、usage 原始文件独立重算，分开报告 K2 路线与空对照，未重新生成产物来替换成绩。
+- 八个高密度 seed 全部保留，没有沿用 GPT 旧报告事后剔除某 seed 的选择。开发的三次重复来自同一份历史，不是三项独立开发任务。
+
+## 输入与复核记录
+
+来源固定为 `WAcry/codeks-bridge` 的 commit `f86b5141a018fd0077696938c2baed4d7dafcf78`，复用[上一批 fixtures](../2026-10-20/fixtures/)。各输入文件路径与 hash 在 [plan.json](plan.json)。本轮保存了 [Claude 基础指令](prompts/base-instructions.txt)，其余沿用原有 [K2 prompt](../2026-10-20/prompts/claude-code.txt) 和 [summary prefix](../2026-10-20/prompts/summary-prefix.txt)，不重复存储。K2 prompt 包括原报告说明的那处示例占位措辞差异。
+
+高密度 H 有 540 个 Responses items：60 条 user、80 条 assistant、200 对真实协议形状的 function call / output；开发 H 有 103 items：12 条 user、7 条 assistant、42 对工具调用 / 输出。通过当前 `buildAnthropicRequest()` 转为原生 `tool_use` / `tool_result`，不是把整段工具历史包装成一条 user 文本。两种输入 H 都没有 reasoning items。
+
+实际生成请求使用原生 Messages SSE，`max_tokens=128000`（包含 thinking），没有 temperature/top_p。摘要生成保留 auto；闭卷问答和空对照使用 none。完整历史对照为共享生成缓存而使用 auto，这一点与上轮 GPT 对照的 none 不同。没有执行任何工具，完整历史对照均正常文字结束。
+
+K2 问答仅有固定的 summary prefix + K2 明文、题目，以及公共基础指令和工具定义。原始 H、U、标准答案、生成时的 thinking、其他对照的答案都不进入问答历史。生产式 64k U 保留未加入此次闭卷测验。
+
+- [results.json](results.json)：逐案例和类别评分汇总、请求用量、失败与重试记录。`groups.*.generation_*` 汇总完成问答的样本；`all_attempts_generation_*` 包括生成拒绝的全部尝试。
+- [cases/](cases/)：九份成功 K2、两份拒绝时的部分文字、27 份原始答题文字。逐题 gold 复用原 fixtures，评分由这些原文重算，不重复存储完整答案表。
+- [lengths.json](lengths.json)：统一离线 tokenizer 的文本长度。
+- [artifacts.json](artifacts.json)：本报告文件的字节数和 SHA-256。
+
+本记录只整理合成材料、文字产物和必要数值。鉴权、私有端点、服务端标识、thinking 签名及原始 SSE 不在报告目录中。
+
+从仓库根目录运行以下命令，可以离线检查文件 hash，并从原始回答重算严格 JSON、仅去外层围栏的评分及用量汇总，不调用模型：
+
+```sh
+node benchmarks/compaction/verify-record.mjs benchmarks/compaction/results/2026-10-20-opus
+```
+
+本轮使用了原生 Messages 的专用实验调度：完整历史对照的 `message_start` 触发同前缀 K2 请求，全部断点为默认 5m。现有通用 Responses runner 不包含这套调度，不能用它的原命令声称精确复现本轮缓存条件。复跑时应按本报告和 plan 保留这些参数与时序；本轮没有扩展生产 adapter 或通用 runner。

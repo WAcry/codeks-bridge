@@ -1,0 +1,62 @@
+{
+  "tokenizer": "o200k_base",
+  "tiktoken_version": "0.14.0",
+  "note": "Same local tokenizer for both texts; not provider billing or context usage.",
+  "cases": [
+    {
+      "case": "normal-r1",
+      "opus_o200k_base": 4042,
+      "gpt_o200k_base": 5813
+    },
+    {
+      "case": "normal-r2",
+      "opus_o200k_base": 3510,
+      "gpt_o200k_base": 6358
+    },
+    {
+      "case": "normal-r3",
+      "opus_o200k_base": 2538,
+      "gpt_o200k_base": 7157
+    },
+    {
+      "case": "stress-3617031",
+      "opus_o200k_base": 19838,
+      "gpt_o200k_base": 22295
+    },
+    {
+      "case": "stress-3617032",
+      "opus_o200k_base": 23686,
+      "gpt_o200k_base": 21841
+    },
+    {
+      "case": "stress-3617033",
+      "opus_o200k_base": null,
+      "gpt_o200k_base": 7422
+    },
+    {
+      "case": "stress-3617034",
+      "opus_o200k_base": 23312,
+      "gpt_o200k_base": 6872
+    },
+    {
+      "case": "stress-3617131",
+      "opus_o200k_base": null,
+      "gpt_o200k_base": 7443
+    },
+    {
+      "case": "stress-3617132",
+      "opus_o200k_base": 21281,
+      "gpt_o200k_base": 7216
+    },
+    {
+      "case": "stress-3617133",
+      "opus_o200k_base": 21058,
+      "gpt_o200k_base": 6777
+    },
+    {
+      "case": "stress-3617134",
+      "opus_o200k_base": 21613,
+      "gpt_o200k_base": 7241
+    }
+  ]
+}

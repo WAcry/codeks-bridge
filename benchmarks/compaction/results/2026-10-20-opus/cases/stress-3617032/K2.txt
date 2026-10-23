@@ -1,0 +1,1134 @@
+<analysis>
+The session consisted of ten epochs (0–9) of authoritative project-state data for project 3617032. Each epoch had the same parts in the same order:
+
+1. An exact parameter ledger with 20 keys.
+2. A set of 20 directed routes.
+3. Twenty database_query probes. I ran these myself with project=3617032 and probe=probe-3617032-N, and every probe returned an authoritative result.
+4. A list of superseded candidates for the corrected-field keys. The user marked all of these obsolete, so they are not reproduced here.
+5. Final authoritative corrections that replace the superseded candidates.
+6. A work checkpoint giving each work item's state, receipt and next action.
+7. Unrelated archival material. The user said explicitly to ignore it, and it updates no active state.
+
+Epoch e uses the indices N = e+1, e+11, e+21, …, e+191, which gives 20 keys per epoch and 200 keys across all epochs. Every key and value must be preserved exactly, and each work item's state, receipt and next action must stay together. No files, code, errors or security constraints came up. No task is pending beyond holding this state for later continuation.
+
+Notation used below:
+
+- Parameter: N=value-X stands for parameter-3617032-N=value-X.
+- Route: N→X stands for route-source-3617032-N->route-target-X.
+- Probe: N=X stands for probe-3617032-N=probe-result-X.
+- Final correction: N=X stands for corrected-field-3617032-N=final-X.
+- Checkpoint: N:STATE|r|n stands for work-item-3617032-N:STATE|receipt=receipt-r|next=next-n.
+</analysis>
+
+<summary>
+1. Primary Request and Intent:
+   The user supplied authoritative state for project 3617032 across epochs 0–9 and asked that every key and value be preserved exactly. Routes are directional and current. Final corrections replace the superseded candidates, which are all obsolete. Each work item's state, receipt and next action are current and must stay associated with that item. The user said to ignore all "UNRELATED ARCHIVAL MATERIAL" for active-project continuation; its simulation values are non-authoritative and update nothing. The authoritative probe results were obtained with `database_query` (project=3617032, probe=probe-3617032-N).
+
+2. Key Technical Concepts:
+   - Key prefixes:
+     - parameter-3617032-N (parameters)
+     - route-source-3617032-N->route-target-… (directed routes)
+     - probe-3617032-N (probes)
+     - corrected-field-3617032-N (corrections)
+     - work-item-3617032-N (work items)
+   - Epoch e covers N = e+1, e+11, …, e+191.
+   - Authoritative data overrides the obsolete and superseded candidates and all archive values.
+   - Notation in section 5:
+     - Parameter: N=value-X means parameter-3617032-N=value-X.
+     - Route: N→X means route-source-3617032-N->route-target-X.
+     - Probe: N=X means probe-3617032-N=probe-result-X.
+     - Correction: N=X means corrected-field-3617032-N=final-X.
+     - Checkpoint: N:STATE|r|n means work-item-3617032-N:STATE|receipt=receipt-r|next=next-n.
+
+3. Files and Code Sections: None. The only tool used was `database_query`.
+
+4. Errors and fixes: None.
+
+5. Problem Solving: All authoritative state is recorded below.
+
+   **EPOCH 0**
+   - **Parameters (value-):**
+     - 1=0d5095aa02c2106c952d79bd
+     - 11=2edde7feea1a663489a65f65
+     - 21=e8743ade2403ebc32a1b9698
+     - 31=ef8c5237cde54276cc0a5066
+     - 41=345b5f03a3692d35760ffe64
+     - 51=93538cc235073d20c2c49362
+     - 61=a910a15bc1de6c08b1dc6bb3
+     - 71=72b941883e6aef3a757e49d4
+     - 81=fbf300ed6d0bf82d7847ae9c
+     - 91=8ab44f71d138776d09224e2c
+     - 101=9af0cbce466a736d1b688cd7
+     - 111=b7991dbcb1cba8728675a1b6
+     - 121=00e2fd9280758cf0aaef520d
+     - 131=ab6a3e830e48cae6a965113f
+     - 141=f4599e9b0bb7440c4ba8e491
+     - 151=f43d4811ee086bdd4ec85319
+     - 161=609379dc8da6f624353cd482
+     - 171=80c888493050bd4ebc7f476c
+     - 181=56ee1d4c201536dde2143a0c
+     - 191=4ad293f6da601df539f438a5
+   - **Routes (route-target-):**
+     - 1→1a9eb5b679e13bd17c88da
+     - 11→b1d79aa984e9dcd96a0c5b
+     - 21→3a413bae04159ee59e894c
+     - 31→ffc1d7f081d2ac8ebeddc2
+     - 41→c693a765ff7cf1f2acfb20
+     - 51→6f6db27b2114ec09fc0514
+     - 61→a05074fb2f9aded0882c97
+     - 71→9d7bcd51f0cb44fff34f1a
+     - 81→5c735bb4e7f74e00e5262c
+     - 91→71033641731ab9dcbb4601
+     - 101→764e0dd6596609e2710d8b
+     - 111→44b7dce420e27435b096a7
+     - 121→53b1f9e9f75d0df4f57452
+     - 131→344acb6690e1d5bba5c75b
+     - 141→efa9da1aeac04099f7c95f
+     - 151→72115bc9d1ea843e709072
+     - 161→5be94faaee4f35e4b13bcd
+     - 171→ef93aa17cbb9ef0820da80
+     - 181→12092a6e4a071ad22eeb74
+     - 191→c2f93fa13f84a5fdacbdca
+   - **Probes (probe-result-):**
+     - 1=9c0a97ca4b976d6d5ccc2ad402
+     - 11=956bf24a9f06db0f52f12feaff
+     - 21=db5d76022d5f7892941f288f18
+     - 31=3275e2c5fc9f50b5bfef9e32dd
+     - 41=b540d6f157f9a7e07ad33463f6
+     - 51=c783cb7c9e3911ae4875d890bb
+     - 61=107284fd49d899195099327ae6
+     - 71=6f89e6476aa6a39e4dfc051454
+     - 81=cadc9fe3ab502d50ef7b164934
+     - 91=075effc092cb9af5c8aefe43e8
+     - 101=28818a311ad4c96b1d8aaa8d63
+     - 111=1020c9b6c8534a5ac9b3ab2872
+     - 121=7036c1de7551408da74dcec391
+     - 131=6f2ea92d9cfec371bbe2f8b565
+     - 141=2c0085443fe52bbac120464663
+     - 151=b7216e66171fe4329ac46fbbe7
+     - 161=45ab01744c66beb21b6de0ac7a
+     - 171=41250b1587f9a6057e028d84d2
+     - 181=571faefc0c5e40bb0ce4dba561
+     - 191=40fa9e52d815ba6fe979fb8600
+   - **Final corrections (final-):**
+     - 1=ae6a0b4e70234fb5c35bc3f0
+     - 11=f9c774180755efbbc6ccbddc
+     - 21=c93cb43a767425c602d3ca22
+     - 31=859dc50bf17dd69bc5117bcd
+     - 41=5554f6e62cdc8cd6dc6a40c5
+     - 51=f43c5a80dd4ecb8c94e38e5e
+     - 61=d9158d2dd62e581f0b141d9f
+     - 71=f17b9e97e09f798aa32f3f4a
+     - 81=0f30e464f179900a32082196
+     - 91=67038428569986e1f87c3685
+     - 101=21f712302ce4a4cbbac65516
+     - 111=82905895503a9e166355b69d
+     - 121=dc87a743aa7164186f90ac3c
+     - 131=9df1c305e065bad30ba22dd2
+     - 141=0676114efd6ed2bbeb471a09
+     - 151=e8ebe09bf5fe53fccd2e13aa
+     - 161=ef680d47e8d316757e0955d0
+     - 171=518945760b909b1cd674cfa7
+     - 181=be8de03c862d62113b1d8232
+     - 191=9b9c315019f5d7216c38fa87
+   - **Checkpoint (state|receipt|next):**
+     - 1:IN_PROGRESS|de061d8c8a263cd280|e024b4c4186b3cbd52
+     - 11:DONE|c9d74aa4aa5de457aa|78dacd1ae8b47e6774
+     - 21:DONE|5337b6f2a1f0ce20d7|e98b5f40aff0ffac3a
+     - 31:VERIFYING|271e8e9144b72344dd|e802ee84bc60b7532d
+     - 41:DONE|fd868f5beabf022130|5157635f50de22f0e1
+     - 51:QUEUED|63e27cf9d254673942|f3b90f754b0032b01a
+     - 61:IN_PROGRESS|9f96b20a9bb7808a88|7d70e4f0e89968ac9e
+     - 71:QUEUED|dc81dd578eacbded98|da5592f122ef8e55bf
+     - 81:QUEUED|886dd943901b2be938|c2768638233c31d982
+     - 91:DONE|81b3b15e02247dc1d1|09abc3fb2e4a38da25
+     - 101:BLOCKED|4e7e4f67cbb0891edd|b8c029fca6abb8f9a1
+     - 111:DONE|fe6f156671d83eced6|94f3d3899ffc9873f5
+     - 121:IN_PROGRESS|bd14d4f2c6b6d08fc4|709fd6ec0a6beb5dc0
+     - 131:VERIFYING|64936c25f9d3377771|ecdaf6b0376d116176
+     - 141:DONE|a70daefa1cf8241b34|d6e39ff57371212379
+     - 151:BLOCKED|e6936e54ef7f46275c|8cb547c45ca4ef8aef
+     - 161:IN_PROGRESS|efceb4220a35f21148|d5e28442d2fa551548
+     - 171:VERIFYING|ec3576c4ed7df87432|1d0df68264d865b145
+     - 181:IN_PROGRESS|53fec1c1c43b9c49ce|2311bf5961b202fa7c
+     - 191:VERIFYING|d80cbb93ec3fbef5a2|bea06e837de8e7b767
+
+   **EPOCH 1**
+   - **Parameters (value-):**
+     - 2=e40c7dd7165c299e5e256acb
+     - 12=5e076c66e463ae7e2a5f62f8
+     - 22=dc9b75e7d4898d645d9d0c5a
+     - 32=d23d6e543f6ccff0f50819d1
+     - 42=bd9c521c56b6ef96bd75ea96
+     - 52=1dd3b020402a40e754066a31
+     - 62=425c79af37ff008fe11b84cb
+     - 72=02d5c93a6858f5ab0e695e8c
+     - 82=a5d02728110133fb10774d53
+     - 92=5eb7115a8e7b26c262d382a0
+     - 102=112d7528d69410388b4f04b2
+     - 112=d2b9c874d2fd394d3b931565
+     - 122=1966d5f901f1a7dce1d8304f
+     - 132=bd1bcfbf03faab09da851d10
+     - 142=3c2bec12d82416d101e9e426
+     - 152=9413cddc9177934c0d83dd6f
+     - 162=88d0cf1bda0e7ff015d71060
+     - 172=981ef49d0ca11ac398a2b795
+     - 182=a71c6a3cd88dccd6fe511347
+     - 192=4fbbae8c7573e25e4b17961e
+   - **Routes (route-target-):**
+     - 2→6424bd683e533394ebd49f
+     - 12→63f6a9bad6392e400d4f23
+     - 22→fd9624393d812e198be894
+     - 32→0b5c8bd2f4df508ca58064
+     - 42→c1f4ec59b5d739a53c7574
+     - 52→32b647d1624eacb4eb2d48
+     - 62→e4abe901115b8e564dba45
+     - 72→c52e57d2b2b079fc9cb21d
+     - 82→1789d460454c8d9dd090af
+     - 92→645de2ae37133969444af8
+     - 102→9ec80107915a56f10d63ba
+     - 112→07d003aa67d28a5336a6ed
+     - 122→7792b5d38878210e21492a
+     - 132→8264a1f6cb4422cc431f62
+     - 142→3e4710eb3becf83a064536
+     - 152→0ff2dd320bd2d3ec5059ca
+     - 162→6671aa9228b3d772d235f8
+     - 172→e85d4c3dc9901edcb5a374
+     - 182→aa9620c2f4b1427017bbcb
+     - 192→24a0da2f7423d5292a3b64
+   - **Probes (probe-result-):**
+     - 2=59711b1415a192cc7119990dfd
+     - 12=fceac3a82d694268dc8a960bda
+     - 22=b5ee3861a9a156e0fe13537e58
+     - 32=e5bb1e46acb1a25bcd9f294ff4
+     - 42=fc46d4d415d9baa3d05ee1bbf8
+     - 52=b0ad6018b93fe0654692cddaf2
+     - 62=bfb5ea25fe21cd3e1ac0675daa
+     - 72=69ce125bbb6e68c81acd7e52a5
+     - 82=f107f4c9169435f39b313bfc07
+     - 92=ceaa15d885c3239ecd08cbe024
+     - 102=f80212c9c912d22bdb9d33a371
+     - 112=295cf98a8ef0a3bb776723326d
+     - 122=f73f38b36c71daf2338d9b1e26
+     - 132=41a9e9b3d0821a532e582e61b4
+     - 142=4f2347b3b66623aa1cbe262799
+     - 152=2f7132be87de2571cf2105f4b8
+     - 162=f3de632e31d4d824f359ebe7f2
+     - 172=032e5b5a0a5c8dc2e1d4de131f
+     - 182=90336502efdd45f8b2927fc038
+     - 192=b11f888671730f11ad3a90f5ef
+   - **Final corrections (final-):**
+     - 2=3aa08420c5f362bada146e55
+     - 12=8cee134b86c69936b71431e5
+     - 22=aeb0777aec322dfd75de3c6f
+     - 32=f99f9b04586e2b64c18f95d0
+     - 42=783df1098451ac44452c471e
+     - 52=aef2465196e990b249337283
+     - 62=e27ec80b605b5ce366f5d56a
+     - 72=1c5724db0934a36776ba9289
+     - 82=913f41aec1e03ea06b8284d0
+     - 92=98d37f307563438816f12746
+     - 102=ffc0a49b3e5d80b03e97e033
+     - 112=ffb4fd0b4480f2ed64f07e7d
+     - 122=b2770ed6cc20098765efdb2c
+     - 132=665fb569cd3268f6f4c39e94
+     - 142=158ec37b115d56bcef23a76c
+     - 152=eae5d52c466d123935378649
+     - 162=82a912d87f3d5cd07919bc7e
+     - 172=310ba9502e819a029d4e4292
+     - 182=532e4b8a3002d914a041c328
+     - 192=7f17a5ba57e1bb46898dee38
+   - **Checkpoint (state|receipt|next):**
+     - 2:IN_PROGRESS|89fe18b1f7a76b2801|23a95bf9db9d0bad26
+     - 12:DONE|9e174d51c2452c9a31|32037e6a4df083c21e
+     - 22:QUEUED|785138da742838d9be|7a900228e06992baf1
+     - 32:QUEUED|6d963972b331f6d6c0|7e42882b6e4c728a43
+     - 42:QUEUED|d6dbb4f859001be372|090e1f123db3e8e4b6
+     - 52:DONE|c4e5e955ece538fa2a|49c292664c8115cf7a
+     - 62:QUEUED|76bf33787b698f4790|38089ed93e84f0c32e
+     - 72:IN_PROGRESS|14a9715f8f85303c8e|5760907b01981bdb2b
+     - 82:IN_PROGRESS|eaf4d29df2d8b73e3f|37ad9960be3395e073
+     - 92:DONE|d491a0980312327117|8c424ff75fe3d733c3
+     - 102:VERIFYING|04d8a6a42d7a0050aa|a6910e57d4deb3fd57
+     - 112:DONE|f8a2e742a076eb01cf|359b473774ec8855ca
+     - 122:BLOCKED|243da26d691dd45811|999b821929eeb6b066
+     - 132:DONE|d78293969cdfe0ed4f|0180361d9423c70e25
+     - 142:VERIFYING|3e3edb90e838bd8ef7|daa02b6650da871283
+     - 152:IN_PROGRESS|cb94c2ac56089cb5b9|81188129960285d46d
+     - 162:QUEUED|6ee28b26de9c2e0635|50b9c8c2155fc3f834
+     - 172:VERIFYING|22522df42b18698130|a7608fcd058a54c8c1
+     - 182:QUEUED|6172889a15796700b4|305a02ba17f4fa7619
+     - 192:BLOCKED|d87dbad2089df13924|dda01769820fc03355
+
+   **EPOCH 2**
+   - **Parameters (value-):**
+     - 3=d0263b11283d07bb3d0c2151
+     - 13=4ea158aba59c853ba160c9fb
+     - 23=ec8808701b87668e09da83fe
+     - 33=d5747e141f0310ecc0fc2b28
+     - 43=eb4b967240959ff860612875
+     - 53=a711a7c30f11a44d215104d1
+     - 63=429f60e3fb549869f5b01041
+     - 73=29e042c945f90fb00adf08dd
+     - 83=94da0ec7b57a8095228cd15b
+     - 93=dcb825430065ded1743cc0f1
+     - 103=15f8978974063b48f002f266
+     - 113=8f6c57dc97443e5d417d5f5a
+     - 123=82d59292639ad5408f316c6f
+     - 133=49bfa69e1af7e7324edf3c12
+     - 143=d7e160debe6f77cecd2a7ddf
+     - 153=30e8f4e09691e6170bd3cc1c
+     - 163=8b66bc6e751983e094f8b59c
+     - 173=71e397db079dcbfff7f2dac5
+     - 183=4f325f9d5cb960fd26ddd898
+     - 193=8c6ce837fff42b3eb7079251
+   - **Routes (route-target-):**
+     - 3→bc1fb1bdf7d1bee488cc19
+     - 13→cf8f1e18f3e7524adda9bd
+     - 23→fea88769e478b4c4b6fa3c
+     - 33→4093d00b21b1905c2cd5eb
+     - 43→d858ec3f646db59690f37f
+     - 53→fb67952039e65788708293
+     - 63→fd56b56c158d51f867e9c7
+     - 73→64be5a0247a35a9ce49606
+     - 83→3e340ad2a10ab19535ca69
+     - 93→5c1e084f571ad4bc867246
+     - 103→8625d7e09c2298e707c236
+     - 113→7125a3968c849bd6f9efb1
+     - 123→3b02c7f560d65d30049290
+     - 133→84bb59b944815488596459
+     - 143→7b5047323ba8ca3e71efa8
+     - 153→9e8352d93a4184812d6658
+     - 163→ac5015eccbfa520834eae4
+     - 173→68104c9ccffa8723f055da
+     - 183→f76d2e18620ab8f5b4c68c
+     - 193→d4dccfb54c2557d1b353c1
+   - **Probes (probe-result-):**
+     - 3=f315a1f4334b6b82a83fc60cea
+     - 13=ea76e08e317977dc066f999331
+     - 23=7911cf5aa8b2d19e1933b6cdf7
+     - 33=acc0e4bb2806b3645c68262ba5
+     - 43=18af20b95df42f2e56ca33bd59
+     - 53=b35bcec88af627d881df8c153b
+     - 63=34f101ddbaaf3c6da24a832821
+     - 73=0f1dac45fed397fcfdf2eba177
+     - 83=3cf73f36ebcbcc2e0a16ce90ba
+     - 93=a15a1dd111273d8652e6f05222
+     - 103=dd21be9407dc68dc262a9b1f0f
+     - 113=558ceccde7dff122725f4ee5d9
+     - 123=4cdb40a7cce578854d0d6f9d91
+     - 133=a9c9e04e81f233670aaa775476
+     - 143=933476b40edfaec58a2f4b898f
+     - 153=a9a4ada4959fcbf72dd7c42ed8
+     - 163=6ccfaae2f1df30909d3f8c7f3a
+     - 173=45cf7c3b17dfccd6e6b071cfc8
+     - 183=4793d09798d92c7006ccd00ccc
+     - 193=056c9b9dd37db9670c92aa9022
+   - **Final corrections (final-):**
+     - 3=923dc25058c0be42f0d86f52
+     - 13=5f13323c59a485beb33934c0
+     - 23=c8ebc6fea6f81f17d77cb70d
+     - 33=e4d2e9fcfe09d94f3eb4914e
+     - 43=70a920e159e122791e4c2691
+     - 53=86d4b97fb026f0161f95d760
+     - 63=e4f99d21ba2bb6d5f14a20f8
+     - 73=e263af8b1046c8323c7834aa
+     - 83=29b21d6d1df5ec1b0bde285b
+     - 93=e354961a74e9a27a695694ff
+     - 103=e3f17cc89c2567218fc29899
+     - 113=f6576221b180f5d9a9d4223a
+     - 123=038d983844a1fcd7186721f8
+     - 133=00a7fbde613f9cf7224bcd0c
+     - 143=25b34b0479024b72adbab8f9
+     - 153=f77c83419b006e2e006ce56f
+     - 163=2eecd035181982121d30abfd
+     - 173=e64f59f0072b753d777937de
+     - 183=c9e3af2362bc426d4e5436ff
+     - 193=490bd19b5411d62b30f66d75
+   - **Checkpoint (state|receipt|next):**
+     - 3:IN_PROGRESS|af8d713152f20ba29f|4b3949d7a6b9483c26
+     - 13:QUEUED|ccfc9343b27aa02296|f4c1e2175dade29a02
+     - 23:VERIFYING|dd94b9f4bf71afa037|a12e288843e3dcb998
+     - 33:BLOCKED|d51d25c076ae414460|422a6c7f2a94b0bcaa
+     - 43:QUEUED|1d3b4ff4cb49167991|c168024be5e61c7a72
+     - 53:QUEUED|b8ac52bae467908865|e61deb64f36d47010a
+     - 63:VERIFYING|84f1038d812d4c716d|c321814b0e717c8896
+     - 73:VERIFYING|c70d7b66e17f67124f|862dc06cda2c778412
+     - 83:DONE|35e63234791dafda34|ac26985dc250f79b5d
+     - 93:QUEUED|ddeddd7aa2cb3f4099|afeb5e4d5b7b0e92a9
+     - 103:DONE|e9ca5828f483408dfb|b34102feb666b09d73
+     - 113:DONE|4dcf1a7a4b2ca5dd17|1581f391681e86c431
+     - 123:BLOCKED|2e02a013074a8ab564|c5262cb244023bccab
+     - 133:QUEUED|46da2a7ed29a888c5c|5b79ce59c58a98d28d
+     - 143:DONE|eed47f8c5ef72590c5|c7cac1ba777cc893d6
+     - 153:BLOCKED|943e204b6dcd41d2bb|03d89355c1af5dd6cc
+     - 163:IN_PROGRESS|81202634d7fbecfab2|68a352a1f10d58fe84
+     - 173:IN_PROGRESS|fe63a8539b6020460c|8009fee06b0596662f
+     - 183:VERIFYING|151b5114a8635eefeb|28ebb2126b42ca8922
+     - 193:DONE|46c8928f0d30649398|e64a551ed63482cdda
+
+   **EPOCH 3**
+   - **Parameters (value-):**
+     - 4=6600007405e45fdbf63ec45d
+     - 14=327b22b36db7a68ab7a37ec6
+     - 24=f551666113d1fabe8e879c48
+     - 34=01a93b35a756d739acf6d6a3
+     - 44=8491fa763844f3858007f58d
+     - 54=7a4d5e33a087138780a2cbc0
+     - 64=1c05a5575b65a2a4c07e9ed3
+     - 74=146d265b67b5d7c5a86d00db
+     - 84=99ea8716e0d3a19813149515
+     - 94=fbd14fd03ff21a254a5de4fe
+     - 104=a4922ab2ed382b6775a09cc0
+     - 114=dd5295812587815a8da4a83b
+     - 124=2f634ffcda8eb3842b1536c2
+     - 134=289121cbdcfdcbac0e184606
+     - 144=9810269d8195b6761cb30a79
+     - 154=b388bfec084be5e4f3803b7b
+     - 164=57be3515830e5d56657fdb61
+     - 174=7b58344d02b614b884e418ee
+     - 184=60d953707e992d83e785b25e
+     - 194=f904cc5de71bc39e4ef98ed3
+   - **Routes (route-target-):**
+     - 4→69a8edd6d227c2cd8e5726
+     - 14→57000da400e2b624153e24
+     - 24→7d9a039376c127b9a69fb8
+     - 34→98b595cdd9c78e672bd88e
+     - 44→862494160fed065e1f32ac
+     - 54→253d23bead28f0090342d5
+     - 64→45e9ea5cd634641859100c
+     - 74→4bda85831d3ec77a02280f
+     - 84→e09542373b16fd52f41daf
+     - 94→ff540c7299e133426d30a0
+     - 104→14a3cb905bd00804722463
+     - 114→aa597a1672bb4a5e999324
+     - 124→64633b408aebc6cb0cc445
+     - 134→e7a3dcad20f7f67f667642
+     - 144→7aaef91a430b81ea446c49
+     - 154→1b1f350f54131dfea2318d
+     - 164→fe7cd7b501128c6e0f9152
+     - 174→488c25a4e1b5e2827557fd
+     - 184→867f73ca73233821aa0743
+     - 194→1510bf0040af93750deee3
+   - **Probes (probe-result-):**
+     - 4=e77ea007815c71b19ec97702ec
+     - 14=38e73406b9f65e89710927fefe
+     - 24=e1c6b5179e78b0b3582ce4e839
+     - 34=cf9259d85c6f542e056e55a570
+     - 44=5c7cb0db5db5a9bd674623502e
+     - 54=2aa5956ef25a2420a52303c43a
+     - 64=d837114856cb92ddf02b0d069e
+     - 74=2ecc0da3c0a6d25ccaf7970bc1
+     - 84=b1a9be7982c2a3396f201a5ea9
+     - 94=8b27f9c97fa2dcdf8cab3d41ba
+     - 104=46e478af0c0d0a39c078ad371e
+     - 114=4d4f5a79924256a42e6f3d41ff
+     - 124=70c71d80eb2b195b65b8d14112
+     - 134=b8f49ba9427c7f6ed179bc2aaa
+     - 144=c8081e8d9eadbfc24990cb0378
+     - 154=13e24478ac64da0c75bdcdbac0
+     - 164=92a4b50b93f1adb20f73687823
+     - 174=c394fbe95cd57112e86ebf583a
+     - 184=179761f5af6b5b98861b3c246b
+     - 194=3d808c1d3b485ae68536628512
+   - **Final corrections (final-):**
+     - 4=12c2fce38bfcac8b3b5429bd
+     - 14=09d6db17edd8bf24549400c1
+     - 24=1e721bc0d8a19e6335ca226f
+     - 34=a0e5d8fa9f1805fae2229996
+     - 44=192f5e21f9206f23d517513c
+     - 54=f91bb48d61f51d8ec1ba1403
+     - 64=e453c652023c80328aa21f25
+     - 74=9bada7640ce2203f35b8424b
+     - 84=5167abf2e3e7b7c605b7786c
+     - 94=4e95a1d0a141fe9ec8961b72
+     - 104=218dffaedbb6f826c4fa9619
+     - 114=af9e7817c0c6227079651d43
+     - 124=3be4b51563f626e874333b44
+     - 134=81283c7a67295fb3366a25c6
+     - 144=136954ad48c2f68abf10c0b3
+     - 154=33464eefcfce23d0c3b09c7d
+     - 164=112ce045264a06e013251d75
+     - 174=44944abd6386cd0b48af6d4b
+     - 184=d414431289e7ec58ccdfeded
+     - 194=3e7ca84d404b249133012170
+   - **Checkpoint (state|receipt|next):**
+     - 4:DONE|79f14d3f4dad57faec|addfb3767b6d690da5
+     - 14:IN_PROGRESS|9ffb45d0e256da383d|e535e0b785d08e7cca
+     - 24:IN_PROGRESS|e084ce908285be7ec7|545455588d98a89968
+     - 34:QUEUED|0264f5e6b0dac46d1f|7aab8f5e78a57aee66
+     - 44:VERIFYING|be0377c840343cfe4c|acffd5976efc76d662
+     - 54:IN_PROGRESS|cd1c515e25871ac0a6|32621e1dd20bd2baa1
+     - 64:BLOCKED|3b659cd33aca11e828|acec7f92ce4eafc38e
+     - 74:DONE|e70e0f10959f6fdfbf|feb09e148e71c225e1
+     - 84:VERIFYING|8551e350c6b42d5509|263715ddf71a6bd2cb
+     - 94:VERIFYING|f76f927c29492e38b6|b6a9d72c21c3077bc9
+     - 104:DONE|120302ac90e80b23ca|5e57bf87d77d7c9958
+     - 114:IN_PROGRESS|1d96cddd69f3ae4cd2|279ec1daee670ed329
+     - 124:QUEUED|131dd17da16d6b153e|946f8a701b8302520a
+     - 134:BLOCKED|821971b91a8d769d52|5e0d13b31a3845100a
+     - 144:DONE|0931ae539a77feae32|297a8524639d9680b8
+     - 154:VERIFYING|90ca31ef3445a0b7dd|544907fdb26fbdb5aa
+     - 164:BLOCKED|9b69decf1ab8837255|d172db7e57004c1703
+     - 174:DONE|5d4fce23c53af4b4a5|eca410e53a3a295c4b
+     - 184:VERIFYING|22cb836d04682d573d|4404709d592c1e0ad3
+     - 194:QUEUED|55618bfecd0a27e872|d6482b9d968e042669
+
+   **EPOCH 4**
+   - **Parameters (value-):**
+     - 5=e9f571d220d8d7828f0ddde7
+     - 15=d9464fc0cab69abcb3782c76
+     - 25=cf46e71dbff1aede3cdc2fbe
+     - 35=45f155d8f35f22c6420660c2
+     - 45=440ab597ace42c8786acb36e
+     - 55=d58a09ce63efe2dae8b19e25
+     - 65=5353a2263eb712f05b98ad21
+     - 75=f10d3f58c5cdfe2f57a70bc3
+     - 85=01fe60a6807ea4ff9dd527e3
+     - 95=9876ffd4b8df91497f142755
+     - 105=a1811372832745290a1be6f5
+     - 115=823cac74add82c3669954f63
+     - 125=579d14450f300f5a132ccc25
+     - 135=c2044ded4ef50b1da1b6b692
+     - 145=02ba8bf051e7b1c6e55cd34f
+     - 155=8cde148ddfd995f6a839db3a
+     - 165=38c2992367d512efc0a53fa1
+     - 175=b7fd8a4ca75e05a86d47da99
+     - 185=9748e58efc6045407e9d1f1b
+     - 195=af9ba97d3a4cab899ecd6c20
+   - **Routes (route-target-):**
+     - 5→51ffdcdebf1b7d6893fae6
+     - 15→b3b746827510794245c4a0
+     - 25→94be43adf76f1c29cc401e
+     - 35→a626767c1bba7e7a657a1d
+     - 45→325b8106ce05eb8b8f4c8d
+     - 55→556df9fa32691950cf3632
+     - 65→2d384b169b0441e2557f88
+     - 75→97a002b4005af54083c02b
+     - 85→22199d987268982bd89f6c
+     - 95→56af780f9b12406866e291
+     - 105→efa45a07f4be7610738952
+     - 115→10bedf329e6b5425cdd0cc
+     - 125→8f2918e1b0379ef236f7ae
+     - 135→e9546bd04ee40de6ee2f2f
+     - 145→8b980c1cededfd3a6940c7
+     - 155→3bb705ed993db1c1d04c33
+     - 165→d3676b0c0990adfbeb894a
+     - 175→30ef81026a08d59c21bd6d
+     - 185→575bb7fdf56404a24d26d0
+     - 195→b4139cf3d7e2af2f83cbfa
+   - **Probes (probe-result-):**
+     - 5=94a3c569bcf216f7ee496748a9
+     - 15=a306723037322d5a5206a16066
+     - 25=360aec5f761d96d9173673eda6
+     - 35=27ebbfe1477a5a3644229e6256
+     - 45=c88237d031683211196e306376
+     - 55=e30e9fa35057c13182ecc886ff
+     - 65=b37581eed6728deb1ee7b69d00
+     - 75=d601541ce3d506cc9edd19c710
+     - 85=64aaaa5f9c767016cff1545fde
+     - 95=59c01b2d00a5714033cf6b4758
+     - 105=f6055b91f3aba836a39a9cf300
+     - 115=632a0ef6ac4e1ebfe9982d5bc6
+     - 125=c024b8101199f9a1a58ba7219b
+     - 135=1e6c3e1b4a0be38c69fe2a7e66
+     - 145=01625f32a763a9d355dfb739b0
+     - 155=70d1bc334496fe5671c45d1412
+     - 165=6d4dc70d4813081c25f8e529f1
+     - 175=f814dd6f9cf639fc8c9f999718
+     - 185=297b5b95aaada000f0463dac80
+     - 195=eba7a10290a16c49f1d03bfc99
+   - **Final corrections (final-):**
+     - 5=c77f878375ac1b749ed6116f
+     - 15=7aad7df0065abfd7141a3aed
+     - 25=9193d2eb3cbb21419ee7c8a5
+     - 35=5367047e8a6360105c9768df
+     - 45=6de98923e0b5d1015a48d1d2
+     - 55=696c6fd17424196f09df2e97
+     - 65=500a5b2d47d10ec8f0d9fe15
+     - 75=b65a0d9aed03f569b9f9efdf
+     - 85=5de2bdcfcedee05d5d70f57c
+     - 95=bf8b0b3471b0b2fe7a223e7d
+     - 105=650a16cf736b0c6ae8997a76
+     - 115=de1afac7cc0cf68d6754626e
+     - 125=cd50bf1ee0cbea3833b31082
+     - 135=94a3792b693979cc398c6f34
+     - 145=66774867c933252f0e05cfda
+     - 155=1245af636700c18f3c6d24db
+     - 165=cbe3f54a198f30c50053c510
+     - 175=e3f91fdc875348530bd496e6
+     - 185=63b14ccc25653be890cbf7d1
+     - 195=fcd470cdbcbab839e46fe5d5
+   - **Checkpoint (state|receipt|next):**
+     - 5:VERIFYING|2f48c56d4ac5b3947c|372c7a95c2677b490c
+     - 15:VERIFYING|2f5563baf05488cedc|c8eeb866d2233407db
+     - 25:QUEUED|9b6bdd9c07c98375eb|a2bf794faa0a840a1d
+     - 35:IN_PROGRESS|f05f7656e2bfe98c1d|dab82138ad0a1857d8
+     - 45:QUEUED|0dc4ca03c67ac8d27f|b2b1c4e672c98cd2f4
+     - 55:IN_PROGRESS|36d677029bb74cc5ed|2e422c881a05859ada
+     - 65:DONE|72afd0ab8bdf4ebfe3|08af309ea236bcacbf
+     - 75:VERIFYING|1bdf43ef7763d40e82|3b29a5a45bae2d5952
+     - 85:VERIFYING|120856e745794724ea|bfd99a865d4b08df4c
+     - 95:BLOCKED|48f546cd4fab037fab|a5410c6bdc19e64336
+     - 105:BLOCKED|4c314d491460bfd441|a819f919eb32d006a7
+     - 115:QUEUED|d8ed21095614259726|c87087463d04c9f760
+     - 125:IN_PROGRESS|8012fc71e7532c5e45|aeea284bf9966290b6
+     - 135:QUEUED|b512d73a0e43bd8011|0649e524e2ea47fb3d
+     - 145:QUEUED|ccb05d18eb68ecd111|b28f1002c28f09b008
+     - 155:DONE|a6070bdb64fb7ea128|124423324321623b1d
+     - 165:IN_PROGRESS|8891db1e08f0ecb928|6abc3f47ecda2adb7e
+     - 175:QUEUED|27a52e05df1cd53437|217ec79742a38aa24d
+     - 185:VERIFYING|335c7a0da21ee07e3a|13dc4e4ac1a2cf7003
+     - 195:QUEUED|1b0359f2837f08cdaa|3d46b24efce2b45347
+
+   **EPOCH 5**
+   - **Parameters (value-):**
+     - 6=e6e3e5be0bf11ad3d1a77b43
+     - 16=35f9dcd189205de345f9f32c
+     - 26=b7daf49170153dd363dc4c60
+     - 36=2121c5401830193832575502
+     - 46=9cbf33616c7d3e02465ec57a
+     - 56=ee0cd3b86415715fbcdeb0c1
+     - 66=5f2bc540f2554cddad447b5d
+     - 76=a0ace42b83e25964ca34145b
+     - 86=ff742eb2db836668ced0203e
+     - 96=dbac482a4698f902ea258fda
+     - 106=071c30075ea9d0cc2a27d8f3
+     - 116=a8b5d1088aa607d56b63557d
+     - 126=00fba62ee3af5e921db6fc5e
+     - 136=b142b1e29aefb13efb1ee454
+     - 146=b1d0fdf2ce9d3a965bb1b597
+     - 156=83d6b870689f2e23f25a4e91
+     - 166=0bcaa6c6ecce269ce45196ca
+     - 176=b094c0f10945cb0f042b911c
+     - 186=7979c669dcea0a5b881fe543
+     - 196=cf79758a374adf8244044543
+   - **Routes (route-target-):**
+     - 6→33d23fd65bcc10d371a9de
+     - 16→6f7460f4c8bace90d6b603
+     - 26→01f181dd340ec730e358e3
+     - 36→9fcb154bd6cecc80dab8dd
+     - 46→db6c2eb42c974c6e52d302
+     - 56→61ae195fbab07bde3bca4c
+     - 66→3d299b88eafd68dbe7dd2b
+     - 76→0026260e5ebda5ca6d7d7e
+     - 86→8bc98ee6d7d0c5225a0f79
+     - 96→a00555120b6af4d24e0812
+     - 106→4953292f00ec15492d4a30
+     - 116→dcfee76bb7feb551f823e3
+     - 126→8aff533e95a3f047c63482
+     - 136→e89bbbbf5ccc58d5682a5b
+     - 146→a25cac4dae4fff9bc3b20e
+     - 156→ce99494035ba325fb35ccc
+     - 166→f99c63caf765450cd5b93c
+     - 176→97bb275d8c5eb578a3b5f0
+     - 186→3951ff3560a584d5cfcc0a
+     - 196→934adbaf57e781c65a7397
+   - **Probes (probe-result-):**
+     - 6=b7ded3cc6c61a429e3aa57178f
+     - 16=59ca7c6bcd4c70c12eedbdba33
+     - 26=7da71a50745af7e646f01d0bcd
+     - 36=40ec8f71f44bf0191474890799
+     - 46=9dbcddbdfe6d051dac9fe40bb8
+     - 56=f2eb3eec70f7e1b8e3981b12d2
+     - 66=f55f523755d0ca4d851eb4037e
+     - 76=f36a52c5a68a43467ab7a54258
+     - 86=cb374b106ddc5c84cef6b2c22e
+     - 96=a3ba3668748ebc1bd5bb2f54f3
+     - 106=aa869d743063747263efcafaa6
+     - 116=d4523b0352cf2cce63993f372a
+     - 126=5c220cd831c2ba30767d71f1e4
+     - 136=074e1b76fabc6147f5fa775c07
+     - 146=33aeb0f27afcfd2c9cd7c16906
+     - 156=4b7e71255d11c427fe315d220b
+     - 166=fed14db30275ad2684b53342b0
+     - 176=1b891efa7b1b454f76893b168c
+     - 186=92c995c6f7e0f1f5127b06dec8
+     - 196=2ed5490575bb5ec16451d4d91d
+   - **Final corrections (final-):**
+     - 6=874f2f1d47eb8c8dec2eb28e
+     - 16=b4c82e2ccf5222ae4961d0ed
+     - 26=7309a9cf117ebf7954e4cb89
+     - 36=7ac28237be0ed5f1e2a2fc44
+     - 46=fd95a25e7eb501f8db5e6bca
+     - 56=8dfb23d7e6b6658b04f656db
+     - 66=e5969a7eb889f4514665a297
+     - 76=1fc054f05f766cdf7f1945dc
+     - 86=468c7dc30869f20be3bc2f90
+     - 96=61a5264f840644f8ddf58f13
+     - 106=eda51f8a610fca792bac1396
+     - 116=466f72d4791a7e7d019bd3b8
+     - 126=dabf7bae471981504ecd8357
+     - 136=53c2dd12802921b19ee1fb4d
+     - 146=9f4e9be9dee76aab7bb56a34
+     - 156=4a17e7eb9057b34c714276c5
+     - 166=39ec48858fba6bcb9236f825
+     - 176=15cf0c523f7c1760fd3f6228
+     - 186=a4fdf155ca413740599cbea2
+     - 196=bc4ecd85b90b07bf382bd746
+   - **Checkpoint (state|receipt|next):**
+     - 6:DONE|49c066cdb19c050442|5d7459703c57beae29
+     - 16:VERIFYING|734fc706024d1c5b1b|601db7a2e250c58a85
+     - 26:IN_PROGRESS|d8c81a76b55aeb2e2b|4cdd1b6086cc661a19
+     - 36:DONE|615d8ca22128cc6580|8712bce5ef259fcb45
+     - 46:BLOCKED|a3740e0475e31dbe46|3e05f4d73337d1600b
+     - 56:BLOCKED|bb62ada7ce9d260775|6fb717d641966256b0
+     - 66:IN_PROGRESS|9debff1ca94a694454|7af7bbad9667bdf52f
+     - 76:DONE|a0859993b0617dee08|f9bf4077cbcb6f861e
+     - 86:DONE|bf4130532eee62adae|3e38eb104564da3c25
+     - 96:BLOCKED|9c637e1b33490ca50c|c90c2ec43e50fd074f
+     - 106:DONE|b96dfe97c432fc004c|ffd615fb2a9d07c951
+     - 116:VERIFYING|5bc0811e07df973cf9|2548c41866f7e71cf2
+     - 126:QUEUED|3d25d9f7df8ce76beb|ca3dbb08c7e5693067
+     - 136:VERIFYING|b3bcdde1b834207a00|02b09c21e4924388ac
+     - 146:VERIFYING|fedac2f05f038fc416|b40384d02810170b4b
+     - 156:BLOCKED|53ca9a0d9572fef966|2603f259bec143a7d0
+     - 166:DONE|452b4906b3465c35db|7e9c576c777b1895d3
+     - 176:VERIFYING|9e364149d4667d3382|24c7023f5125bf379e
+     - 186:VERIFYING|875ee49b7306811259|8533abd21687d45130
+     - 196:BLOCKED|1776d2d47e715b2396|ced7da3472a767b62a
+
+   **EPOCH 6**
+   - **Parameters (value-):**
+     - 7=6079c04dfc938f11139759c6
+     - 17=a73623b9220258c5ff2983b6
+     - 27=7a4a7123994f5715dcff8337
+     - 37=eca07dad189bb32a51ea2ba4
+     - 47=c5a71f20318c866d53b61534
+     - 57=326d8c678593d9fd9dc10cbe
+     - 67=f7ffa936c160525e63a6033d
+     - 77=27f8392e4010e5731f797ae8
+     - 87=9d4dc53778b0f4890ac245ee
+     - 97=9e0e987bbc16f60c784d9039
+     - 107=f600d57b0eac845ac0d5e495
+     - 117=6354bb973b324f3762c39562
+     - 127=8f4dbd720032295dfc239263
+     - 137=2039a3443f24203422043eb1
+     - 147=d7a40a5c2da403e0ba44e122
+     - 157=cce30d47813dba7163e61347
+     - 167=a4284c9c934016f1447c19d6
+     - 177=be8198389a2ce08f21b53abd
+     - 187=cc328c7fc137d0fd22d7ac9b
+     - 197=84a3441d89ca3a997c7e73b9
+   - **Routes (route-target-):**
+     - 7→7821790393ef1ca60e87bd
+     - 17→03062623f3cbf0e3c6fb0c
+     - 27→975f99dbe32f063aee919f
+     - 37→70367054cf8d43a36c4cf2
+     - 47→5eb4398d9a99db84a45fce
+     - 57→ec9452ffa07307a80f5e76
+     - 67→d8288afdf5eb9745464a54
+     - 77→8887434140af71b080856c
+     - 87→4389ebf86482494ec8d7ee
+     - 97→3f7e6e1aa5ae518ed008c8
+     - 107→a90b053755f81157f34390
+     - 117→71a63171516c30702925f3
+     - 127→46a8d37dfb27ccc31df326
+     - 137→6e3959f2d59ef37ceb6e06
+     - 147→072eab7607b0c880c89bde
+     - 157→160dbcd06a8fab6fbca3c3
+     - 167→8514a1a6074aeba2851f78
+     - 177→1059620e4d34cec60d9353
+     - 187→c4c1ab0946ec7840445f45
+     - 197→a59752b565acbfaca628c8
+   - **Probes (probe-result-):**
+     - 7=bc95ae4b27b93bdd0bbb4e8f2b
+     - 17=3dd657e37889ac793b5f82ca88
+     - 27=ee09d16a9faed93a6f639b3a58
+     - 37=0fa9707f1a62b566e43d7c53ea
+     - 47=b7811d73e517b3aad59d2fef95
+     - 57=d78708451df38ad9b079cbd847
+     - 67=fa669b5dc3726cc8e08af1e6cb
+     - 77=9f4951fab42c8698bd033e57e7
+     - 87=112fe01d0fcb53b172fe42de9d
+     - 97=0a88bfd44fcaeff15b2dd16d45
+     - 107=a6c529834e71117b612d2da807
+     - 117=92bd6877dd802b0f299be8d7d3
+     - 127=4d31099ba03de373ce72532360
+     - 137=6140590dbb258a370ace85fe56
+     - 147=d15922757e15852f174d93025f
+     - 157=7a589029afa3cbf1a6a9b813fa
+     - 167=79825735ee8098a9bc0f6216c9
+     - 177=2414cffffe0ed19517060dae00
+     - 187=dbc735e3a704c5c6177ab75f44
+     - 197=9aaa169bd9f8965144fdf799e6
+   - **Final corrections (final-):**
+     - 7=028fd55ae8968fb278e6b8c6
+     - 17=6da7e206b690f5f405295533
+     - 27=734222693b513c013a4978f6
+     - 37=1704cb10d0fda0c39f9dcc7a
+     - 47=170ac0d9eafb1770d8496172
+     - 57=0a66db640ef613ad84001a16
+     - 67=ef585659b7032e9f8c3c7dd4
+     - 77=5f59a91c648cef047079c205
+     - 87=ab2342b56eed37d6b37dd364
+     - 97=293936f1471f141cb9f52e04
+     - 107=fc2d6c7e5af0f80c98a04d59
+     - 117=d05af703f62241668d5c8733
+     - 127=1a6bd4fd7d2ed623623a5c7a
+     - 137=4f6f398496238683792ca688
+     - 147=7cc8a4d2e0bc033ca2756887
+     - 157=e8b2aa4e60a07c9b4a8025da
+     - 167=ff3be6ce956e9567a625a0aa
+     - 177=d860500118d304129b2f8288
+     - 187=6246199cefbbaa4994085990
+     - 197=c14e492662d23c7423337521
+   - **Checkpoint (state|receipt|next):**
+     - 7:VERIFYING|e850db1250f0bc1712|a418aa425940e7ce9c
+     - 17:VERIFYING|cbe44f85ee6938ce95|7a304b737533838bee
+     - 27:QUEUED|6a8c3d7e47b8de092d|e239bc4b2a66ec690d
+     - 37:IN_PROGRESS|fab44ba1718584227e|249a788c9f82865e8b
+     - 47:VERIFYING|ef88c74fd0123b6a56|a7422beb49750d19e5
+     - 57:QUEUED|dfa029b1e516ad09f8|be24d99299736e432b
+     - 67:QUEUED|8a4a39f8e71ce4f59b|88df4f3a1b993546a1
+     - 77:QUEUED|cf9e025a7b21aff3c2|06a80f3cdd22a7f787
+     - 87:BLOCKED|d4ab8cafb8a9432398|aa49ac21253595bbce
+     - 97:DONE|bf3fca1c7d9faa949b|6360dca7fcf25e0c74
+     - 107:VERIFYING|3ba2de38f70883273b|5204c36ae917fbfc3a
+     - 117:DONE|c9042b795ccca26e52|1f4c8ae06169ab3a1e
+     - 127:IN_PROGRESS|65fec51d74ddf0b538|0abf28ac681af4ca5c
+     - 137:DONE|a5f9425b523faf6767|5d5fe0263415c6ed37
+     - 147:IN_PROGRESS|9bf74986e7753f08cc|3118d629d1c4bfd4c9
+     - 157:DONE|1fa58bf2cb71b82acb|e9a0b1ee0eefe686b8
+     - 167:DONE|4160df68ee6141005c|8f75de9d70782eb324
+     - 177:QUEUED|7f1b8dd050a9e84158|d94b81382ee2567fb9
+     - 187:DONE|a3ac3db0afb622ead9|36436f079e515b3f09
+     - 197:BLOCKED|790c10ba2523edc25b|a63683154e98411469
+
+   **EPOCH 7**
+   - **Parameters (value-):**
+     - 8=bc800ff939c7eaa6aefc5d48
+     - 18=83f92611338638719c2cdb97
+     - 28=92237b3e4c5741ed8eb81b77
+     - 38=eb0d3509fb354bfdc7a070d7
+     - 48=61b6b823903d5ed06679cfa3
+     - 58=c221066f9b064ed393f24188
+     - 68=09b8a3a3fd4f8d711568093e
+     - 78=e1381bc16d0c97f450467c28
+     - 88=6d7392f30412b88efb7d728a
+     - 98=7b2a1e560cb67557e1ede75c
+     - 108=4b06ef3f3d9cef08cb4606ba
+     - 118=a74c61130e2992025a71f03a
+     - 128=620ec567d1d05324cacfd44a
+     - 138=e4a31d0f0afe3b041a2080df
+     - 148=c983242895cef4ed8562f658
+     - 158=6f47ca27444b60c6445cc794
+     - 168=bbc099a8e7477cb02b8b0e42
+     - 178=df0e0daa7866aa0bae16b7f3
+     - 188=411e4b31fba43b81af9e400d
+     - 198=c7a80587c4d254701dc47708
+   - **Routes (route-target-):**
+     - 8→644d3ce2b075cb7846158c
+     - 18→11320d6917b6ef3b0a07a4
+     - 28→623a2fbd211879890d79f8
+     - 38→7e460bc6977ca53e558c1c
+     - 48→8026a1d42c92c1a50f48bc
+     - 58→91df6c67942e23fb9f1133
+     - 68→26fa4c7ee2b96c4ba26a73
+     - 78→005fce5bdd9ccccbe766a8
+     - 88→847038b853b7b825cd25ec
+     - 98→1f1c4978ce48754a1aded8
+     - 108→1d00590566e1e9154f20af
+     - 118→0c5572d995148bf5d25461
+     - 128→4c56e1a8c798a163b14675
+     - 138→ed0b2a886a7fd005d137ff
+     - 148→e0e8efa20c6c0f9d30ef11
+     - 158→62736c06b7a618b7f8aac8
+     - 168→e6c64e40e6bf1b2b360cd2
+     - 178→ef24e4b79c35b048e17b85
+     - 188→b186d777272a293a3bb91a
+     - 198→1bba7c21f43bfc458f094e
+   - **Probes (probe-result-):**
+     - 8=b70e483ee4ba10c296e2aa9071
+     - 18=2847c840acba0e2c501e8280cb
+     - 28=ba86937d4a07e1d399ec59b250
+     - 38=5d7e454a942a0532ef53f8f528
+     - 48=ac60607a9857e3bf30f647a25f
+     - 58=cb630a44b65bff1598bca765b7
+     - 68=99429b9943ce4f2ad09aad257f
+     - 78=3f616385b07d2eca059f8c8495
+     - 88=dec6c0336b05235be63897035e
+     - 98=651030273a9d5c2b714e2ca95a
+     - 108=d15e3b1141d80930bfba92ff3b
+     - 118=68739ee7899918988257abd811
+     - 128=c630cae55bcf5a5e40b59b9ffc
+     - 138=42b1553b013d7ef17eef5c7a0a
+     - 148=d162d8fcd17e19148274568c8f
+     - 158=05ed3a55556be1777f4f18fff1
+     - 168=fc3fc9ce90ddfc4ddba19c45bb
+     - 178=eb28540f5cfa5f59cdc238e927
+     - 188=a99f3575567b8106e2f6f22946
+     - 198=21de2c109c4cd39cc6c2f7892d
+   - **Final corrections (final-):**
+     - 8=6be7df118c2fbec98d09a3de
+     - 18=c1911fe4716fb284d0bc370a
+     - 28=67150289793bb6a402304e90
+     - 38=dcf675de39a1a1248bfa3622
+     - 48=2214290f2f72b948729ca1d1
+     - 58=99c27b5503b13f91b5408d02
+     - 68=b0ce7110b0c17ebb3748b2fa
+     - 78=d4f0e7fb26b57743f769c571
+     - 88=aa46a567ee64c88e72b0910d
+     - 98=58d683b96398bbbf7faf5ca4
+     - 108=5382cb5994e6e8ff11caeead
+     - 118=8fa4ab9be241519a8d28764b
+     - 128=ef60722014bf2b07801a9838
+     - 138=5382a6f72127160c4ae52213
+     - 148=96fa04558c40257e7211edc7
+     - 158=0ed0014cbc75b343e21f530a
+     - 168=08edf3f47a8ef02d254e671e
+     - 178=fe8b26dea2b05e608fd2ca57
+     - 188=7b8142e60e655ce268dd6161
+     - 198=90040a077317ad0feb52dd1f
+   - **Checkpoint (state|receipt|next):**
+     - 8:IN_PROGRESS|8d7b3710f68349313f|5bbc072b55dbeb4bf3
+     - 18:BLOCKED|c53a8e0c94a49b71e8|ab6e1c6e80041e1da3
+     - 28:BLOCKED|27fe155cb0b24d3c2b|357abbee1f44cbc89d
+     - 38:QUEUED|b038328b1d8c3033a1|f61e70ef252f4a1cb5
+     - 48:QUEUED|c569e89b8f6e7ccd00|7429c9bf3ee2e90d4e
+     - 58:BLOCKED|32a3c5104e9fb09720|34f52cba18a4d0f69e
+     - 68:IN_PROGRESS|0e85ee95e8807a2f16|95edc8f31f77c14fa2
+     - 78:IN_PROGRESS|8b0c6b8fd5b74e923e|219762dc12d5c1ed8a
+     - 88:QUEUED|b67a1071429401308d|3499eac013184aa82a
+     - 98:DONE|7d6c3088cb23361cbe|3ee0d6e9ae3770cb43
+     - 108:IN_PROGRESS|0dfc24c001c846b3ee|9eea32ad528f5a9ca2
+     - 118:IN_PROGRESS|9a8ffe93e03be3feef|0abcd7006df14641c7
+     - 128:IN_PROGRESS|f37e8bb0cda90c3323|8ba094e04e79b23efb
+     - 138:IN_PROGRESS|1dd66f23ffc18f28eb|b1754f3bf6f6827037
+     - 148:IN_PROGRESS|084bd01f46931890d8|a2c40bf3cff5c546b3
+     - 158:BLOCKED|b756d839dbacc525ef|f2b56f56e2dd4e2311
+     - 168:IN_PROGRESS|81e3511166d4163e2c|5977ba5fc6e9578f71
+     - 178:DONE|e9dd94cdea1eabf662|11a0463d57d6d8a8d2
+     - 188:DONE|035444b468a5cc39c7|fcaa055488c39eedf5
+     - 198:QUEUED|bfff1cdd5ae9431acf|5f27191f9c1a9f1b0d
+
+   **EPOCH 8**
+   - **Parameters (value-):**
+     - 9=7e4540510a7f3f8b97e8b1d7
+     - 19=5cccb992098667a7820b6950
+     - 29=e310bef88e166cf70bfcc213
+     - 39=4614756c35297c38959c4c25
+     - 49=6dfc6a2dcd2ff86064ea5d1b
+     - 59=10a17e86dfa82221285f8082
+     - 69=519319ec53d02ed0d833f329
+     - 79=ee8ed84f7973f57beaced35f
+     - 89=6972e091f9d7642aaacfa1b4
+     - 99=671c982fde44c787913afb5f
+     - 109=25726f5e9db3a81ff2944729
+     - 119=31159cddf7fd7902e0b33d52
+     - 129=8cc11f453ff9dc8c5aadf3d2
+     - 139=8819fbcd2cbb91cf08dd3bed
+     - 149=37fdbe5c1ec200cc3274f35f
+     - 159=a3767cc998ffec7efcbdad3e
+     - 169=065b0e961336250d687b82dd
+     - 179=cb988643604b840a57aef299
+     - 189=92b89562a986d16bcdb70b4c
+     - 199=02dd09b92a82a93755d83698
+   - **Routes (route-target-):**
+     - 9→d603a86367e964c0a7c8d1
+     - 19→c256fd6378f5eec9e91584
+     - 29→0f54c245684af5e05e252d
+     - 39→c13df6df142a37458239b6
+     - 49→9c53a99cf0026613137be6
+     - 59→eed7f5eed8be42f0b72bc0
+     - 69→db3f424c483982a78db47d
+     - 79→4908bd4662364a2a6f60d5
+     - 89→4f1dbdc32d00a161f0b86f
+     - 99→1bacc08fa11694da8c9848
+     - 109→d53e09d7207d6d428ae73d
+     - 119→5e5a89cf7a013f21b9d1ee
+     - 129→c00b3ba129c83fb678eb27
+     - 139→304121d0871cb09b075d42
+     - 149→493adce8fd16c812d27b88
+     - 159→c2915ee65fb47677cb8c66
+     - 169→708d524a603f93f62a74d1
+     - 179→172225f62e381253472a89
+     - 189→1e49e018e1dcc82ae6afb2
+     - 199→3767b90b466c6b533fce50
+   - **Probes (probe-result-):**
+     - 9=be80f7121d815a9635ec0cd4e3
+     - 19=b83ecf09195ad22e5f088e07e3
+     - 29=1315cbda2862625f212ed30a25
+     - 39=455c01888304a760d22212af78
+     - 49=ccf10cf2d7eecde9550d70a7ac
+     - 59=fee933a0eb69623fa34ce29eba
+     - 69=978768581e85c782952bb232c5
+     - 79=67002082bb8f6ac3776e58d5ee
+     - 89=bb0f55381d5b1bc1635467f366
+     - 99=4f1fc7d512c1364696bee2c8dd
+     - 109=7e9ffc173e955f376690849e85
+     - 119=a5cf8d850bf13151d4cc428959
+     - 129=a821d2fee4ba0a8b5e0bc999f0
+     - 139=b6f645a37e232abd92cdc03b18
+     - 149=e63e73ead969c1550bef7d4c9f
+     - 159=59e93f89fb97f24901a7c703f1
+     - 169=b264bd61f5b86cf7b5d1c3f148
+     - 179=0719f9d164da6b17435cc9bde7
+     - 189=131d111ada12f63b77310acdd5
+     - 199=b0156d8fb6b07b24b8fdee27da
+   - **Final corrections (final-):**
+     - 9=25c6ea2aec2725acd0035f25
+     - 19=6ce2fab3a2b518a9eddced82
+     - 29=c418a6da91abebf963364ea1
+     - 39=fd38ae944514bc0865c507cc
+     - 49=7e96de0b79ec203200841939
+     - 59=124882c7f79b23324689357d
+     - 69=ed69bdbb28337b18bb874618
+     - 79=40122504e4e60226073bc8fd
+     - 89=6e27ecda26f95cfb2869b583
+     - 99=5f225c74c0cac6648953d545
+     - 109=38d7787efb117dd0eca3ffe5
+     - 119=f2e26d44f6ef7edefb9954d1
+     - 129=98eb8baea7bb66bf4ef672af
+     - 139=68fdfd2b3a8cd7122385bfa2
+     - 149=c1161e5cbc46bcd06d6e8443
+     - 159=463e6e8c2397b32d673c7d18
+     - 169=1dae63bf6affd9e6cfd6d603
+     - 179=aa7981288ec4897f3a901b80
+     - 189=4f3fdb22509407f17382747e
+     - 199=29eeaddddc876cf9001930bb
+   - **Checkpoint (state|receipt|next):**
+     - 9:QUEUED|ecac8baaa40768f2bd|0d6c4ff088dd319200
+     - 19:IN_PROGRESS|a49db8a9d8eaf6a607|2234138bf517e5468c
+     - 29:BLOCKED|cba31e58108e4b37d9|dbd4fa8d4be33f886f
+     - 39:DONE|546871a4861356c1a4|26affc869ce5b5a5f4
+     - 49:QUEUED|cbd3758b4bc69899bf|c2c84eff98a09d73ae
+     - 59:QUEUED|c52d374ad23e2f7f92|934cfee411521ac5dc
+     - 69:QUEUED|78207c38767b47a979|5306a6827681888d5e
+     - 79:DONE|425105b46116d8d998|1b8d7ac81a8b6530e7
+     - 89:DONE|2e86c0f7d03bec0788|21b424e56fe9ce036c
+     - 99:VERIFYING|3df0002cd21c6e0d6d|b7069a621334cd926c
+     - 109:VERIFYING|864b2f800c0cb96b55|06ddacc5292e570b78
+     - 119:BLOCKED|ca63239cfb904c8afc|00e4db1cd6b754271c
+     - 129:VERIFYING|bd0cb78212c11faa14|2debec4b7eddcc4e2d
+     - 139:QUEUED|c8cf376e47b14fe8ac|cc699ea479fc2d08e1
+     - 149:VERIFYING|088f05b6f833a67032|88569e9a6de305d419
+     - 159:VERIFYING|6109d21d3474fa72c0|3d313cda98b0692310
+     - 169:QUEUED|37ba18a06b0f25979e|c9af979ca988a56d89
+     - 179:DONE|c736e176c759ea4a23|a2a3b5d05ca2260543
+     - 189:VERIFYING|e7a03329480337a518|4cca7d77c05592977b
+     - 199:QUEUED|eaa4281d7077282cea|8b36506940d84006f2
+
+   **EPOCH 9**
+   - **Parameters (value-):**
+     - 10=21a486d4373fcc02e548d045
+     - 20=37544c70d64c8cdc928d6da5
+     - 30=0f2a7a060ace9091a6a73fde
+     - 40=41e03ee1cdf47c176702e13e
+     - 50=c69e8f91a9a00e5184283912
+     - 60=9ba760b93ad89bad7f60d0ab
+     - 70=6baca8ef9b64e751f5d1b491
+     - 80=692f6cfbbf4cea67c029c245
+     - 90=1fa68c777c3f6f8d1e9ee20d
+     - 100=7d9b79e431d7439dc9634238
+     - 110=8d83048692d49e2b7a83f206
+     - 120=97fe3723ca930d8a95702c5b
+     - 130=93499a6ddb5fabc1a715d384
+     - 140=0d4d1f5631de902e17e266bb
+     - 150=b599c0cb7a96c3708a343f64
+     - 160=65a01d0a6d561c5963150143
+     - 170=da36a8286367733c539a0903
+     - 180=b35f64ddad3f42acfaa567f0
+     - 190=5d710dbf790e82aa4f87ee77
+     - 200=24c959fb366b1fcf874c362f
+   - **Routes (route-target-):**
+     - 10→b58ba457ee28c219b07e8d
+     - 20→3414c45da93e413e39a9a4
+     - 30→5323f5f7e9b390da4b5490
+     - 40→b69f67d02db5baaf78d396
+     - 50→bdf6e5148f7346f63a64ce
+     - 60→754b4d34849e2d18aa4a3f
+     - 70→6f8290b56bfee36064d961
+     - 80→39bb1866c188636d53044e
+     - 90→a1e0f8e0538ce2659c3580
+     - 100→fb7f9c4291959de3f84cf4
+     - 110→c06feea0103aeae46a0788
+     - 120→e0b254f1eb6199e579decc
+     - 130→9e80831d13dea4bbc654a7
+     - 140→78dd3e0e0a6c728de751e2
+     - 150→b24edae32779997b3bd261
+     - 160→bfb85bfdcb433398a9942c
+     - 170→6c7edcb5b7997c3c590e7c
+     - 180→756f4f8a29baf0d915dd13
+     - 190→6413a248ef9f093565437a
+     - 200→ca4efc6bcd4995c7fc01b1
+   - **Probes (probe-result-):**
+     - 10=f4e178c9a3fcf653b472e68af8
+     - 20=532f83ccd04f54fe3c80317600
+     - 30=b37a9de541f8d5532f64bba2d9
+     - 40=2a711862638fcb0ae912d3f698
+     - 50=62577045a625f6fbb9b999e0db
+     - 60=f42c56859bfceac1a3edf808d2
+     - 70=ad8ed157415910d89fd186f4c8
+     - 80=9d749889357a9daa06d25775dd
+     - 90=f18cd242425eec3273c37ef7e6
+     - 100=4934db8559f0481ee442f354d3
+     - 110=8848e95c9ef14d679c3c063962
+     - 120=6e5fd1be056120c6a4cfbaf504
+     - 130=b5b8263bfa448ceb702e1452b6
+     - 140=5579285f6c64bbc6932f730ef6
+     - 150=4e7e1844679415c5e103d75013
+     - 160=df0113bd768f23fad1452f924f
+     - 170=8623ef07862f3f3be034b91e77
+     - 180=f5509889dcb39aa309bf4deff1
+     - 190=5aeef94c4db9d89d5735b7864a
+     - 200=ab19ddd6f5a5d10a1baa41d136
+   - **Final corrections (final-):**
+     - 10=b4ab2f4b7a7d97919098702d
+     - 20=7158d45a27aa5f4bdff3eacc
+     - 30=5fcb61007df27a64d650c2a7
+     - 40=556a63c627ae86e8a71ed948
+     - 50=3eaf6b1184001d9b7efcd0d6
+     - 60=5c09e2b416445e252a2da291
+     - 70=a8690dfae0f297fdf69806b9
+     - 80=f9fba81d105582f197d2646c
+     - 90=dcbc3e0ab5237d406668f829
+     - 100=d5319e2b41c2cfeda0e7f551
+     - 110=e6e47edefb42c28ff951c747
+     - 120=e7b8761770f088ec60df95f6
+     - 130=b721c1e85d17fdb9e4084286
+     - 140=b076808db0026d2a5480c590
+     - 150=7230ef730979ca6348da4220
+     - 160=819e240c680694a0403f44f9
+     - 170=2f441998c5750da12b304dd4
+     - 180=303c8772ab2c32c81c93e33a
+     - 190=2ab1d39489d27f39bf8a2027
+     - 200=d563e651ba527aaf61e76372
+   - **Checkpoint (state|receipt|next):**
+     - 10:BLOCKED|ac74502092f85af64f|8b5cc3dff4a4883c22
+     - 20:VERIFYING|17becc1fc481af9839|686b20b3837b5aff9f
+     - 30:VERIFYING|fd0fb8ee19de2946be|be1878faedb212e1c0
+     - 40:BLOCKED|98d755627ffe35bb85|4125346715d3be78ec
+     - 50:QUEUED|a1490231ae53a2ecf0|ded86020d8e8301d8a
+     - 60:QUEUED|9ab9121acc296553b9|82f33015b6b2841199
+     - 70:IN_PROGRESS|bb565d93703e5b7219|068a724d0103d36435
+     - 80:BLOCKED|70ea7f19648246e56b|991a9905fb7eb4e148
+     - 90:VERIFYING|a66f014ab4f4495b13|a1fb0741ce397881b6
+     - 100:BLOCKED|d7b8e93e6be835813d|d92b99ac6cb6e32756
+     - 110:BLOCKED|c61b4323bc8264565d|f048cf699453f3800d
+     - 120:IN_PROGRESS|818a5dedca79460469|31a5c30fcdbf1b6cef
+     - 130:DONE|6479db30deb2942d0e|51375d3cb7bfae12b5
+     - 140:IN_PROGRESS|19f259ae6dd15e6163|0da86c9ecc34f40d5c
+     - 150:BLOCKED|8df9bf4e5105344efa|f5c1b2c4ea73d686ad
+     - 160:DONE|657fe8cd69c0816cac|3dd5977c1fd99c1745
+     - 170:QUEUED|55a046749317c05e56|c90b52a2224afbf3f0
+     - 180:QUEUED|9642e5b1acacd117b6|106d9011f7cebdff0d
+     - 190:QUEUED|7e210b4b34f9fa9001|d5060d33ac95debda9
+     - 200:BLOCKED|ddf5b787aa9d376ba9|2ae06356453a0114f6
+
+6. All user messages: For each of epochs 0–9, in this order:
+   - "AUTHORITATIVE EXACT LEDGER, epoch N: … Preserve every key and value exactly."
+   - "AUTHORITATIVE DIRECTED ROUTES, epoch N: … Every arrow is directional and current."
+   - "SUPERSEDED CANDIDATES, epoch N: … Every value in this ledger is obsolete."
+   - "FINAL AUTHORITATIVE CORRECTIONS, epoch N: … These values replace the superseded candidates exactly."
+   - "AUTHORITATIVE WORK CHECKPOINT, epoch N: … Each state, receipt, and next action is current and must remain associated with its work item."
+   - "UNRELATED ARCHIVAL MATERIAL FOR EPOCH N. Ignore it for active-project continuation." The material consists of long lists of non-authoritative archive notebook values.
+
+   The final message asked for this text-only summary with no tool calls.
+
+7. Pending Tasks: No explicit task is pending beyond holding all of the authoritative state above exactly.
+
+8. Current Work: All ten epochs are recorded. The most recent step was acknowledging the epoch 9 archive ("Archived epoch 9; active-project state is unchanged."), after which the user asked for this summary.
+
+9. Optional Next Step: Wait for the user's next instruction. Any answer about project 3617032 should draw on the authoritative state in section 5 and ignore the obsolete values and the archive values.
+</summary>

@@ -88,11 +88,14 @@ node benchmarks/compaction/run.mjs \
 
 [四路压缩报告](results/2026-10-20/README.md)记录 GPT-6.1 Sol / medium 的八个高密度 seeds 和同一开发历史的三次独立生成。主表按讨论事后剔除一个极端低分的整案例，四路线统一使用七个高密度 seeds；完整八样本和全部原始产物保留在附录。报告并列展示正确率、产物 output tokens 和回放 input tokens。
 
+[Opus K2 补充报告](results/2026-10-20-opus/README.md)复用同样材料，只测试详细文字摘要。记录六份成功高密度产物、两次生成拒绝、三个开发重复，以及原生 Messages 下默认 5 分钟缓存的实际命中。内容评分与严格 JSON 格式评分分开；其完整历史对照使用 auto 以复用生成前缀，专用调度与上述通用 Responses runner 有所不同。
+
 本地假上游检查 runner 的实验隔离和数据处理；公开记录核验器检查文件 hash，并从原始回答和题目重算分数。两者都不调用模型：
 
 ```sh
 node --test benchmarks/compaction/offline-test.mjs
 node benchmarks/compaction/verify-record.mjs benchmarks/compaction/results/2026-10-20
+node benchmarks/compaction/verify-record.mjs benchmarks/compaction/results/2026-10-20-opus
 ```
 
 生成器改编自公开 MIT 项目 `algal/pi-openai-server-compaction`，完整许可在源文件内；Codex prompt 和文本保留算法的归属见仓库 [NOTICE](../../NOTICE)。

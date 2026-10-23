@@ -1,0 +1,220 @@
+{
+  "schema_version": 1,
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 13453,
+      "sha256": "c78df197ba9458b7229ce9a648e0fe6e2355f9256eed9aa653fb487b8790a64a"
+    },
+    {
+      "file": "cases/normal-r1/K2.txt",
+      "bytes": 17909,
+      "sha256": "affd6455bc559ce05efef22f8191c048dc05712d1f529d13687465f32643edfd"
+    },
+    {
+      "file": "cases/normal-r1/control-empty.txt",
+      "bytes": 60,
+      "sha256": "e290bccf9d2189d9657439f3829f27b999eb0c0927a84c9a519271441edc2259"
+    },
+    {
+      "file": "cases/normal-r1/control-full.txt",
+      "bytes": 4531,
+      "sha256": "5fa3191a6a57ed0fca2097733b60ed33e5e95c30d50b30d6aafbbe7c6dc55c21"
+    },
+    {
+      "file": "cases/normal-r1/quiz-K2.txt",
+      "bytes": 4305,
+      "sha256": "d65cf9e544a7af0cffb8e96dd4286f377ea571d6a46fa9cb41fb13ca94a7ab40"
+    },
+    {
+      "file": "cases/normal-r2/K2.txt",
+      "bytes": 14665,
+      "sha256": "aadea4ee9c17d1faa3fcad690850164a99f7af8221f62a2be6e5a94cf500493c"
+    },
+    {
+      "file": "cases/normal-r2/quiz-K2.txt",
+      "bytes": 4193,
+      "sha256": "ff18132fb7e6fd03b428cd3ee73c17105260ef332d151f59f2a471ef344e466f"
+    },
+    {
+      "file": "cases/normal-r3/K2.txt",
+      "bytes": 10696,
+      "sha256": "5649a4d7537c8df9ec5ae0ae8af4300b7dad0cbe7bc74779d9557b7d3d08d2e1"
+    },
+    {
+      "file": "cases/normal-r3/quiz-K2.txt",
+      "bytes": 3952,
+      "sha256": "a723f33bf8e5c4d16292fa22266b9ed854987e98f29da6484385f966cb09068b"
+    },
+    {
+      "file": "cases/stress-3617031/K2.txt",
+      "bytes": 37698,
+      "sha256": "449606a3824ca1dbbb423e518d6b985fa4f67ef8bbbfec9540d6d7159219cd4a"
+    },
+    {
+      "file": "cases/stress-3617031/control-empty.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "cases/stress-3617031/control-full.txt",
+      "bytes": 10082,
+      "sha256": "62ae3f6bb9c9213044dcf8cbcb33be36ea9206db73aebc37c92cfa4fba19204a"
+    },
+    {
+      "file": "cases/stress-3617031/quiz-K2.txt",
+      "bytes": 10082,
+      "sha256": "62ae3f6bb9c9213044dcf8cbcb33be36ea9206db73aebc37c92cfa4fba19204a"
+    },
+    {
+      "file": "cases/stress-3617032/K2.txt",
+      "bytes": 46522,
+      "sha256": "48c33ff288752839b02bbf76406f60bc66d5eea5ce56d6083db2a08dfe30b13d"
+    },
+    {
+      "file": "cases/stress-3617032/control-empty.txt",
+      "bytes": 72,
+      "sha256": "f81f42cfadd13bb23ef85a3f762a36640d39d1d03dab54a0f7e6949d9d13753e"
+    },
+    {
+      "file": "cases/stress-3617032/control-full.txt",
+      "bytes": 10103,
+      "sha256": "25ed1c0f8e2431e3a07fcea695a65e1908c3c4d8b61a37ccac96e184f148d238"
+    },
+    {
+      "file": "cases/stress-3617032/quiz-K2.txt",
+      "bytes": 9947,
+      "sha256": "dc5bb45e7e80dc88eb60e8871b13ee815b8a195e531fd26682328294100fb790"
+    },
+    {
+      "file": "cases/stress-3617033/control-empty.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "cases/stress-3617033/control-full.txt",
+      "bytes": 10111,
+      "sha256": "75ced81f552a11e0423f3c6272dacd6a996aa2b4b105ef4b20f863a763905283"
+    },
+    {
+      "file": "cases/stress-3617033/generate-K2-partial.txt",
+      "bytes": 2614,
+      "sha256": "d5b203d24694c0fcb1c94e2adcd854bfb2cbf3dfcbc03c3b122445f2104299e1"
+    },
+    {
+      "file": "cases/stress-3617034/K2.txt",
+      "bytes": 43126,
+      "sha256": "766d873e475f65dde825c6181aef8da5bc722643bee53855acb33bebbcad75b5"
+    },
+    {
+      "file": "cases/stress-3617034/control-empty.txt",
+      "bytes": 56,
+      "sha256": "4ee567fe64cef3d2ab222e85c483d9c7f3da50c1d8b56a39209815ac75e2aacd"
+    },
+    {
+      "file": "cases/stress-3617034/control-full.txt",
+      "bytes": 10282,
+      "sha256": "23e7ade6de085bd93aeec229933168cac65becdde16af9d3608a530ecb282563"
+    },
+    {
+      "file": "cases/stress-3617034/quiz-K2.txt",
+      "bytes": 10127,
+      "sha256": "725ad7c370a88c27db5d0ced3f1b8a74f4c7ee5b78c3890f889478ed75d572db"
+    },
+    {
+      "file": "cases/stress-3617131/control-empty.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "cases/stress-3617131/control-full.txt",
+      "bytes": 9928,
+      "sha256": "32e873dc940a98e3d68427d14ff783244f1e2b677668c48ac8f16642c3b3856b"
+    },
+    {
+      "file": "cases/stress-3617131/generate-K2-partial.txt",
+      "bytes": 2627,
+      "sha256": "3db72865cf3125540ac49a4f98152d1e41b4193ac8977ad34c9c884b18cbff6c"
+    },
+    {
+      "file": "cases/stress-3617132/K2.txt",
+      "bytes": 39720,
+      "sha256": "32b5c83b001d97d70265cce6bd9066ef195bd5e5f6eb3e6a37a50aaf7f20cbab"
+    },
+    {
+      "file": "cases/stress-3617132/control-empty.txt",
+      "bytes": 52,
+      "sha256": "8f65eca4d5e30c98e5a1da89e6cadd39d82e1e7b6e4da14ac45255caf9a316c2"
+    },
+    {
+      "file": "cases/stress-3617132/control-full.txt",
+      "bytes": 10270,
+      "sha256": "adec17b19182c9923e722fe05858802b2082ef3eda6b1b5a2fad3fa656998edc"
+    },
+    {
+      "file": "cases/stress-3617132/quiz-K2.txt",
+      "bytes": 10115,
+      "sha256": "7a7b3cdd00c2428c85b2bac013a0aacf7d187ffe6ded3548b1ede8a334308006"
+    },
+    {
+      "file": "cases/stress-3617133/K2.txt",
+      "bytes": 37816,
+      "sha256": "87baf04fd9047347f9dcfde0fe1af23df11e145df2e75de510ae12c626318158"
+    },
+    {
+      "file": "cases/stress-3617133/control-empty.txt",
+      "bytes": 56,
+      "sha256": "edac9eb3d39377c345b49711459ef22c9c50c7dbe947a0975c316d5147870567"
+    },
+    {
+      "file": "cases/stress-3617133/control-full.txt",
+      "bytes": 9946,
+      "sha256": "ffc140b8a1917d48a2caaa29c878fe16efd2de95a6727e0666009b37c890b708"
+    },
+    {
+      "file": "cases/stress-3617133/quiz-K2.txt",
+      "bytes": 10114,
+      "sha256": "2ed7b628e953cfc6468eb6fde30293b8e25d6a270a3d9a2fdfbd0703052c2cf4"
+    },
+    {
+      "file": "cases/stress-3617134/K2.txt",
+      "bytes": 39870,
+      "sha256": "4410343183e84ac5e6e6f4fbca62c83c964f81294f01f022bac91f0566ce7335"
+    },
+    {
+      "file": "cases/stress-3617134/control-empty.txt",
+      "bytes": 88,
+      "sha256": "5ef5ff03ae77d4dc124b78b37dc5f5d93ec82758cc1835b56e6b16c25f408610"
+    },
+    {
+      "file": "cases/stress-3617134/control-full.txt",
+      "bytes": 10101,
+      "sha256": "2d22b17673118ddc4d6644bf6fbbe3a878ce40aa74f14574d89707e4adf9a24c"
+    },
+    {
+      "file": "cases/stress-3617134/quiz-K2.txt",
+      "bytes": 10101,
+      "sha256": "2d22b17673118ddc4d6644bf6fbbe3a878ce40aa74f14574d89707e4adf9a24c"
+    },
+    {
+      "file": "lengths.json",
+      "bytes": 1318,
+      "sha256": "7ae5b2d47c853f3a69c9529358f0e434149e0217e1e4bb700b9ffcfa1fe466d7"
+    },
+    {
+      "file": "plan.json",
+      "bytes": 4401,
+      "sha256": "bd8b88d5c84ecbfa675b2936fed22cc21a5b2843b790213c565f66373df58a1c"
+    },
+    {
+      "file": "prompts/base-instructions.txt",
+      "bytes": 21780,
+      "sha256": "5322a61da7b36d35b685b314c932b2e50ee02d019f514491810ee54278010c0e"
+    },
+    {
+      "file": "results.json",
+      "bytes": 208515,
+      "sha256": "7af08c51353afff70a66d66d6529bad82eb2594d952704718a0e44d021da3e56"
+    }
+  ]
+}
