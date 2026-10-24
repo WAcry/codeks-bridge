@@ -12,12 +12,12 @@
 | `upstream` | `primary` | 选择连接、鉴权和区域 |
 | `model` | `deployment-a` | 实际发给上游的模型或部署名 |
 
-当前支持的八个 key 见[模型目录](../catalog/README.md)。没有通用兜底条目，未知 key 在加载配置时报错。实际部署名无需与 key 相同，也不用于推断协议。
+当前支持的 key 见[模型目录](../catalog/README.md)。没有通用兜底条目，未知 key 在加载配置时报错。实际部署名无需与 key 相同，也不用于推断协议。
 
 | 目录模型 | 条目指定的 adapter | 上游路径 |
 | --- | --- | --- |
 | GPT 系列 | [`gpt-responses`](backends-responses.md) | `/responses` |
-| Claude Opus / Sonnet | [`claude-messages`](backends-anthropic.md) | `/messages` |
+| Claude Opus / Sonnet / Haiku | [`claude-messages`](backends-anthropic.md) | `/messages` |
 | DeepSeek Flash | [`deepseek-chat`](backends-deepseek-chat.md) | `/chat/completions` |
 
 同一个兼容网关的连接可供不同条目使用。服务按每条请求的别名独立选路，因此父代理、子代理和并行会话可以同时使用不同上游。别名固定对应一个目标，不做上游模型发现或自动负载均衡。
@@ -91,7 +91,7 @@
 
 `expose` 控制目录展示，不改变别名的路由、来源身份或访问权限。隐藏模型仍可用于压缩、handoff 和状态复用，显式按别名发送请求也仍可调用；inspector 保留其诊断记录。`config-snippet` 选择首个公开别名作为默认模型；全部隐藏时目录为空，该命令明确报错。
 
-不设置窗口时，原条目的两个窗口字段各自保留。当前 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；Opus 5.5 和 Sonnet 5.5 为 `context_window: 400000`、`max_context_window: 1000000`；DeepSeek Flash 的两个字段均为 `1000000`。压缩阈值沿用模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 必须提供 `max_tokens`，对应目录外层默认预算为 `128000`；GPT 和 DeepSeek 使用请求、模型配置或上游提供的默认值。原生 options 也可调整预算，实际限制由部署端点裁决。
+不设置窗口时，原条目的两个窗口字段各自保留。当前 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；Opus 5.5、Sonnet 5.5 和 Haiku 5.5 为 `context_window: 400000`、`max_context_window: 1000000`；DeepSeek Flash 的两个字段均为 `1000000`。压缩阈值沿用模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 必须提供 `max_tokens`，对应目录外层默认预算为 `128000`；GPT 和 DeepSeek 使用请求、模型配置或上游提供的默认值。原生 options 也可调整预算，实际限制由部署端点裁决。
 
 请求先由 adapter 转换，再浅层合并 `upstream.options`、`model.options`；后者优先，嵌套对象整体替换。例如模型 `options.output_config` 会替换推导值和上游同名对象。由此可以显式调整 thinking budget、原生 effort 或端点专有字段。
 
@@ -145,7 +145,7 @@
 
 请求没有 effort 时使用配置默认值；有映射则转换，未列出的显式 effort 直接透传，交给上游判断。catalog 与实际请求使用同一份配置；通过原生 `options` 再覆盖 thinking/effort 时，应同时调整这里的展示设置。
 
-codeks 的 `ultra` 是客户端特殊档位：注入多代理提示词，并优先使用条目的 `multi_agent_reasoning_effort`，未配置时按客户端规则选择 `max` 或其他可用普通档位。GPT 条目保留各自原值；GPT-6.1 Sol 和 Opus 5.5 使用 `xhigh`，Sonnet 5.5 和 DeepSeek Flash 使用 `max`。若显式覆盖 `effort_map` 并提供 `ultra`，映射中还须有一个非 `ultra`/`persistent` 档位指向相同原生值；bridge 据此填写客户端字段，不能表达时明确报错。例如 `ultra: "max"` 与 `max: "max"` 配对。直接 HTTP 请求中的未知 effort 仍按上述规则透传。
+codeks 的 `ultra` 是客户端特殊档位：注入多代理提示词，并优先使用条目的 `multi_agent_reasoning_effort`，未配置时按客户端规则选择 `max` 或其他可用普通档位。GPT 条目保留各自原值；GPT-6.1 Sol 和 Opus 5.5 使用 `xhigh`，Sonnet 5.5、Haiku 5.5 和 DeepSeek Flash 使用 `max`。若显式覆盖 `effort_map` 并提供 `ultra`，映射中还须有一个非 `ultra`/`persistent` 档位指向相同原生值；bridge 据此填写客户端字段，不能表达时明确报错。例如 `ultra: "max"` 与 `max: "max"` 配对。直接 HTTP 请求中的未知 effort 仍按上述规则透传。
 
 摘要显示由 codeks 的顶层配置控制，bridge 不强制打开：
 

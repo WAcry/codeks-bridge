@@ -12,8 +12,8 @@ export interface CatalogEntry {
 }
 
 export const catalogKeys = [
-  "gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol",
-  "claude-opus-5-5", "claude-sonnet-5-5", "deepseek-flash",
+  "gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+  "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "deepseek-flash",
 ] as const;
 
 const entries = new Map<string, CatalogEntry>(catalogKeys.map(key => [
