@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { validateConfig, resolveModel, resolveCompactionModel } from "./config.ts";
-import { buildCatalog, MAX_HTTP_CATALOG_BYTES } from "./catalog.ts";
+import { buildCatalog } from "./catalog.ts";
 import { reasoningSummaryRequested } from "./profiles.ts";
 import { BridgeError, ResponsesIncompleteError, ResponsesStreamError, transportError, UpstreamHttpError } from "./errors.ts";
 import { ResponseWriter, usageJson } from "./writer.ts";
@@ -63,7 +63,6 @@ export function createBridgeServer(value: BridgeConfig, options: BridgeServerOpt
   const config = validateConfig(value);
   const compactions = new CompactionHandoffStore(config, BACKENDS);
   const catalog = JSON.stringify(buildCatalog(config));
-  const catalogBytes = Buffer.byteLength(catalog);
   const catalogEtag = `"${createHash("sha256").update(catalog).digest("hex")}"`;
   const token = config.token_env ? process.env[config.token_env] : undefined;
   if (config.token_env && !token) throw new BridgeError(`Missing bridge token environment variable: ${config.token_env}`);
@@ -90,9 +89,6 @@ export function createBridgeServer(value: BridgeConfig, options: BridgeServerOpt
       const path = url.pathname.replace(/^\/v1(?=\/)/, "");
       if (req.method === "GET" && path === "/health") { json(res, 200, { status: "ok" }); return; }
       if (req.method === "GET" && path === "/models") {
-        if (catalogBytes > MAX_HTTP_CATALOG_BYTES) {
-          throw new BridgeError("HTTP model catalog exceeds the client's 1 MiB limit. Reduce model aliases or export a static catalog and use model_catalog_json.", "invalid_prompt", 413);
-        }
         res.writeHead(200, { "content-type": "application/json", "cache-control": "no-cache", etag: catalogEtag });
         res.end(catalog); return;
       }

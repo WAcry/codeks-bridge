@@ -2,9 +2,6 @@ import { modelProfile } from "./profiles.ts";
 import { BridgeError } from "./errors.ts";
 import type { BridgeConfig } from "./types.ts";
 
-/** Codex bounds downloads from an explicit model_catalog_url to 1 MiB. */
-export const MAX_HTTP_CATALOG_BYTES = 1024 * 1024;
-
 function exposedModels(config: BridgeConfig) {
   return Object.entries(config.models).filter(([, model]) => model.expose !== false);
 }
