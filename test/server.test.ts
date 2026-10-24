@@ -172,7 +172,7 @@ test("anonymous loopback requests with a browser Origin never reach upstream", a
   assert.equal(f.seen.length, 1);
 });
 
-test("oversized HTTP catalogs fail explicitly while static catalogs and inference remain usable", async (t) => {
+test("HTTP catalogs preserve every alias and match static exports above 1 MiB", async (t) => {
   const f = await fixture(t, (_body, _req, res) => nativeSuccess(res, [message("Hello")]), {}, config => {
     config.models = Object.fromEntries(Array.from({ length: 20 }, (_,index) => [`preset-${index}`, { ...config.models.gpt }]));
   });
@@ -180,8 +180,8 @@ test("oversized HTTP catalogs fail explicitly while static catalogs and inferenc
   assert.equal(exported.models.length, 20);
   assert(Buffer.byteLength(JSON.stringify(exported)) > 1024 * 1024);
   const response = await fetch(`${f.url}/v1/models`);
-  assert.equal(response.status, 413);
-  assert.match((await responseJson(response)).error.message, /model_catalog_json/);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseJson(response), exported);
   assert.equal((await fetch(`${f.url}/health`)).status, 200);
   assert.equal((await post(f.url, { model: "preset-0", input: "Hello" })).status, 200);
 });

@@ -275,7 +275,7 @@ provider 显示名为 `Local bridge`，并显式声明 `[model_providers.bridge.
 
 bridge 使用 HTTP/SSE。已核对 Codex `0.163.0` 的 `codex-rs/model-provider-info/src/lib.rs` 与 `codex-rs/core/src/client.rs`：自定义 provider 的 `supports_websockets` 默认为 `false`，生成的片段沿用该默认值；目录中的 `prefer_websockets: true` 保留源条目原值，不会越过 provider 的能力开关。若将片段合并到已有 provider 配置，应确认没有遗留的 `supports_websockets = true`。今后接入 WebSocket 时需实现相应传输契约，而不只是修改目录偏好。
 
-目录响应带 `ETag`，普通响应带同值的 `x-models-etag`。服务配置修改后重启 bridge，新内容的标记会让客户端刷新模型目录；客户端也有定时缓存刷新。当前 Codex 的目录请求限制为 1 MiB、5 秒且不跟随重定向。每个别名都包含完整提示词，大量窗口或部署别名会增大响应。超过 1 MiB 时，HTTP 目录返回明确的 413 错误，不删减条目；模型请求和静态目录导出仍可用。可减少别名，或使用下方的静态 `model_catalog_json` 方案。这是客户端接口的固定限制，不是上游模型能力预检。
+目录响应带 `ETag`，普通响应带同值的 `x-models-etag`。服务配置修改后重启 bridge，新内容的标记会让客户端刷新模型目录；客户端也有定时缓存刷新。HTTP 和静态导出都提供完整目录，每个别名包含完整提示词，窗口或部署别名较多时响应也会增大。目录下载的大小与超时边界由客户端控制；codeks 的显式 HTTP 目录上限为 32 MiB，超时为 5 秒且不跟随重定向。需要固定本地快照时可使用下方的静态 `model_catalog_json` 方案。
 
 顶层 `model_catalog_json` 的优先级高于 HTTP 目录。若已有该配置，迁移时移除它，再重载客户端配置。
 
