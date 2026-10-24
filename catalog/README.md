@@ -11,8 +11,11 @@
 | `gpt-6-sol` | 同名条目 | `gpt-responses` |
 | `gpt-6-luna` | 同名条目 | `gpt-responses` |
 | `gpt-5.6-sol` | 同名条目 | `gpt-responses` |
+| `gpt-5.6-terra` | 同名条目 | `gpt-responses` |
+| `gpt-5.6-luna` | 同名条目 | `gpt-responses` |
 | `claude-opus-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
 | `claude-sonnet-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
+| `claude-haiku-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
 | `deepseek-flash` | `gpt-6.1-sol`，经精调 | `deepseek-chat` |
 
 每份 JSON 包含：
@@ -28,17 +31,19 @@
 
 ## 当前精调
 
-五个 GPT 的 `model` 对象分别完整保留对应上游条目，包括各自的提示词、默认 effort、摘要设置、服务档位和多代理设置。运行时从各自的 `supported_reasoning_levels` 推导普通档位；`ultra` 是客户端模式，按 `multi_agent_reasoning_effort` 解析，源条目未指定时使用 `max`，不会把 `ultra` 直接作为 GPT 原生 effort。不能用 GPT-6.1 Sol 的默认值覆盖 Luna 或其他 GPT 的差异。
+七个 GPT 的 `model` 对象分别完整保留对应上游条目，包括各自的提示词、默认 effort、摘要设置、服务档位和多代理设置。GPT-5.6 Terra 保留原生多代理 v2；GPT-5.6 Luna 按用户选择跟随上游保留 v1，不额外添加 `ultra` 档位。运行时从各自的 `supported_reasoning_levels` 推导普通档位；`ultra` 是客户端模式，按 `multi_agent_reasoning_effort` 解析，源条目未指定时使用 `max`，不会把 `ultra` 直接作为 GPT 原生 effort。不能用 GPT-6.1 Sol 的默认值覆盖 Luna 或其他 GPT 的差异。
 
 Claude 和 DeepSeek 从 GPT-6.1 Sol 的完整条目开始，只做各自 JSON 中列出的修改：底层模型与展示信息、工作窗口、reasoning 档位，以及当前 adapter 尚未转换的参数和 GPT 专属的服务展示信息。提示词仅将首句的 `based on GPT-6` 换成 `based on Claude` 或 `based on DeepSeek`；`You are Codex`、`As Codex` 和其余客户端指令保留。`default_reasoning_summary` 保持源条目的 `none`，由用户在 codeks 中选择摘要展示方式。
 
-预算默认值遵循与 GPT-6.1 Sol 模板对齐的维护原则：仅保留模板已有字段，或为上游必填参数补充默认值；公布的能力上限本身不要求新增默认配置。窗口字段沿用模板结构：按用户选择，两个 Claude 条目的默认 `context_window` 为 `400000`，`max_context_window` 保留 `1000000`；DeepSeek Flash 的两个字段均为 `1000000`。压缩阈值保留模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 要求 `max_tokens`，因此两个 Claude 条目提供 `128000` 默认预算；GPT 和 DeepSeek 的输出预算由请求、用户配置或上游默认值决定。
+预算默认值遵循与 GPT-6.1 Sol 模板对齐的维护原则：仅保留模板已有字段，或为上游必填参数补充默认值；公布的能力上限本身不要求新增默认配置。窗口字段沿用模板结构：按用户选择，三个 Claude 条目的默认 `context_window` 为 `400000`，`max_context_window` 保留 `1000000`；400K 是项目的工作预算，不是官方能力上限。DeepSeek Flash 的两个字段均为 `1000000`。压缩阈值保留模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 要求 `max_tokens`，因此三个 Claude 条目提供 `128000` 默认预算；GPT 和 DeepSeek 的输出预算由请求、用户配置或上游默认值决定。
 
-依据：[Claude 模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[Messages 必填参数](https://platform.claude.com/docs/en/api/messages/create)、[DeepSeek 模型规格](https://api-docs.deepseek.com/quick_start/pricing/)。这些是第三方精调的依据，`source` 仍记录 Codex 模板来源。
+依据：[Sonnet 模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[Haiku 模型规格](https://platform.claude.com/docs/en/models/haiku-5-5/overview)、[Messages 必填参数](https://platform.claude.com/docs/en/api/messages/create)、[DeepSeek 模型规格](https://api-docs.deepseek.com/quick_start/pricing/)。这些是第三方精调的依据，`source` 仍记录 Codex 模板来源。
 
-Claude 的默认 effort 为 `medium`，DeepSeek 为 `high`。DeepSeek 的 `none` 请求关闭 thinking；Claude 两个条目从 `low` 开始：Opus 5.5 始终启用 thinking，Sonnet 5.5 的最低模式 `between_tools` 仍保留工具之间的思考，因此不能用 `none` 表示。需要 Sonnet 的这一模式时，使用 [Messages 原生 options](../docs/backends-anthropic.md#历史与-thinking) 显式配置。目录列出的档位应与已审阅模型匹配；未列出的显式请求值仍交给上游裁决。[Claude thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)
+Claude 的默认 effort 为 `medium`，DeepSeek 为 `high`。DeepSeek 和 Haiku 5.5 的 `none` 请求关闭 thinking；Haiku 省略原生 effort，使用上游默认 `medium`，符合 disabled 仅允许 `high` 或以下的约束。[Haiku thinking 规则](https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5)
 
-`ultra` 保留 Codex 的自动分工提示词和档位说明：Opus 5.5 使用原生 `xhigh`，Sonnet 5.5 与 DeepSeek Flash 使用 `max`；各条目的 `multi_agent_reasoning_effort` 与映射一致。
+Opus / Sonnet 两个条目从 `low` 开始：Opus 5.5 始终启用 thinking，Sonnet 5.5 的最低模式 `between_tools` 仍保留工具之间的思考，因此不能用 `none` 表示。需要 Sonnet 的这一模式时，使用 [Messages 原生 options](../docs/backends-anthropic.md#历史与-thinking) 显式配置。目录列出的档位应与已审阅模型匹配；未列出的显式请求值仍交给上游裁决。[Claude thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)
+
+`ultra` 保留 Codex 的自动分工提示词和档位说明：Opus 5.5 使用原生 `xhigh`，Sonnet 5.5、Haiku 5.5 与 DeepSeek Flash 使用 `max`；各条目的 `multi_agent_reasoning_effort` 与映射一致。
 
 这些源模型都明确设置 `supports_search_tool: true`，本目录保持原值。Code Mode Only 如何暴露工具由客户端源码决定，不能因为没有独立的外层 `tool_search` 就把此字段改为 false。网页搜索和图片生成有各自的客户端设置，不通过这个字段控制。
 

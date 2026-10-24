@@ -1,6 +1,6 @@
 # Claude Messages
 
-模型选择 `catalog: "claude-opus-5-5"` 或 `"claude-sonnet-5-5"`，条目指定 `claude-messages` adapter，请求转换为 `POST <base_url>/messages`。官方端点的 `base_url` 为 `https://api.anthropic.com/v1`；默认使用 `x-api-key` 和 `anthropic-version: 2023-06-01`，可通过连接配置覆盖。
+模型选择 `catalog: "claude-opus-5-5"`、`"claude-sonnet-5-5"` 或 `"claude-haiku-5-5"`，条目指定 `claude-messages` adapter，请求转换为 `POST <base_url>/messages`。官方端点的 `base_url` 为 `https://api.anthropic.com/v1`；默认使用 `x-api-key` 和 `anthropic-version: 2023-06-01`，可通过连接配置覆盖。
 
 ## 历史与 thinking
 
@@ -8,9 +8,11 @@
 
 相邻同角色消息合并；reasoning、文本和工具调用成为 assistant 内容块，工具输出成为下一条 user 消息中的 `tool_result`。原历史不变。
 
-默认 effort 为 `medium`，普通映射提供 `low`、`medium`、`high`、`xhigh`、`max` 并保留同名值，使用 adaptive thinking 并写入 `output_config.effort`。codeks 的 `ultra` 注入多代理提示词，并将 Opus 5.5 的原生 effort 设为 `xhigh`、Sonnet 5.5 设为 `max`。
+默认 effort 为 `medium`，普通映射提供 `low`、`medium`、`high`、`xhigh`、`max` 并保留同名值，使用 adaptive thinking 并写入 `output_config.effort`。codeks 的 `ultra` 注入多代理提示词，并将 Opus 5.5 的原生 effort 设为 `xhigh`、Sonnet 5.5 与 Haiku 5.5 设为 `max`。
 
 Opus 5.5 始终启用 thinking；Sonnet 5.5 的最低模式是 `between_tools`，关闭回复前的思考，但仍在工具之间返回带签名的进度说明。两者都拒绝 `thinking.type: "disabled"`，因此目录不把 `none` 作为可选档位，也不把关闭思考的请求静默改成 `low`。Sonnet 的 `between_tools` 只接受 `high` 或以下 effort，且 `thinking` 对象中不能附带 `display`、`budget_tokens` 等字段。[官方 thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)、[Sonnet 5.5 变更说明](https://platform.claude.com/docs/en/models/sonnet-5-5/whats-new-sonnet-5-5)
+
+Haiku 5.5 还提供 `none`：使用 `thinking.type: "disabled"`，省略 `output_config.effort`，采用上游默认 `medium`。该模型仅在 `high` 或以下 effort 支持 disabled；模式为 disabled 时不附加 display 或 block binding。其余档位沿用共同的 adaptive 转换，不需要按模型名增加 adapter 分支。[Haiku 5.5 变更说明](https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5)
 
 `reasoning.summary` 缺省或为 `none` 时选择 `display: "omitted"`；`auto`、`concise`、`detailed` 选择 `summarized`，不保证上游区分摘要长度。目录默认值与 GPT-6.1 Sol 一样为 `none`；要显示摘要，在 codeks 配置中设置 `model_reasoning_summary = "auto"`。显示开关不关闭 thinking 或载荷回放。
 
@@ -28,9 +30,9 @@ Opus 5.5 始终启用 thinking；Sonnet 5.5 的最低模式是 `between_tools`�
 }
 ```
 
-未映射的显式 effort 仍交给上游判断；客户端显式请求 `none` 时，adapter 仍发送 `thinking.type: "disabled"`，由上游返回错误。目录精调不构成运行时能力预检。
+未映射的显式 effort 仍交给上游判断；对 Opus / Sonnet 显式请求 `none` 时，adapter 仍发送 `thinking.type: "disabled"`，由上游返回错误。目录精调不构成运行时能力预检。
 
-Opus / Sonnet 5.5 目录的默认上下文窗口为 `400000`，最大上下文窗口为 `1000000`，Messages API 要求提供 `max_tokens`，因此目录设置默认输出预算 `128000`，对应官方标准最大输出。输出预算依次取请求 `max_output_tokens`、模型配置、目录默认值，再接受上游和模型 options 的覆盖；这是允许的上限，不要求每次生成同样长度。[模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[配置优先级](config.md)
+Opus / Sonnet / Haiku 5.5 目录按用户选择设置默认上下文窗口 `400000`，最大上下文窗口为 `1000000`，Messages API 要求提供 `max_tokens`，因此目录设置默认输出预算 `128000`，对应官方标准最大输出。输出预算依次取请求 `max_output_tokens`、模型配置、目录默认值，再接受上游和模型 options 的覆盖；这是允许的上限，不要求每次生成同样长度。[Sonnet 模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[Haiku 模型规格](https://platform.claude.com/docs/en/models/haiku-5-5/overview)、[配置优先级](config.md)
 
 完整 `thinking`/`redacted_thinking` block，包括签名或隐藏数据，存入 `anthropic.thinking.v1` carrier。请求按 `replay.reasoning_from` 恢复允许来源，签名完整保留；其他来源只在当前请求过滤。允许配对不意味着上游一定接受其签名。[Reasoning 策略](reasoning.md)
 
