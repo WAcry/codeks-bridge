@@ -270,7 +270,7 @@ test("catalog resolves codeks Ultra through the configured map instead of the te
 });
 
 test("curated GPT entries preserve each model's instructions and reasoning choices", () => {
-  const keys = ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol"];
+  const keys = ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"];
   const c = validateConfig({
     upstreams: { a: { base_url: "https://example.com/v1" } },
     models: Object.fromEntries(keys.map(key => [key, { catalog: key, upstream: "a", model: `deployment/${key}` }])),
@@ -300,6 +300,14 @@ test("curated GPT entries preserve each model's instructions and reasoning choic
   assert.notDeepEqual(sol.model_messages, previous.model_messages);
   assert.equal(reasoningEffort(resolveModel(c, "gpt-6.1-sol"), "ultra"), "xhigh");
   assert.equal(reasoningEffort(resolveModel(c, "gpt-6-sol"), "ultra"), "max");
+  const terra56 = entries.find(entry => entry.slug === "gpt-5.6-terra")!;
+  const luna56 = entries.find(entry => entry.slug === "gpt-5.6-luna")!;
+  assert.equal(terra56.multi_agent_version, "v2");
+  assert.equal(luna56.multi_agent_version, "v1");
+  assert.equal(terra56.default_reasoning_level, "medium");
+  assert.equal(luna56.default_reasoning_level, "medium");
+  assert.equal(reasoningEffort(resolveModel(c, "gpt-5.6-terra"), "ultra"), "max");
+  assert(!luna56.supported_reasoning_levels.some((level: any) => level.effort === "ultra"));
 });
 
 test("catalog keys select reviewed models while deployments and window aliases remain configurable", () => {
@@ -364,6 +372,7 @@ test("third-party defaults retain the Codex role and provide model-specific Ultr
   for (const [key, vendor, ultra, output, contextWindow] of [
     ["claude-opus-5-5", "Claude", "xhigh", 128000, 400000],
     ["claude-sonnet-5-5", "Claude", "max", 128000, 400000],
+    ["claude-haiku-5-5", "Claude", "max", 128000, 400000],
     ["deepseek-flash", "DeepSeek", "max", undefined, 1000000],
   ] as const) {
     const c = validateConfig({ upstreams: { a: { base_url: "https://example.com/v1" } }, models: {
@@ -413,4 +422,35 @@ test("Claude 5.5 catalogs offer thinking efforts and permit an explicit Sonnet n
   });
   assert.deepEqual(body.thinking, { type: "between_tools" });
   assert.deepEqual(body.output_config, { effort: "low" });
+});
+
+test("Haiku 5.5 uses adaptive thinking by default and can disable it without an effort parameter", () => {
+  const c = validateConfig({
+    upstreams: { anthropic: { base_url: "https://example.com/v1" } },
+    models: { haiku: { upstream: "anthropic", catalog: "claude-haiku-5-5", model: "haiku-deployment" } },
+  });
+  const info = buildCatalog(c).models[0];
+  assert.deepEqual(info.supported_reasoning_levels.map((level: any) => level.effort),
+    ["none", "low", "medium", "high", "xhigh", "max", "ultra"]);
+  assert.equal(info.default_reasoning_level, "medium");
+  assert.equal(info.multi_agent_version, "v2");
+  assert.deepEqual(info.input_modalities, ["text", "image"]);
+  const ctx = {
+    route: resolveModel(c, "haiku"), request: { model: "haiku", input: "Hello" },
+    signal: new AbortController().signal,
+  };
+  assert.equal(ctx.route.profile.id, "claude-messages");
+  const { body } = buildAnthropicRequest(ctx);
+  assert.equal(body.model, "haiku-deployment");
+  assert.deepEqual(body.thinking, {
+    type: "adaptive", display: "omitted", block_binding: { prefix_mismatch_behavior: "drop_block" },
+  });
+  assert.deepEqual(body.output_config, { effort: "medium" });
+  assert.equal(buildAnthropicRequest({ ...ctx, request: { ...ctx.request, reasoning: { summary: "auto" } } })
+    .body.thinking.display, "summarized");
+  const disabled = buildAnthropicRequest({
+    ...ctx, request: { ...ctx.request, reasoning: { effort: "none", summary: "auto" } },
+  }).body;
+  assert.deepEqual(disabled.thinking, { type: "disabled" });
+  assert.equal(disabled.output_config, undefined);
 });
