@@ -75,10 +75,10 @@
 
 ### ChatGPT 订阅
 
-先用 codeks 登录 ChatGPT，并明确选择文件存储：
+先用 codeks 登录 ChatGPT，默认使用文件存储：
 
 ```sh
-codex -c 'cli_auth_credentials_store="file"' login
+codex login
 ```
 
 远程或无浏览器的机器可使用 `login --device-auth`。已有有效的文件登录可以直接复用。bridge 读取 `auth.codex_home` 指定目录中的 `auth.json`；省略时依次使用 bridge 进程的 `CODEX_HOME`、`~/.codex`。自定义目录须与登录时的 `CODEX_HOME` 一致，例如：
@@ -100,7 +100,7 @@ codex -c 'cli_auth_credentials_store="file"' login
 
 无需复制 access token、refresh token 或账号 ID。每次请求从同一份登录记录读取 token 与所选账号，写入 `Authorization` 和 `ChatGPT-Account-ID`，覆盖同名客户端及静态 header。登录文件中的 `tokens.account_id` 是权威值，不能用 JWT 中的账号声明代替用户选择的 workspace。重新登录或切换账号后，后续请求会读取新记录；显式换账号也可能改变上游对已有历史密文的接受范围。
 
-bridge 使用文件存储，不读取系统 keyring。只有 keyring 登录时，运行上面的文件登录命令；缺少登录、凭据失效或刷新写回失败会明确报错。它不会从 API key 登录或其他存储中猜测一份备用凭据。
+bridge 使用文件存储，不读取系统 keyring。如果曾将 `cli_auth_credentials_store` 改为 `keyring` 或 `auto`，可运行 `codex -c 'cli_auth_credentials_store="file"' login` 明确保存文件登录；默认配置不需要这个参数。缺少登录、凭据失效或刷新写回失败会明确报错。它不会从 API key 登录或其他存储中猜测一份备用凭据。
 
 token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次鉴权恢复，再重发尚未被接受的请求。普通模型错误的重试仍由 codeks 控制。具体刷新、并发与取消边界见 [GPT 订阅鉴权](backends-responses.md#订阅凭据与续期)。
 
