@@ -4,20 +4,13 @@
 
 ## Lite 工具声明
 
-客户端默认把完整工具 schema 放在 `input[].additional_tools`。GPT 保留原始声明项。DeepSeek 及 Claude 的 `top_level` 模式在转换消息前提取声明，与顶层 `tools` 按历史顺序合并；Claude 默认 `inline` 模式保留增量定义生效的位置。声明不会变成普通 reminder。
+客户端默认把完整工具 schema 放在 `input[].additional_tools`。GPT 保留原始声明项。Claude 与 DeepSeek 在转换消息前提取声明，与顶层 `tools` 按历史顺序合并，最终只向上游发送一张顶层工具表。声明不会变成普通 reminder，客户端保存的历史不变。
 
-增量声明只包含新增或变更的成员，按 namespace 与工具名覆盖旧定义，保留未变的其他成员和已分配的上游名字。工具移除的 developer 通知保留原位置，不从提示词文字推断删工具。codeks 将默认 `functions` namespace、空 namespace 和省略 namespace 视为同一身份，因此历史调用和显式工具选择均按此规则查找；返回调用保留声明中的原 namespace。
+增量声明只包含新增或变更的成员，按 namespace 与工具名覆盖旧定义，保留未变的其他成员和已分配的上游名字。每个工具身份最终只有一份定义；反复切换模型产生的同名版本也只保留最后一份。工具移除的 developer 通知保留原位置，不从提示词文字推断删工具。codeks 将默认 `functions` namespace、空 namespace 和省略 namespace 视为同一身份，因此历史调用和显式工具选择均按此规则查找；返回调用保留声明中的原 namespace。
 
-Claude 的 `adapters.claude-messages.tool_updates` 有两种明确模式：
+选择合并顶层定义，是为了让会话中的同名更新具有确定的替换语义，而不是同时声明多个不同版本。Code Mode Only 下多数工具位于 `exec` 内的目录，外层工具变化较少；但模型切换仍可能改变 `exec` 的描述，例如 `supports_image_detail_original` 决定嵌套 `view_image` 是否提供 `detail` 参数。此时同名工具必须使用最新定义。
 
-| 模式 | 初始定义 | 中途新增与同名更新 |
-| --- | --- | --- |
-| `inline`（默认） | 顶层 `tools` 及会话开始前的声明组成原生顶部工具表 | 在原生中途 system 消息中发送 `tool_addition`，携带完整 `tool_definition`；此前定义不变 |
-| `top_level` | 各批定义累积成同一顶部工具表 | 用最新定义覆盖同身份工具，适用于尚未支持完整 inline 的端点 |
-
-完整 inline 定义能同时表达新工具和同名工具更新，避免为了更新定义重写早先的工具前缀；这是选择它作为默认方式的理由。bridge 在 user 或整批工具结果之后、下一条 assistant 之前发送中途 system 工具声明；工具交换内的声明先等待结果完整，无法形成合法边界则报错。普通 system/developer 提醒仍转为原位 user reminder，不因工具使用原生中途 system 而改变角色。
-
-端点需要支持 `inline-tools-2026-09-15` beta；bridge 在请求包含中途更新时自动追加，保留已有 beta。不兼容时直接交付错误，不自动切换模式。`top_level` 可能改变缓存前缀和旧 thinking 的绑定；失配处理由独立的 [thinking 策略](backends-anthropic.md#失配策略与故障续接)决定。Code Mode Only 下多数工具位于 `exec` 内的目录，因此外层更新较少，但仍按协议完整处理。
+代价是定义变化时，顶层工具前缀也随之变化，可能导致缓存未命中及 Claude 旧 thinking 绑定失配。默认 `drop_block` 请服务端处理失配，可能丢弃失配块及依赖其前缀的后续 thinking，并不保证推理上下文无损。具体行为与诊断见 [thinking 策略](backends-anthropic.md#失配策略与故障续接)。普通 system/developer 提醒仍在原位置转换成 user reminder。
 
 ## 工具发现与网页搜索
 
@@ -63,7 +56,7 @@ Messages 对不符合端点格式的 call ID 采用确定性映射，并添加�
 
 根 schema 的 `$ref`、`$defs`、`allOf`、`anyOf`、`oneOf` 及其他约束均保留；缺少根 `type` 时补为 `object`，已有类型不覆盖，由上游判断是否支持。codeks 可以发送没有根 `type` 的引用或组合 schema，不能因此把参数清空。未提供参数 schema 时使用空对象定义；显式提供非对象 schema 值则报错，不在 bridge 内解析引用或删减约束。
 
-普通函数显式给出的 `strict: true` 或 `strict: false` 原样保留：Messages 放在工具定义顶层，Chat 放在 `function` 内；省略时不添加默认值。Lite 同名更新替换完整定义，因此新定义省略 `strict` 时也不继承旧值；Claude inline 的早先版本保持不变。custom 工具的 JSON 外壳不因此自动启用 strict。
+普通函数显式给出的 `strict: true` 或 `strict: false` 原样保留：Messages 放在工具定义顶层，Chat 放在 `function` 内；省略时不添加默认值。Lite 同名更新替换完整定义，因此新定义省略 `strict` 时也不继承旧值。custom 工具的 JSON 外壳不因此自动启用 strict。
 
 [Claude strict tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/strict-tool-use) 与 [DeepSeek strict mode](https://api-docs.deepseek.com/guides/tool_calls/#strict-mode-beta) 各有支持的 schema 范围；DeepSeek 官方文档还要求 beta 端点及所有函数都设为 `strict: true`。bridge 只转换调用方明确提供的字段，不切换端点、不改其他工具或删减 schema 来满足 strict。需要该能力时由用户配置支持的端点，上游不接受则保留错误。
 

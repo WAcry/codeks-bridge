@@ -60,23 +60,19 @@ test("configuration validates local references and formats without guessing endp
   assert.throws(() => validateConfig(c), /credentials/);
 });
 
-test("adapter settings resolve each leaf from model, connection, and adapter defaults", () => {
+test("adapter settings resolve from model, connection, and adapter defaults", () => {
   const c = config();
   c.models.first.catalog = "claude-sonnet-5-5";
   assert.deepEqual(resolveClaudeOptions(resolveModel(c, "first")), {
-    tool_updates: "inline", thinking_mismatch: "drop_block",
+    thinking_mismatch: "drop_block",
   });
-  c.upstreams.a.adapters = { "claude-messages": { tool_updates: "top_level", thinking_mismatch: "error" } };
+  c.upstreams.a.adapters = { "claude-messages": { thinking_mismatch: "error" } };
   assert.deepEqual(resolveClaudeOptions(resolveModel(validateConfig(c), "first")), {
-    tool_updates: "top_level", thinking_mismatch: "error",
+    thinking_mismatch: "error",
   });
   c.models.first.adapters = { "claude-messages": { thinking_mismatch: "upstream_default" } };
   assert.deepEqual(resolveClaudeOptions(resolveModel(validateConfig(c), "first")), {
-    tool_updates: "top_level", thinking_mismatch: "upstream_default",
-  });
-  c.models.first.adapters["claude-messages"]!.tool_updates = "inline";
-  assert.deepEqual(resolveClaudeOptions(resolveModel(validateConfig(c), "first")), {
-    tool_updates: "inline", thinking_mismatch: "upstream_default",
+    thinking_mismatch: "upstream_default",
   });
 });
 
@@ -87,7 +83,7 @@ test("adapter behavior does not alter state identity, catalog, or native request
   const beforeCatalog = buildCatalog(c);
   c.upstreams.a.options = { future_parameter: { enabled: true } };
   c.models.first.options = { another_parameter: 12 };
-  c.upstreams.a.adapters = { "claude-messages": { tool_updates: "top_level" } };
+  c.upstreams.a.adapters = { "claude-messages": { thinking_mismatch: "error" } };
   c.models.first.adapters = { "claude-messages": { thinking_mismatch: "upstream_default" } };
   validateConfig(c);
   assert.deepEqual(resolveModel(c, "first").origin, beforeOrigin);
@@ -105,9 +101,7 @@ test("adapter settings reject misspelled keys and invalid values at either confi
       [{ "claude-message": {} }, /unknown adapter settings claude-message/],
       [{ "gpt-responses": {} }, /unknown adapter settings gpt-responses/],
       [{ "claude-messages": null }, /claude-messages must be an object/],
-      [{ "claude-messages": { tool_update: "inline" } }, /unknown claude-messages setting tool_update/],
-      [{ "claude-messages": { tool_updates: "automatic" } }, /tool_updates must be inline or top_level/],
-      [{ "claude-messages": { tool_updates: false } }, /tool_updates must be inline or top_level/],
+      [{ "claude-messages": { thinking_mismtach: "drop_block" } }, /unknown claude-messages setting thinking_mismtach/],
       [{ "claude-messages": { thinking_mismatch: "ignore" } }, /thinking_mismatch must be drop_block, error, or upstream_default/],
       [{ "claude-messages": { thinking_mismatch: null } }, /thinking_mismatch must be drop_block, error, or upstream_default/],
     ] as const) {
@@ -122,12 +116,12 @@ test("adapter settings reject misspelled keys and invalid values at either confi
 
 test("shared connections can configure one adapter without applying it to other model protocols", () => {
   const c = config();
-  c.upstreams.a.adapters = { "claude-messages": { tool_updates: "top_level" } };
+  c.upstreams.a.adapters = { "claude-messages": { thinking_mismatch: "error" } };
   c.models.claude = { upstream: "a", catalog: "claude-sonnet-5-5", model: "claude-deployment" };
   assert.equal(validateConfig(c), c);
-  assert.equal(resolveClaudeOptions(resolveModel(c, "claude")).tool_updates, "top_level");
+  assert.equal(resolveClaudeOptions(resolveModel(c, "claude")).thinking_mismatch, "error");
   assert.equal(resolveModel(c, "first").profile.id, "deepseek-chat");
-  c.models.first.adapters = { "claude-messages": { tool_updates: "inline" } };
+  c.models.first.adapters = { "claude-messages": { thinking_mismatch: "drop_block" } };
   assert.throws(() => validateConfig(c), /claude-messages does not match the model adapter deepseek-chat/);
 });
 

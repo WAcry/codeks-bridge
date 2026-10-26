@@ -44,9 +44,7 @@ Opus / Sonnet / Haiku 5.5 目录按用户选择设置默认上下文窗口 `4000
 
 流式响应可能已交付完整 thinking 或文字项，随后才过载或断流。codeks 保存这些已完成项并负责重试，因此重试历史可能以 assistant 结束。若最后的 assistant 不含 `tool_use`，bridge 在出站请求追加 user `Continue.`，提供合法续接边界；含工具调用时不补这一句，以免掩盖缺失工具结果。
 
-若这个 assistant 后紧跟持久化的增量工具声明，同样在声明前补续接边界；后续回放时，声明的位置让 bridge 能重新构造相同边界，不需要另存隐藏会话状态。
-
-对于没有增量工具声明锚定的尾部 `Continue.`，若本次响应的第一个原生内容块是 `thinking` 或 `redacted_thinking`，bridge 在该块的 `cxbr1:` 外层记录可选字段 `continuation_before`，值为实际补入的文本。原生 thinking、签名和隐藏数据保持不变；字段随原 reasoning item 的 `output_item.done` 进入 codeks 历史，不产生独立的控制项或用户消息。
+对于补入的尾部 `Continue.`，若本次响应的第一个原生内容块是 `thinking` 或 `redacted_thinking`，bridge 在该块的 `cxbr1:` 外层记录可选字段 `continuation_before`，值为实际补入的文本。原生 thinking、签名和隐藏数据保持不变；字段随原 reasoning item 的 `output_item.done` 进入 codeks 历史，不产生独立的控制项或用户消息。
 
 以后恢复这块 reasoning 时，先在同一位置补回记录的 user 文本。假设失败前已保存 T1，重试的首块为 T2：
 
@@ -58,11 +56,11 @@ Opus / Sonnet / Haiku 5.5 目录按用户选择设置默认上下文窗口 `4000
 
 这样 T2 不会仅因续接边界消失而失配。同一响应只标记首块，后续 thinking、正文和工具继续保持原顺序；如果 T2 完整交付后又发生故障，这个边界已随 T2 保存，下一次重试可恢复它并记录新的续接边界。首块尚未完整交付时没有新载荷，下次仍按已有历史重试。字段跟随 reasoning 的来源与格式筛选：本次不恢复该载荷时，也不恢复其中的边界；以后允许恢复时，两者一起生效。
 
-覆盖范围按实际输出顺序决定。Adaptive thinking 不保证第一个内容块就是 thinking；若先输出正文或工具，再输出 thinking，bridge 不给后来的块添加这个字段，否则会把 `Continue.` 恢复到错误的位置。这类响应及没有字段的既有历史仍沿用当前失配策略；没有 thinking 的响应则没有新签名需要通过这个字段保护。由增量工具声明锚定的边界不重复记录。[官方 thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)
+覆盖范围按实际输出顺序决定。Adaptive thinking 不保证第一个内容块就是 thinking；若先输出正文或工具，再输出 thinking，bridge 不给后来的块添加这个字段，否则会把 `Continue.` 恢复到错误的位置。这类响应及没有字段的既有历史仍沿用当前失配策略；没有 thinking 的响应则没有新签名需要通过这个字段保护。[官方 thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)
 
 用户选择保留正常 thinking、正文的流式显示，并用少量自包含状态恢复边界。因此只记录位置确定的首块，不缓存整轮正文，也不引入会话索引、独立控制载荷或向前查找历史位置的规则。工具调用仍按现有规则等完整成功后交付。`continuation_before` 记录已发生的请求事实，不改变来源复用配置，也不替代 `thinking_mismatch`。
 
-工具定义等其他前缀变化仍可能导致失配，未覆盖的续接次序也可能丢失 thinking。默认 `drop_block` 让服务端报告并丢弃失配块；`error` 或 `upstream_default` 下，服务端仍可能拒绝请求。丢失推理上下文可能影响质量或增加重新推理成本，不能把边界恢复视为所有签名和输入均可接受的保证。具体发生了什么以[检查器中的服务端报告](inspect.md#claude-服务端输入处理)为准。
+工具定义等其他前缀变化仍可能导致失配，未覆盖的续接次序也可能丢失 thinking。默认 `drop_block` 让服务端报告并丢弃失配块及可能依赖其前缀的后续 thinking；`error` 或 `upstream_default` 下，服务端仍可能拒绝请求。丢失推理上下文可能影响质量或增加重新推理成本，不能把边界恢复视为所有签名和输入均可接受的保证。具体发生了什么以[检查器中的服务端报告](inspect.md#claude-服务端输入处理)为准。
 
 一次失配不会令今后生成的 thinking 永久失效。后续请求保持前缀稳定时，新生成的块仍可正常复用；原始历史里的旧失配块可能在多轮请求中被重复报告，重复报告不代表每轮都丢弃新的 thinking。实际保留与丢弃以各次上游报告为准。
 
@@ -72,9 +70,7 @@ Responses `text.format: {type: "json_schema", schema: ...}` 转为 `output_confi
 
 namespace 和 custom tool 使用共享映射。自由文本工具转换成 `{input: string}`，Lark/regex 放入描述，返回时恢复原始字符串；不添加工具专属提示词。指定工具必须能在当前工具表中解析，`tool_choice: "required"` 转为原生 `any`，不会改成 `auto`。显式 `temperature`、`top_p` 也继续发送；这些参数与具体模型、thinking 的组合是否受支持由上游判断。静默删除参数或关闭 thinking 会改变用户请求，bridge 不做这类修正。
 
-工具更新默认使用完整 inline 定义，保持已有顶部工具与历史前缀稳定；仅实际包含中途工具更新的请求添加 `inline-tools-2026-09-15` beta。初始声明、更新位置与兼容模式见 [Lite 工具声明](tools.md#lite-工具声明)。端点不支持时可在连接配置中显式选择 `tool_updates: "top_level"`；不会在错误后自动探测或降级。
-
-从 `0.0.1` 的顶部合并方式切到默认 inline 时，已有增量声明历史会改变出站工具前缀，可能触发旧 thinking 丢弃或缓存重建；可显式设为 `top_level` 保持原工具策略。切换模式不改变状态来源身份，也不改写客户端保存的历史。
+工具定义由共享转换层按历史顺序合并到顶层 `tools`，同身份的新定义覆盖旧定义，其他成员保留。每个上游工具名只对应一份最终定义；详情与取舍见 [Lite 工具声明](tools.md#lite-工具声明)。
 
 有工具且未选择 `none` 时，显式 `parallel_tool_calls: false` 转为 `tool_choice.disable_parallel_tool_use: true`，显式 `true` 则转为 `false`；未指定 choice 时采用 `auto`，原生 options 仍可覆盖。这保留 Codex Lite 的外层工具调用限制，不限制一次 `exec` 内 JavaScript 的并发执行。[Claude 并行工具调用](https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use)
 
@@ -84,7 +80,7 @@ namespace 和 custom tool 使用共享映射。自由文本工具转换成 `{inp
 
 ## 缓存与压缩
 
-最多四个显式缓存断点：最后一个顶层工具、最后一段顶层 system、最近两条 user 消息的末块。普通请求 TTL 为 `1h`。压缩保留公共前缀的 `1h`，只将最后的摘要请求末块设为 `5m`，使长 TTL 位于短 TTL 之前。thinking 块不直接设置缓存断点。inline 模式不为新增定义重写顶部 tools；兼容模式修改顶部定义可能导致缓存未命中及 thinking 前缀失配，两者最终由上游判断。
+最多四个显式缓存断点：最后一个顶层工具、最后一段顶层 system、最近两条 user 消息的末块。普通请求 TTL 为 `1h`。压缩保留公共前缀的 `1h`，只将最后的摘要请求末块设为 `5m`，使长 TTL 位于短 TTL 之前。thinking 块不直接设置缓存断点。工具定义改变时，顶部 `tools` 会随之更新，可能导致缓存未命中及 thinking 前缀失配，实际结果由上游判断。
 
 压缩只生成文字摘要，保留工具定义及普通请求的工具选择，移除 `output_config.format`，其他参数保留。摘要封装为客户端 V2 compaction item，可供其他模型恢复。保留工具选择的缓存依据及意外工具调用的处理见 [压缩](compaction.md#工具选择与缓存)。
 

@@ -179,17 +179,16 @@ token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次�
 
 | 字段 | 值与默认行为 |
 | --- | --- |
-| `tool_updates` | 默认 `inline`，把中途工具声明转换为原生完整 `tool_addition`；兼容模式 `top_level` 将所有定义合并到顶部 |
 | `thinking_mismatch` | 默认 `drop_block`，请服务端丢弃前缀失配的 thinking；`error` 请求报错；`upstream_default` 不补充该策略 |
 
-连接级设置适合端点差异，模型级设置适合同一连接下的模型差异。每个叶字段依次取模型设置、连接设置、adapter 默认值；模型只覆盖一个字段时，仍继承连接里的其他字段。下面的连接显式使用兼容工具模式，模型再单独调整 thinking 策略：
+连接级设置适合端点差异，模型级设置适合同一连接下的模型差异。每个叶字段依次取模型设置、连接设置、adapter 默认值；模型只覆盖一个字段时，仍继承连接里的其他字段。下面的连接显式使用默认失配策略，模型再单独选择报错：
 
 ```json
 {
   "upstreams": {
     "compatible": {
       "base_url": "https://example.com/v1",
-      "adapters": { "claude-messages": { "tool_updates": "top_level" } }
+      "adapters": { "claude-messages": { "thinking_mismatch": "drop_block" } }
     }
   },
   "models": {
@@ -203,7 +202,7 @@ token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次�
 
 省略 `thinking_mismatch` 表示 bridge 默认的 `drop_block`，与显式 `upstream_default` 不同。对最终 `thinking.type` 为 `adaptive` 或 `enabled` 的请求，bridge 补充 `block_binding.prefix_mismatch_behavior`；原生 `options.thinking.block_binding` 中明确设置的同名值优先。`between_tools` 等不支持该字段的模式不补充策略，不擅自换 thinking 模式。`options` 本身仍按前述浅层规则合并，不进行通用递归合并。
 
-专用设置不作为请求参数发给上游，不改变状态来源身份或客户端目录。共享连接可以配置供不同模型使用的 adapter；模型级只接受自身 adapter 的设置。未知命名空间、字段及枚举会报配置错误；尚无专用字段的 adapter 无需配置空对象。`inline` 需要上游支持相关协议，不兼容时直接返回错误，应在该连接显式选择 `top_level`。恢复代价及端点行为见 [Claude Messages](backends-anthropic.md#失配策略与故障续接)。
+专用设置不作为请求参数发给上游，不改变状态来源身份或客户端目录。共享连接可以配置供不同模型使用的 adapter；模型级只接受自身 adapter 的设置。未知命名空间、字段及枚举会报配置错误；尚无专用字段的 adapter 无需配置空对象。恢复代价及端点行为见 [Claude Messages](backends-anthropic.md#失配策略与故障续接)。
 
 ## Reasoning 与模型目录
 

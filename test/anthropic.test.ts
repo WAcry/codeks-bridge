@@ -3,6 +3,7 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import test from "node:test";
 import { buildAnthropicRequest, runAnthropic } from "../src/backends/anthropic.ts";
+import { buildDeepSeekRequest } from "../src/backends/deepseek.ts";
 import { decodeReasoning, encodeReasoning } from "../src/carrier.ts";
 import { formatSse } from "../src/sse.ts";
 import { resolveModel, validateConfig } from "../src/config.ts";
@@ -106,7 +107,7 @@ test("Messages represents empty tool results without content or placeholder text
   }
 });
 
-test("Messages top-level compatibility mode round trips Lite namespaced tools", async () => {
+test("Messages round trips Lite namespaced tools with current definitions", async () => {
   const custom = { type: "custom", name: "exec", format: { type: "grammar", syntax: "lark", definition: 'start: "hello"' } };
   const ctx = context({ tool_choice: { type: "custom", name: "exec" }, input: [
     { type: "additional_tools", role: "developer", tools: [
@@ -122,7 +123,6 @@ test("Messages top-level compatibility mode round trips Lite namespaced tools", 
     message("developer", "New rule."),
   ] });
   const before = structuredClone(ctx.request);
-  ctx.route = { ...route, upstream: { ...route.upstream, adapters: { "claude-messages": { tool_updates: "top_level" } } } };
   const stream = events(start,
     { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "next", name: "functions__exec", input: { input: "hello" } } },
     { type: "content_block_stop", index: 0 }, ...finish("tool_use"));
@@ -192,20 +192,17 @@ test("Messages uses adaptive thinking and permits explicit endpoint options", ()
   assert.deepEqual(body.thinking, { type: "enabled", budget_tokens: 2048, block_binding: { prefix_mismatch_behavior: "drop_block" } });
 });
 
-test("Messages defaults binding controls independently of tool mode and native thinking options", () => {
-  for (const tool_updates of ["inline", "top_level"] as const) {
-    const ctx = context();
-    ctx.route = { ...route, upstream: { ...route.upstream, adapters: { "claude-messages": { tool_updates } } } };
-    assert.equal(buildAnthropicRequest(ctx).body.thinking.block_binding.prefix_mismatch_behavior, "drop_block");
-    ctx.route.config = { ...route.config, adapters: { "claude-messages": { thinking_mismatch: "upstream_default" } } };
-    assert.equal(buildAnthropicRequest(ctx).body.thinking.block_binding, undefined);
-    ctx.route.config = { ...route.config, adapters: { "claude-messages": { thinking_mismatch: "error" } } };
-    assert.equal(buildAnthropicRequest(ctx).body.thinking.block_binding.prefix_mismatch_behavior, "error");
-    ctx.route.config = { ...route.config, options: { thinking: { type: "adaptive", display: "omitted", block_binding: { prefix_mismatch_behavior: "error", future_field: true } } } };
-    assert.deepEqual(buildAnthropicRequest(ctx).body.thinking.block_binding, { prefix_mismatch_behavior: "error", future_field: true });
-    ctx.route.config = { ...route.config, options: { thinking: { type: "between_tools" } } };
-    assert.deepEqual(buildAnthropicRequest(ctx).body.thinking, { type: "between_tools" });
-  }
+test("Messages defaults binding controls independently of native thinking options", () => {
+  const ctx = context();
+  assert.equal(buildAnthropicRequest(ctx).body.thinking.block_binding.prefix_mismatch_behavior, "drop_block");
+  ctx.route = { ...route, config: { ...route.config, adapters: { "claude-messages": { thinking_mismatch: "upstream_default" } } } };
+  assert.equal(buildAnthropicRequest(ctx).body.thinking.block_binding, undefined);
+  ctx.route.config = { ...route.config, adapters: { "claude-messages": { thinking_mismatch: "error" } } };
+  assert.equal(buildAnthropicRequest(ctx).body.thinking.block_binding.prefix_mismatch_behavior, "error");
+  ctx.route.config = { ...route.config, options: { thinking: { type: "adaptive", display: "omitted", block_binding: { prefix_mismatch_behavior: "error", future_field: true } } } };
+  assert.deepEqual(buildAnthropicRequest(ctx).body.thinking.block_binding, { prefix_mismatch_behavior: "error", future_field: true });
+  ctx.route.config = { ...route.config, options: { thinking: { type: "between_tools" } } };
+  assert.deepEqual(buildAnthropicRequest(ctx).body.thinking, { type: "between_tools" });
 });
 
 test("Messages resumes thinking or text tails without hiding a missing tool result", () => {
@@ -225,26 +222,55 @@ test("Messages resumes thinking or text tails without hiding a missing tool resu
   assert.ok(body.messages.at(-1).content.some((b: any) => b.type === "tool_use"));
 });
 
-test("Messages inline tool updates preserve old definitions and signed message prefixes", () => {
-  const initial = { type: "additional_tools", tools: [tool] };
-  const history = [initial, message("user", "First."), reasoning, message("assistant", "Done.")];
-  const before = buildAnthropicRequest(context({ input: [...history, message("user", "Next.")] })).body;
-  const request = context({ input: [
-    ...history,
-    { type: "additional_tools", tools: [{ ...tool, description: "Updated lookup." }, { ...tool, name: "write" }] },
-    message("developer", "New constraint."), message("user", "Next."),
-  ] });
-  const { body, tools, betas } = buildAnthropicRequest(request);
-  assert.deepEqual(body.tools, before.tools);
-  assert.deepEqual(body.messages.slice(0, 2), before.messages.slice(0, 2));
-  assert.deepEqual(body.messages.map((m: any) => m.role), ["user", "assistant", "user", "system"]);
-  assert.deepEqual(body.messages.at(-1).content.map((b: any) => b.tool.definition.name), ["lookup", "write"]);
-  assert.equal(body.messages.at(-1).content[0].tool.definition.description, "Updated lookup.");
-  assert.equal(tools.get(undefined, "write")?.name, "write");
-  assert.ok(betas.includes("inline-tools-2026-09-15"));
-});
+for (const api of ["Messages", "DeepSeek"] as const) {
+  test(`${api} uses the latest definition after repeated model tool changes`, () => {
+    const currentRoute = api === "Messages" ? route : resolveModel(validateConfig({
+      upstreams: { chat: { base_url: "https://api.example.com/v1" } },
+      models: { chat: { upstream: "chat", model: "deepseek-flash", catalog: "deepseek-flash" } },
+    }), "chat");
+    const exec = (description: string) => ({ type: "custom", name: "exec", description,
+      format: { type: "grammar", syntax: "lark", definition: 'start: "hello"' } });
+    const withDetail = exec('view_image({ path: string, detail?: "high" | "original" })');
+    const withoutDetail = exec("view_image({ path: string })");
+    const declaration = (...tools: unknown[]) => ({ type: "additional_tools", tools: [
+      { type: "namespace", name: "functions", tools },
+    ] });
+    const state = { type: "reasoning", encrypted_content: encodeReasoning({
+      source: currentRoute.origin, format: currentRoute.profile.reasoning_format,
+      data: api === "Messages" ? thinking : "Synthetic reasoning.",
+    }) };
+    const request: ResponsesRequest = { model: currentRoute.slug,
+      tools: [{ type: "namespace", name: "functions", tools: [withoutDetail, { ...tool, name: "wait" }] }],
+      input: [
+        declaration(withoutDetail), message("user", "First."), state, message("assistant", "Done."),
+        declaration(withDetail), message("user", "Next."), message("assistant", "Done."),
+        declaration(withoutDetail), message("user", "Finish."),
+      ],
+    };
+    const before = structuredClone(request);
+    const ctx = { ...context(), route: currentRoute, request };
+    const build = api === "Messages" ? buildAnthropicRequest : buildDeepSeekRequest;
+    const intermediate = build({ ...ctx, request: { ...request, input: (request.input as any[]).slice(0, -2) } }).body;
+    const intermediateExec = api === "Messages" ? intermediate.tools[0] : intermediate.tools[0].function;
+    assert.ok(intermediateExec.description.startsWith(withDetail.description), "The intermediate model's definition also takes effect");
+    const { body } = build(ctx);
+    const definitions = api === "Messages" ? body.tools : body.tools.map((entry: any) => entry.function);
+    assert.deepEqual(definitions.map((entry: any) => entry.name), ["functions__exec", "functions__wait"]);
+    assert.ok(definitions[0].description.startsWith(withoutDetail.description));
+    assert.ok(!definitions[0].description.includes("detail?"));
+    assert.match(definitions[0].description, /start: "hello"/);
+    assert.deepEqual(body.messages.map((entry: any) => entry.role), ["user", "assistant", "user", "assistant", "user"]);
+    if (api === "Messages") {
+      assert.deepEqual(body.messages[1].content[0], thinking);
+      assert.equal(body.thinking.block_binding.prefix_mismatch_behavior, "drop_block");
+    } else {
+      assert.equal(body.messages[1].reasoning_content, "Synthetic reasoning.");
+    }
+    assert.deepEqual(request, before);
+  });
+}
 
-test("Messages keeps inline additions after a complete tool result batch and before replayed thinking", () => {
+test("Messages keeps complete tool result batches and replayed thinking when tools change", () => {
   const { body } = buildAnthropicRequest(context({ tools: [tool], input: [
     message("user", "First."),
     { type: "function_call", call_id: "a", name: "lookup", arguments: "{}" },
@@ -254,30 +280,10 @@ test("Messages keeps inline additions after a complete tool result batch and bef
     { type: "function_call_output", call_id: "b", output: "b" },
     reasoning, message("assistant", "Done."), message("user", "Next."),
   ] }));
-  assert.deepEqual(body.messages.map((m: any) => m.role), ["user", "assistant", "user", "system", "assistant", "user"]);
+  assert.deepEqual(body.tools.map((entry: any) => entry.name), ["lookup", "write"]);
+  assert.deepEqual(body.messages.map((m: any) => m.role), ["user", "assistant", "user", "assistant", "user"]);
   assert.deepEqual(body.messages[2].content.map((b: any) => b.type), ["tool_result", "tool_result"]);
-  assert.equal(body.messages[3].content[0].tool.definition.name, "write");
-  assert.deepEqual(body.messages[4].content[0], thinking);
-});
-
-test("Messages reconstructs a continuation boundary anchored by an inline declaration", () => {
-  const partial = [
-    message("user", "First."), reasoning,
-    { type: "additional_tools", tools: [{ ...tool, name: "write" }] },
-  ];
-  const continued = buildAnthropicRequest(context({ tools: [tool], input: partial })).body;
-  const replayed = buildAnthropicRequest(context({ tools: [tool], input: [
-    ...partial, reasoning, message("assistant", "Done."), message("user", "Next."),
-  ] })).body;
-  const withoutCache = (value: unknown) => JSON.parse(JSON.stringify(value, (key, part) => key === "cache_control" ? undefined : part));
-  assert.deepEqual(withoutCache(continued.messages), withoutCache(replayed.messages.slice(0, 4)));
-  assert.deepEqual(continued.messages.map((m: any) => m.role), ["user", "assistant", "user", "system"]);
-  assert.throws(() => buildAnthropicRequest(context({ tools: [tool], input: [
-    message("user", "First."),
-    { type: "function_call", call_id: "missing", name: "lookup", arguments: "{}" },
-    { type: "additional_tools", tools: [{ ...tool, name: "write" }] },
-    reasoning,
-  ] })), /completed tool-result boundary/);
+  assert.deepEqual(body.messages[3].content[0], thinking);
 });
 
 test("Messages merges required betas with configured flags without duplicates", async () => {
@@ -293,7 +299,7 @@ test("Messages merges required betas with configured flags without duplicates", 
     } };
     await runAnthropic(ctx, writerCapture().writer);
     assert.deepEqual(requests[0].headers["anthropic-beta"].split(","), [
-      "configured-flag", "thinking-binding-controls-2026-08-01", "inline-tools-2026-09-15",
+      "configured-flag", "thinking-binding-controls-2026-08-01",
     ]);
   });
 });

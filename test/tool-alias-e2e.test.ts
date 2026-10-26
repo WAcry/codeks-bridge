@@ -129,6 +129,9 @@ async function fixture(t: TestContext, api: Api, ambiguous: boolean, respond: (b
           return responsesReply();
         }
         assert.equal(String(url), `https://fixture.example/v1/${api === "chat" ? "chat/completions" : "messages"}`);
+        const definitions = api === "chat" ? body.tools.map((entry: any) => entry.function) : body.tools;
+        const names = definitions.map((entry: any) => entry.name);
+        assert.equal(new Set(names).size, names.length, "Each current tool has exactly one top-level definition");
         requests.push(body);
         return response(api, respond(body, requests.length));
       } catch (error) {
@@ -252,6 +255,17 @@ for (const api of ["chat", "messages"] as const) {
     });
     assert.deepEqual(ids(clientRequests.at(-1)), persistedIds, "Switching to GPT must not rewrite the stored source history");
     assert.match(JSON.stringify(requests.at(-1).messages), /SYNTHETIC_SWITCH_BACK/);
+    const declarations = clientRequests.at(-1).input
+      .filter((item: any) => item.type === "additional_tools")
+      .flatMap((item: any) => item.tools)
+      .filter((tool: any) => tool.type === "namespace" && tool.name === "functions")
+      .flatMap((namespace: any) => namespace.tools)
+      .filter((tool: any) => tool.name === "exec");
+    assert.ok(new Set(declarations.map((tool: any) => tool.description)).size >= 2,
+      "The real client changes exec's nested tool description when switching models");
+    const definitions = api === "chat" ? requests.at(-1).tools.map((entry: any) => entry.function) : requests.at(-1).tools;
+    const exec = definitions.find((tool: any) => tool.name === "functions__exec");
+    assert.ok(exec.description.startsWith(declarations.at(-1).description), "Switch-back uses the latest exec definition");
     const calls = delivered.filter(item => item.type === "custom_tool_call");
     assert.equal(calls.length, 2);
     assert.ok(calls.every(call => call.name === "exec" && call.namespace === "functions" && call.call_id.startsWith("cxbt1_")));

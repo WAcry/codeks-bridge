@@ -5,7 +5,6 @@ export type Api = "responses" | "anthropic" | "chat";
 export type AdapterId = "gpt-responses" | "claude-messages" | "deepseek-chat";
 export type UnrecognizedStatePolicy = "passthrough" | "drop" | "error";
 export interface ClaudeMessagesOptions {
-  tool_updates: "inline" | "top_level";
   thinking_mismatch: "drop_block" | "error" | "upstream_default";
 }
 /** Bridge behavior, distinct from native request-body options. */

@@ -182,17 +182,23 @@ test("legacy carriers retain their payload and gain no synthetic boundary on nor
   assert.equal(item.encrypted_content, original);
 });
 
-test("persisted inline declarations anchor their own Continue without duplicating carrier metadata", async () => {
+test("tool updates preserve the failed-response continuation boundary on later replay", async () => {
   const update = { type: "additional_tools", tools: [{ ...tool, description: "Updated lookup." }] };
   const input = [...history, update];
-  const { sent, items } = await exchange(context({ input, tools: [tool] }), [thought("after_inline"), text]);
-  assert.deepEqual(messages(sent).map(message => message.role), ["user", "assistant", "user", "system"]);
+  const snapshot = structuredClone(input);
+  const { sent, items } = await exchange(context({ input, tools: [tool] }), [thought("after_update"), text]);
+  assert.equal(sent.tools.length, 1);
+  assert.equal(sent.tools[0].name, "lookup");
+  assert.equal(sent.tools[0].description, "Updated lookup.");
+  assert.deepEqual(messages(sent).map(message => message.role), ["user", "assistant", "user"]);
   const envelope = decodeReasoning(items.find(item => item.type === "reasoning")!.encrypted_content) as any;
-  assert.equal(Object.hasOwn(envelope, "continuation_before"), false);
+  assert.equal(envelope.continuation_before, "Continue.");
   const replay = buildAnthropicRequest(context({
     input: [...input, ...items, message("user", "Next.")], tools: [tool],
   })).body;
-  assert.deepEqual(messages(replay).slice(0, 4), messages(sent));
-  assert.deepEqual(messages(replay).map(message => message.role), ["user", "assistant", "user", "system", "assistant", "user"]);
+  assert.deepEqual(replay.tools, sent.tools);
+  assert.deepEqual(messages(replay).slice(0, 3), messages(sent));
+  assert.deepEqual(messages(replay).map(message => message.role), ["user", "assistant", "user", "assistant", "user"]);
   assert.equal(replay.messages.flatMap((message: any) => message.content).filter((block: any) => block.text === "Continue.").length, 1);
+  assert.deepEqual(input, snapshot);
 });
