@@ -6,6 +6,26 @@ import { resolveModel, validateConfig } from "../src/config.ts";
 import { catalogKeys, getCatalogEntry } from "../src/model-catalog.ts";
 import { reasoningEffort } from "../src/profiles.ts";
 
+test("GPT-6.1 Terra keeps its reviewed window and resolves subscription Ultra through xhigh", () => {
+  const original = getCatalogEntry("gpt-6.1-terra");
+  const config = validateConfig({
+    upstreams: { test: { base_url: "https://example.com/v1" } },
+    models: { terra: { catalog: "gpt-6.1-terra", upstream: "test", model: "terra-deployment" } },
+  });
+  const [entry] = buildCatalog(config).models;
+  assert.equal(entry.context_window, 272000);
+  assert.equal(entry.max_context_window, 872000);
+  assert.equal(entry.shell_type, "unified_exec");
+  assert.equal(entry.tool_mode, "code_mode_only");
+  assert.equal(entry.multi_agent_version, "v2");
+  assert.equal(entry.use_responses_lite, true);
+  assert.deepEqual(entry.model_messages, original.model.model_messages);
+  assert.equal(Object.hasOwn(entry, "auto_compact_token_limit"), false);
+  const route = resolveModel(config, "terra");
+  assert.equal(reasoningEffort(route), "low");
+  assert.equal(reasoningEffort(route, "ultra"), "xhigh");
+});
+
 test("legacy GPT catalogs retain their protocol, window, and reasoning differences", () => {
   const cases = [
     ["gpt-5.5", true, null, 272000, 272000, "2911", "medium", "xhigh"],

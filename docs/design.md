@@ -30,7 +30,7 @@ Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于
 
 ## 有限目录与显式精调
 
-项目只支持明确列出的模型。`catalog/` 保存每个模型的完整条目及来源；GPT 分别使用 Codex 源码中各自的版本，保留提示词、默认 effort、摘要、窗口和工具元数据的差异，GPT-5.5 的 Lite 调整单独记录在 `adjustments`。源码没有的 GPT-Reserve 使用手工取得并审阅的订阅目录条目，记录取得日期与客户端版本；具体来源与公开信息处理见[模型目录](../catalog/README.md)。Claude 与 DeepSeek 从 GPT-6.1 Sol 模板开始，只替换底层模型身份（如 `You are Codex, an agent based on Claude.`），保留 Codex 代理角色及 `As Codex` 人格说明；参数和确有差异的能力逐项精调，记录在条目的 `adjustments`。摘要默认值继续使用模板的 `none`，是否展示由客户端配置决定，不为第三方模型强制打开。
+项目只支持明确列出的模型。`catalog/` 保存每个模型的完整条目及来源；GPT 分别使用 Codex 源码中各自的版本，保留提示词、默认 effort、摘要、窗口和工具元数据的差异，GPT-5.5 的 Lite 调整单独记录在 `adjustments`。源码尚未收录的 GPT-6.1 Terra、GPT-Reserve 使用取得并审阅的订阅目录快照，记录端点、取得日期与客户端版本；具体来源与公开信息处理见[模型目录](../catalog/README.md)。Claude 与 DeepSeek 从 GPT-6.1 Sol 模板开始，只替换底层模型身份（如 `You are Codex, an agent based on Claude.`），保留 Codex 代理角色及 `As Codex` 人格说明；参数和确有差异的能力逐项精调，记录在条目的 `adjustments`。摘要默认值继续使用模板的 `none`，是否展示由客户端配置决定，不为第三方模型强制打开。
 
 导入脚本只生成独立候选文件，供人或 Agent 对比审阅。运行时使用已提交的完整条目，不自动导入、不猜测未知模型，也不从 ChatGPT 订阅获取目录。这样更新仍有工具辅助，同时提示词和能力变化可审查、可追踪。来源及更新步骤见[模型目录](../catalog/README.md)。
 

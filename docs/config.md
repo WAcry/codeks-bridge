@@ -330,7 +330,7 @@ GPT 将透传项保留在 Responses `input` 中，包括其 `id`；Claude/DeepSe
 
 bridge 的 `GET /v1/models` 返回 Codex 专用的 `{"models": [...]}`，每项包含完整提示词、窗口、工具、多代理和 reasoning 元数据。它与经典 OpenAI 的 `{"object":"list","data":[...]}` 格式不同。仅列出配置中的别名，不暴露上游连接、实际部署名或凭据设置。
 
-这些条目来自仓库内已审阅的 [catalog](../catalog/README.md)，运行时只展开别名和显式配置覆盖。GPT 分别使用自己的 Codex 源码条目；Claude 和 DeepSeek 使用经过精调的 GPT-6.1 Sol 模板。不会启动 codeks 导出模板，也不请求订阅账号的模型目录。目录版本随 bridge 代码更新，升级客户端不会自动改写它。
+这些条目来自仓库内已审阅的 [catalog](../catalog/README.md)，运行时只展开别名和显式配置覆盖。GPT 优先使用自己的 Codex 源码条目，源码尚未收录的模型使用已审阅订阅快照；Claude 和 DeepSeek 使用经过精调的 GPT-6.1 Sol 模板。不会启动 codeks 导出模板，也不请求订阅账号的模型目录。目录版本随 bridge 代码更新，升级客户端不会自动改写它。
 
 ### HTTP 发现
 

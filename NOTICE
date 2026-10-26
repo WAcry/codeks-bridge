@@ -9,8 +9,9 @@ licensed under the Apache License, Version 2.0:
 - src/prompts.ts contains handoff instructions adapted from:
   codex-rs/prompts/templates/compact/prompt.md
 - catalog/*.json contains model metadata and prompts copied or adapted from:
-  codex-rs/models-manager/models.json
-  Each catalog entry records its source tag, commit, and changes.
+  codex-rs/models-manager/models.json and reviewed subscription model catalogs.
+  Each entry records its source tag and commit, or its catalog endpoint,
+  client version, and retrieval date, together with any changes.
 - benchmarks/compaction/prompts/ contains frozen or adapted compact prompts,
   the summary prefix, and model instructions from OpenAI Codex, together with
   user-supplied experiment prompts. File hashes and source notes are recorded

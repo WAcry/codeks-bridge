@@ -2,12 +2,13 @@
 
 这里保存运行时使用的完整模型条目。每个文件对应一个受支持的 catalog key；显示别名、连接和实际发给上游的模型名由用户配置。未知 key 直接报错，不使用通用模板猜测模型能力。
 
-来源是 OpenAI Codex 的 `codex-rs/models-manager/models.json`，每份 JSON 独立记录版本。原有条目来自 [`rust-v0.163.0`](https://github.com/openai/codex/tree/rust-v0.163.0)，commit `83086188ae0614bd882818ff1aa23f3194962012`；GPT-5.5、两个 Daybreak 条目及 Codex Auto Review 来自 [`rust-v0.164.0`](https://github.com/openai/codex/tree/rust-v0.164.0)，commit `6aaac694803004a63c6f393d153c96d22521a6b9`。源码没有的 GPT-Reserve 例外，见下文。运行时不从订阅账号请求远端目录，也不在用户启动时读取本机 codeks 的最新模板。
+来源是 OpenAI Codex 的 `codex-rs/models-manager/models.json`，每份 JSON 独立记录版本。原有条目来自 [`rust-v0.163.0`](https://github.com/openai/codex/tree/rust-v0.163.0)，commit `83086188ae0614bd882818ff1aa23f3194962012`；GPT-5.5、两个 Daybreak 条目及 Codex Auto Review 来自 [`rust-v0.164.0`](https://github.com/openai/codex/tree/rust-v0.164.0)，commit `6aaac694803004a63c6f393d153c96d22521a6b9`。源码尚未收录的 GPT-6.1 Terra、GPT-Reserve 使用订阅快照，见下文。运行时不从订阅账号请求远端目录，也不在用户启动时读取本机 codeks 的最新模板。
 
 | Catalog key | 来源条目 | Adapter |
 | --- | --- | --- |
 | `gpt-6-astra` | 同名条目 | `gpt-responses` |
 | `gpt-6.1-sol` | 同名条目 | `gpt-responses` |
+| `gpt-6.1-terra` | 订阅目录同名条目 | `gpt-responses` |
 | `gpt-6-sol` | 同名条目 | `gpt-responses` |
 | `gpt-6-luna` | 同名条目 | `gpt-responses` |
 | `gpt-5.6-sol` | 同名条目 | `gpt-responses` |
@@ -25,7 +26,7 @@
 
 每份 JSON 包含：
 
-- `source`：上游仓库、tag、commit、文件路径和源模型名。
+- `source`：上游仓库、tag、commit、文件路径和源模型名；订阅快照改为记录端点、客户端版本、取得日期和源模型名。
 - `adjustments`：相对于源条目的精调说明，供审阅和更新时核对。
 - `adapter`：协议转换实现。
 - `effort_map`：第三方模型显式提供的客户端档位到原生参数映射；GPT 从原始模型条目推导，不重复填写。
@@ -36,9 +37,13 @@
 
 ## 当前精调
 
-GPT 的 `model` 对象以对应上游完整条目为基础，包括各自的提示词、默认 effort、摘要设置、服务档位和多代理设置；GPT-5.5 仅对 Lite 作下述调整。GPT-5.6 Terra 保留原生多代理 v2；GPT-5.6 Luna 按用户选择跟随上游保留 v1，不额外添加 `ultra` 档位。运行时从各自的 `supported_reasoning_levels` 推导普通档位；`ultra` 是客户端模式，按 `multi_agent_reasoning_effort` 解析，源条目未指定时使用 `max`，不会把 `ultra` 直接作为 GPT 原生 effort。不能用 GPT-6.1 Sol 的默认值覆盖 Luna 或其他 GPT 的差异。
+GPT 的 `model` 对象以对应源码或订阅目录的完整条目为基础，包括各自的提示词、默认 effort、摘要设置、服务档位和多代理设置；GPT-5.5 仅对 Lite 作下述调整。GPT-5.6 Terra 保留原生多代理 v2；GPT-5.6 Luna 按用户选择跟随上游保留 v1，不额外添加 `ultra` 档位。运行时从各自的 `supported_reasoning_levels` 推导普通档位；`ultra` 是客户端模式，按 `multi_agent_reasoning_effort` 解析，源条目未指定时使用 `max`，不会把 `ultra` 直接作为 GPT 原生 effort。不能用 GPT-6.1 Sol 的默认值覆盖 Luna 或其他 GPT 的差异。
 
 GPT-5.5 按用户选择将 `use_responses_lite` 从 `false` 改为 `true`，统一工具声明传输；其他字段完整保留上游值，包括未指定的工具模式与多代理版本、272K 窗口和 `comp_hash: "2911"`，不套用 GPT-5.6 的整份配置。多代理版本由客户端配置和 feature 决定，不强制 v2。Daybreak Blue 保留 Lite、多代理 v2 和 272K/872K 窗口；Daybreak Red 为 Lite、多代理 v2 和 372K 窗口。Codex Auto Review 保留 Lite、多代理 v1 和 272K/872K 窗口。两个旧 Daybreak key 继续按独立模型路由；新版 Codex 的 `access_programs.cyber` 请求参数也由 Responses adapter 原样转发，不把二者自动互换。模型、Lite 或访问模式是否可用由具体上游和账号决定，错误直接返回。
+
+GPT-6.1 Terra 取自 2026-10-26（America/Los_Angeles）由 Codex 0.164.0 取得的订阅目录缓存，当时公开源码目录尚未收录。按用户选择将默认工作窗口从订阅条目的 `500000` 调整为 `272000`，最大窗口保留 `872000`，记录在 `adjustments` 中；其余字段和专属提示词完整保留，没有从 Sol 模板补齐省略字段或推断额外默认值。默认 effort 为 `low`，支持 `low` 到 `max` 及客户端 `ultra`（原生 `xhigh`）；保留 Responses Lite、Code Mode Only、多代理 v2、`shell_type: "unified_exec"`、`default_reasoning_summary: "none"`、图片 `original` 能力和 `comp_hash: "3000"`。codeks 通过远端 `/models` 读取新条目，已有客户端协议即可处理，不依赖二进制内置同名模型。配置 `catalog: "gpt-6.1-terra"` 并指定实际部署名即可使用；具体端点和账号的可用性由上游决定。
+
+订阅缓存是客户端解析后的目录表示，缺省字段按当前客户端语义处理。当前 codeks 将 `shell_command` 作为 `unified_exec` 的旧名称解析，因此 Terra 与 Sol 的 shell 类型实际一致。条目只记录模型内容与来源，不包含整个缓存的账号标识、ETag 或本机路径。未来公开 release 收录同名模型时，按下方更新流程对比完整提示词与能力，再将来源切回固定 tag；不能仅因名字相同就用别的 GPT 条目替换。
 
 GPT-Reserve 是客户端在普通额度用尽、后端授权后切换的回退模型。Codex 源码目录没有 `gpt-reserve` 条目，客户端只在 TUI 中按这个模型名处理额度回退和模型选择器。因此该条目取自 ChatGPT 订阅端点 `/models` 的同名条目，`source` 记录端点、请求时的客户端版本和取得日期，不记录 tag 与 commit。字段顺序和取值原样保留，包括 `visibility: "hide"`、`upgrade: null`、`model_messages.auto_review: null`、`base_instructions` 和 `available_access_programs`；提示词、Lite、多代理 v1、272K/872K 窗口、reasoning 和 `comp_hash` 与 GPT-5.6 Luna 一致。只删除公开源码未出现的名称：两个值为 `false` 的布尔字段，以及 `available_in_plans` 中的两个方案名；客户端不读取这些字段。导入脚本不处理订阅端点，更新时需手动取得条目并重新审阅。与其他条目一样，客户端目录中的 slug、展示名、排序和可见性由别名配置决定；要在选择器中隐藏，需在别名上设置 `visibility: "hide"`。
 
@@ -56,7 +61,7 @@ Opus / Sonnet 两个条目从 `low` 开始：Opus 5.5 始终启用 thinking，So
 
 这些源模型都明确设置 `supports_search_tool: true`，本目录保持原值。Code Mode Only 如何暴露工具由客户端源码决定，不能因为没有独立的外层 `tool_search` 就把此字段改为 false。网页搜索和图片生成有各自的客户端设置，不通过这个字段控制。
 
-`comp_hash` 与 `prefer_websockets: true` 也保留源值。前者标记客户端压缩兼容组，GPT-5.5 为 `"2911"`，其余当前条目为 `"3000"`；bridge 检查点的文字表示使跨目标恢复可行，原生密文是否复用仍由独立策略决定。后者是模型偏好，实际传输受 provider 的 WebSocket 能力开关控制。详见[压缩兼容组](../docs/compaction.md#comp_hash-与原生状态兼容性)和[客户端配置](../docs/config.md#http-发现)。
+`comp_hash` 与 WebSocket 偏好也保留源条目的值及省略状态。前者标记客户端压缩兼容组，GPT-5.5 为 `"2911"`，其余当前条目为 `"3000"`；bridge 检查点的文字表示使跨目标恢复可行，原生密文是否复用仍由独立策略决定。后者是模型偏好，实际传输受 provider 的 WebSocket 能力开关控制。详见[压缩兼容组](../docs/compaction.md#comp_hash-与原生状态兼容性)和[客户端配置](../docs/config.md#http-发现)。
 
 ## 更新流程
 
