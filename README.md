@@ -2,7 +2,7 @@
 
 给 [codeks](https://github.com/WAcry/codeks) 使用的本地模型桥接器。一个 Responses provider 可接入多个 GPT、Claude Messages 和 DeepSeek Chat 上游，支持工具、图片、流式回答和跨模型会话。
 
-项目维护一份有限的[模型目录](catalog/README.md)。GPT 以 Codex 源码中各自的条目为基础，第三方模型采用经精调的现代模板。客户端使用 Responses Lite，工具模式和多代理设置保留各模型差异；配置可分别指定模型别名、目录条目和真实部署名。
+项目维护一份有限的[模型目录](catalog/README.md)。GPT 优先以 Codex 源码中各自的条目为基础，缺失的 GPT-Reserve 使用已审阅的订阅目录快照；第三方模型采用经精调的现代模板。客户端使用 Responses Lite，工具模式和多代理设置保留各模型差异；配置可分别指定模型别名、目录条目和真实部署名。
 
 ## 安装和使用
 
