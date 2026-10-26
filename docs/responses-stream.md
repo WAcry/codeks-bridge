@@ -67,7 +67,7 @@ HTTP 失败发生在建立下游流之前，响应体使用顶层 `error`，Retr
 | 无效输入、鉴权或权限错误 | `invalid_prompt` |
 | 断流、传输等其他失败 | `stream_error` 或 `upstream_error` |
 
-原始错误体保留厂商 code/type 和其他诊断。这个转换表只适用于非 Responses 上游，不用于改写 GPT 原生错误。网络错误保留可用的原因链。缺少凭据、凭据命令失败、输出为空或多行均返回 HTTP 400 + `invalid_prompt`，保持原本的终止语义；命令的 stdout/stderr 不外传。
+原始错误体保留厂商 code/type 和其他诊断。这个转换表只适用于非 Responses 上游，不用于改写 GPT 原生错误。网络错误保留可用的原因链。API key 连接缺少凭据、凭据命令失败、输出为空或多行均返回 HTTP 400 + `invalid_prompt`，保持原本的终止语义；命令的 stdout/stderr 不外传。ChatGPT 文件登录缺失或失效返回 HTTP 401 + `invalid_api_key`，并提示重新登录。
 
 普通模型错误的重试预算和退避由客户端决定；bridge 不替换端点，也不因错误移除 reasoning、关闭 thinking 或改用文字压缩。ChatGPT 订阅 HTTP 401 在下游 SSE 开始前最多进行一次鉴权恢复并重发，再次失败照常返回。下游取消会取消当前相关模型请求，包括正在进行的原生压缩或复述；尚未开始的后续步骤不会执行。已经发出的 OAuth 刷新使用独立的 30 秒超时完成并保存轮换凭据，避免取消推理时丢失新的 refresh token；它不会恢复已取消的模型请求。[鉴权边界](backends-responses.md#订阅凭据与续期)
 
