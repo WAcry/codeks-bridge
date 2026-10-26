@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveDeepSeekOptions } from "../src/adapter-options.ts";
-import { buildCatalog } from "../src/catalog.ts";
 import { resolveModel, validateConfig } from "../src/config.ts";
 import { buildDeepSeekRequest, runDeepSeek } from "../src/backends/deepseek.ts";
 import type { BackendContext } from "../src/types.ts";
@@ -21,9 +19,8 @@ function config() {
   });
 }
 
-function context(mode?: "native" | "json_mode"): BackendContext {
+function context(): BackendContext {
   const c = config();
-  if (mode) c.models.flash.adapters = { "deepseek-chat": { structured_output: mode } };
   return {
     route: resolveModel(validateConfig(c), "flash"),
     signal: new AbortController().signal,
@@ -36,53 +33,15 @@ function context(mode?: "native" | "json_mode"): BackendContext {
   };
 }
 
-test("DeepSeek structured output is opt-in, resolves model over connection, and does not change provenance or catalog", () => {
-  const c = config();
-  const before = resolveModel(c, "flash");
-  const catalog = buildCatalog(c);
-  assert.deepEqual(resolveDeepSeekOptions(before), { structured_output: "native" });
-  c.upstreams.a.adapters = { "deepseek-chat": { structured_output: "json_mode" } };
-  assert.deepEqual(resolveDeepSeekOptions(resolveModel(validateConfig(c), "flash")), { structured_output: "json_mode" });
-  c.models.flash.adapters = { "deepseek-chat": { structured_output: "native" } };
-  const route = resolveModel(validateConfig(c), "flash");
-  assert.deepEqual(resolveDeepSeekOptions(route), { structured_output: "native" });
-  assert.deepEqual(route.origin, before.origin);
-  assert.deepEqual(buildCatalog(c), catalog);
-});
-
-test("DeepSeek settings reject misspellings, invalid values, and another model's adapter", () => {
-  for (const scope of ["upstreams", "models"] as const) {
-    for (const settings of [null, [], { structured_output: true }, { structured_output: "auto" }, { structure_output: "native" }]) {
-      const c = config();
-      const target = scope === "upstreams" ? c.upstreams.a : c.models.flash;
-      Object.assign(target, { adapters: { "deepseek-chat": settings } });
-      assert.throws(() => validateConfig(c), /deepseek-chat/);
-    }
-  }
-  const c = config();
-  c.models.flash.catalog = "claude-sonnet-5-5";
-  c.upstreams.a.adapters = { "deepseek-chat": { structured_output: "json_mode" } };
-  assert.equal(validateConfig(c), c);
-  c.models.flash.adapters = c.upstreams.a.adapters;
-  assert.throws(() => validateConfig(c), /deepseek-chat does not match the model adapter claude-messages/);
-});
-
-test("native structured output preserves the schema and does not add a format message", () => {
+test("DeepSeek defaults to JSON mode with the complete title schema and unchanged prior prefix", () => {
   const ctx = context();
-  const { body } = buildDeepSeekRequest(ctx);
-  assert.deepEqual(body.response_format, {
-    type: "json_schema", json_schema: { name: "codex_output_schema", schema: titleSchema, strict: true },
-  });
-  assert.equal(body.messages.length, 2);
-});
-
-test("JSON mode appends the complete title schema while preserving the request and prior prefix", () => {
-  const ctx = context("json_mode");
   const original = structuredClone(ctx.request);
-  const native = buildDeepSeekRequest(context()).body;
+  const plain = context();
+  delete plain.request.text;
+  const prefix = buildDeepSeekRequest(plain).body.messages;
   const { body } = buildDeepSeekRequest(ctx);
   assert.deepEqual(body.response_format, { type: "json_object" });
-  assert.deepEqual(body.messages.slice(0, -1), native.messages);
+  assert.deepEqual(body.messages.slice(0, -1), prefix);
   assert.equal(body.messages.at(-1).role, "system");
   const instruction = body.messages.at(-1).content as string;
   assert.match(instruction, /single JSON object/);
@@ -92,8 +51,10 @@ test("JSON mode appends the complete title schema while preserving the request a
 });
 
 test("JSON mode leaves normal and JSON-object requests alone and compaction has no format suffix", () => {
-  const ctx = context("json_mode");
-  const messages = buildDeepSeekRequest(context()).body.messages;
+  const ctx = context();
+  const plain = context();
+  delete plain.request.text;
+  const messages = buildDeepSeekRequest(plain).body.messages;
   for (const format of [undefined, { type: "text" }, { type: "json_object" }]) {
     ctx.request.text = format ? { format } : undefined;
     const body = buildDeepSeekRequest(ctx).body;
@@ -109,8 +70,10 @@ test("JSON mode leaves normal and JSON-object requests alone and compaction has 
 });
 
 test("explicit native format options take precedence without a contradictory schema reminder", () => {
-  const ctx = context("json_mode");
-  const messages = buildDeepSeekRequest(context()).body.messages;
+  const ctx = context();
+  const plain = context();
+  delete plain.request.text;
+  const messages = buildDeepSeekRequest(plain).body.messages;
   ctx.route.upstream.options = { response_format: { type: "json_object" } };
   assert.deepEqual(buildDeepSeekRequest(ctx).body.response_format, { type: "json_object" });
   assert.deepEqual(buildDeepSeekRequest(ctx).body.messages, messages);
@@ -122,14 +85,14 @@ test("explicit native format options take precedence without a contradictory sch
 
 test("JSON-mode schema conversion rejects a missing or invalid schema rather than inventing a format", () => {
   for (const schema of [undefined, null, [], "object"]) {
-    const ctx = context("json_mode");
+    const ctx = context();
     ctx.request.text.format.schema = schema;
     assert.throws(() => buildDeepSeekRequest(ctx), /requires a schema object/);
   }
 });
 
 test("JSON-mode title request reaches Chat once and its JSON text survives the Responses writer", async () => {
-  const ctx = context("json_mode");
+  const ctx = context();
   let calls = 0;
   ctx.fetch = async (_url, init) => {
     calls++;

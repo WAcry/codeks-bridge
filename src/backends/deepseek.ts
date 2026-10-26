@@ -1,5 +1,4 @@
 import { BridgeError } from "../errors.ts";
-import { resolveDeepSeekOptions } from "../adapter-options.ts";
 import { reasoningEffort } from "../profiles.ts";
 import type { Backend, BackendContext } from "../types.ts";
 import { buildChatRequest, runChat } from "./chat.ts";
@@ -15,10 +14,15 @@ const deepseek: ChatDialect = {
   },
   configureStructuredOutput({ request, route }, body) {
     const format = request.text?.format;
-    if (format?.type !== "json_schema" || resolveDeepSeekOptions(route).structured_output !== "json_mode") return;
+    if (!format || format.type === "text") return;
     // Explicit native options own their schema and must not receive a conflicting reminder.
     if (Object.hasOwn(route.upstream.options ?? {}, "response_format") ||
         Object.hasOwn(route.config.options ?? {}, "response_format")) return;
+    if (format.type === "json_object") {
+      body.response_format = { type: "json_object" };
+      return;
+    }
+    if (format.type !== "json_schema") throw new BridgeError(`DeepSeek does not support text format ${String(format.type)}.`);
     if (!format.schema || typeof format.schema !== "object" || Array.isArray(format.schema)) {
       throw new BridgeError("JSON schema output requires a schema object.");
     }

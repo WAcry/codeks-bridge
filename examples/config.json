@@ -12,10 +12,7 @@
     },
     "deepseek": {
       "base_url": "https://api.deepseek.com",
-      "api_key_env": "DEEPSEEK_API_KEY",
-      "adapters": {
-        "deepseek-chat": { "structured_output": "json_mode" }
-      }
+      "api_key_env": "DEEPSEEK_API_KEY"
     }
   },
   "models": {

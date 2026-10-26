@@ -1,5 +1,5 @@
 import { BridgeError } from "./errors.ts";
-import type { AdapterId, ClaudeMessagesOptions, DeepSeekChatOptions, ResolvedModel } from "./types.ts";
+import type { AdapterId, ClaudeMessagesOptions, ResolvedModel } from "./types.ts";
 
 function object(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -13,18 +13,9 @@ export function validateAdapterConfig(value: unknown, location: string, adapter?
   }
   if (!object(value)) fail("must be an object");
   for (const [name, settings] of Object.entries(value)) {
-    if (name !== "claude-messages" && name !== "deepseek-chat") fail(`unknown adapter settings ${name}`);
+    if (name !== "claude-messages") fail(`unknown adapter settings ${name}`);
     if (adapter !== undefined && name !== adapter) fail(`${name} does not match the model adapter ${adapter}`);
     if (!object(settings)) fail(`${name} must be an object`);
-    if (name === "deepseek-chat") {
-      for (const field of Object.keys(settings)) {
-        if (field !== "structured_output") fail(`unknown ${name} setting ${field}`);
-      }
-      if (settings.structured_output !== undefined && !["native", "json_mode"].includes(settings.structured_output as string)) {
-        fail(`${name}.structured_output must be native or json_mode`);
-      }
-      continue;
-    }
     for (const field of Object.keys(settings)) {
       if (field !== "tool_updates" && field !== "thinking_mismatch") fail(`unknown ${name} setting ${field}`);
     }
@@ -44,13 +35,5 @@ export function resolveClaudeOptions(route: Pick<ResolvedModel, "upstream" | "co
   return {
     tool_updates: model?.tool_updates ?? upstream?.tool_updates ?? "inline",
     thinking_mismatch: model?.thinking_mismatch ?? upstream?.thinking_mismatch ?? "drop_block",
-  };
-}
-
-export function resolveDeepSeekOptions(route: Pick<ResolvedModel, "upstream" | "config">): DeepSeekChatOptions {
-  const upstream = route.upstream.adapters?.["deepseek-chat"];
-  const model = route.config.adapters?.["deepseek-chat"];
-  return {
-    structured_output: model?.structured_output ?? upstream?.structured_output ?? "native",
   };
 }
