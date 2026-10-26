@@ -3,7 +3,7 @@ import test from "node:test";
 import { responsesBody } from "../src/backends/responses.ts";
 import { buildCatalog } from "../src/catalog.ts";
 import { resolveModel, validateConfig } from "../src/config.ts";
-import { getCatalogEntry } from "../src/model-catalog.ts";
+import { catalogKeys, getCatalogEntry } from "../src/model-catalog.ts";
 import { reasoningEffort } from "../src/profiles.ts";
 
 test("legacy GPT catalogs retain their protocol, window, and reasoning differences", () => {
@@ -21,7 +21,7 @@ test("legacy GPT catalogs retain their protocol, window, and reasoning differenc
   for (const [key, lite, multiAgent, window, maxWindow, compHash, defaultEffort, highestEffort] of cases) {
     const entry = catalog.find(entry => entry.slug === key)!;
     const original = getCatalogEntry(key);
-    assert.equal(original.source.tag, "rust-v0.164.0");
+    assert.equal("tag" in original.source && original.source.tag, "rust-v0.164.0");
     if (key === "gpt-5.5") assert.match(original.adjustments[0], /Responses Lite/);
     else assert.deepEqual(original.adjustments, []);
     assert.deepEqual(entry.model_messages, original.model.model_messages);
@@ -38,6 +38,41 @@ test("legacy GPT catalogs retain their protocol, window, and reasoning differenc
     assert.equal(reasoningEffort(route), defaultEffort);
     assert.equal(reasoningEffort(route, highestEffort), highestEffort === "ultra" ? "max" : highestEffort);
   }
+});
+
+test("GPT-Reserve keeps the subscription entry without names absent from public sources", () => {
+  const reserve = getCatalogEntry("gpt-reserve");
+  const luna = getCatalogEntry("gpt-5.6-luna");
+  assert.deepEqual(reserve.source, {
+    endpoint: "https://chatgpt.com/backend-api/codex/models", client_version: "0.164.0", retrieved: "2026-10-25", model: "gpt-reserve",
+  });
+  assert.equal(reserve.adapter, "gpt-responses");
+  const subscriptionOnly = Object.keys(reserve.model).filter(key => !Object.hasOwn(luna.model, key));
+  assert.deepEqual(subscriptionOnly, ["base_instructions", "available_access_programs"]);
+  const publicPlans = new Set(catalogKeys.map(getCatalogEntry).filter(entry => "tag" in entry.source)
+    .flatMap(entry => entry.model.available_in_plans ?? []));
+  assert.deepEqual(reserve.model.available_in_plans.filter((plan: string) => !publicPlans.has(plan)), []);
+  for (const key of ["context_window", "max_context_window", "comp_hash", "multi_agent_version", "supported_reasoning_levels"]) {
+    assert.deepEqual(reserve.model[key], luna.model[key], key);
+  }
+  assert.equal(reserve.model.model_messages.instructions_template, luna.model.model_messages.instructions_template);
+  assert.equal(reserve.model.visibility, "hide");
+  assert.equal(reserve.model.upgrade, null);
+
+  const config = validateConfig({
+    upstreams: { test: { base_url: "https://example.com/v1" } },
+    models: { "gpt-reserve": { catalog: "gpt-reserve", upstream: "test", model: "gpt-reserve", visibility: "hide" } },
+  });
+  const [entry] = buildCatalog(config).models;
+  assert.equal(entry.slug, "gpt-reserve");
+  assert.equal(entry.visibility, "hide");
+  assert.equal(entry.description, reserve.model.description);
+  assert.equal(entry.upgrade, null);
+  assert.equal(entry.multi_agent_version, "v1");
+  assert.equal(entry.default_reasoning_level, "medium");
+  const route = resolveModel(config, "gpt-reserve");
+  assert.equal(route.profile.id, "gpt-responses");
+  assert.equal(reasoningEffort(route), "medium");
 });
 
 test("GPT-5.5 preserves Lite declarations and Responses forwards explicit Daybreak access", () => {
