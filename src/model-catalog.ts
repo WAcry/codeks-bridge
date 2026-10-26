@@ -3,7 +3,9 @@ import { BridgeError } from "./errors.ts";
 import type { AdapterId } from "./types.ts";
 
 export interface CatalogEntry {
-  source: { repository: string; tag: string; commit: string; path: string; model: string };
+  source:
+    | { repository: string; tag: string; commit: string; path: string; model: string }
+    | { endpoint: string; client_version: string; retrieved: string; model: string };
   adjustments: string[];
   adapter: AdapterId;
   effort_map?: Record<string, string>;
@@ -13,7 +15,7 @@ export interface CatalogEntry {
 
 export const catalogKeys = [
   "gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-  "gpt-5.5", "gpt-daybreak-blue-latest", "gpt-daybreak-red-latest", "codex-auto-review",
+  "gpt-5.5", "gpt-daybreak-blue-latest", "gpt-daybreak-red-latest", "codex-auto-review", "gpt-reserve",
   "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "deepseek-flash",
 ] as const;
 
