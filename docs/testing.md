@@ -15,7 +15,7 @@ npm run check
 ## 测试覆盖什么
 
 - 工具：普通函数、namespace、自定义工具的原始字符串、Lark/regex 描述、名称冲突与超长名称、加密 schema 关键字的清理。
-- Lite：工具声明原位传给 GPT；Claude/DeepSeek 提取增量 schema，保留原历史与默认 namespace 身份；header、all-turns 和原生压缩前缀保持。
+- Lite：工具声明原位传给 GPT；Claude/DeepSeek 将增量 schema 按历史合并为唯一的最新顶层定义，保留其他成员、原历史与默认 namespace 身份；header、all-turns 和原生压缩前缀保持。
 - 流：跨字节分块的 UTF-8、CR/LF、SSE 多行数据、结束标记、非法 JSON。
 - Responses 输出：先 added 后 delta/done、完整历史项、usage、reasoning carrier、原生消息 phase（含 `partial_answer`）、缺省 phase 与 `end_turn` 的关系、摘要分段索引和最终数组一致、明文多代理参数、失败时不执行尚未提交的工具。
 - 配置与目录：有限 key、原始 GPT 条目保留、第三方精调、别名与部署名分离、窗口覆盖、effort 映射及默认值、catalog 与出站参数一致、options 覆盖顺序。
@@ -34,7 +34,7 @@ npm run check
 
 压缩后的信息保留与 handoff 质量另有[手动 benchmark](../benchmarks/compaction/README.md)：使用公开合成材料，对比两种文字 prompt、原生压缩和原生压缩后 handoff。它独立于 CI，提供复跑方法、输入、产物和逐题结果；真实模型请求需要显式执行。
 
-Claude 续接边界的回归同时检查生成和下一轮回放：首块 thinking/redacted 的 `continuation_before` 只记录一次，原生载荷不变；连续失败、多个 thinking、关闭摘要显示时仍保持顺序；来源过滤与切回按同一载荷生效；增量工具声明已有边界时不重复插入。正文或工具先于 thinking、没有 thinking，以及没有该字段的既有载荷，继续使用原有失配策略。`test/claude-continuation.test.ts` 检查转换，`test/claude-recovery-e2e.test.ts` 使用真实 codeks 和假上游检查持久化与重试；签名是否被真实上游接受须另行验证，不能由合成签名测试推断。
+Claude 续接边界的回归同时检查生成和下一轮回放：首块 thinking/redacted 的 `continuation_before` 只记录一次，原生载荷不变；连续失败、多个 thinking、关闭摘要显示时仍保持顺序；来源过滤与切回按同一载荷生效。正文或工具先于 thinking、没有 thinking，以及没有该字段的既有载荷，继续使用原有失配策略。`test/claude-continuation.test.ts` 检查转换，`test/claude-recovery-e2e.test.ts` 使用真实 codeks 和假上游检查持久化与重试；签名是否被真实上游接受须另行验证，不能由合成签名测试推断。
 
 2026-10-20（America/Los_Angeles），以 `@wacry/codeks@0.163.0-codeks.5` 启用全部客户端测试，286 项通过、0 跳过，类型检查、构建和私有内容检查通过。续接场景覆盖 overload、EOF、连续两次失败及进程重启后的 resume。另复用真实 T1/T2 签名直接请求官方 Sonnet 5.5：恢复原位 `user: Continue.` 后返回 HTTP 200，`input_transformations` 明确为空数组。这验证边界恢复的协议依据；carrier 的生成、保存与重放由真实客户端加本地假上游验证，两类证据分别成立。
 
@@ -118,6 +118,16 @@ TypeScript 检查和普通测试通过，客户端场景各在两个现成二进
 真实端点的配置、鉴权、请求与响应只保存在仓库外。公开测试数据必须是合成内容，不能复制真实密钥、端点、签名、密文、对话或账号信息。
 
 真实验证应区分：单次请求、工具回环、图片、切换模型后 reasoning 隔离、压缩后续接。原生压缩模式还需要检查同源续聊没有辅助请求，跨目标首次导出与缓存复用行为正确，文字准备完成后才发送目标请求。未允许的端点或模型使用可读摘要，允许来源且目标开启 native replay 时恢复原生压缩内容；分别测允许与不允许的配对。某一服务上的成功不代表另一服务也支持同样的字段。
+
+### 跨模型工具历史
+
+2026-10-26（America/Los_Angeles），用公开合成历史验证 GPT-6-Luna、官方 Claude Haiku 5.5 与 DeepSeek Flash，均使用 medium effort；Claude 探测将缓存 TTL 设为 5 分钟。每次模型切换都追加新版本的 `exec` 描述，历史同时包含别名调用和失败调用的 `cxbt1_` 载体。
+
+- Claude 的同名工具只发送最后一份顶层定义。真实 thinking 生成后改变工具定义，下一次请求仍返回 HTTP 200，并明确报告 `thinking_dropped`、原因 `prefix_binding_mismatch`。这是接受顶层更新的实际代价，不是推理上下文无损的保证。
+- Claude → DeepSeek → GPT → Claude 连续请求全部成功。GPT 的两组调用与结果 ID 均为 48 字符；切回后仍可按原载体回放，客户端输入未被改写。另一次 GPT 探测确认失败调用的保留身份与诊断可被接受。
+- `test/tool-alias-e2e.test.ts` 用真实 codeks 0.164 与本地假上游，分别验证 Claude、DeepSeek 的工具执行与持久化、切到 GPT 两轮、再切回。实际客户端生成了不同版本的 `exec` 声明，转换后的工具表仅含最新定义，同时覆盖 call/result 配对与稳定 ID。
+
+真实端点测试验证请求被接受及服务端报告；工具执行和进程重启后的恢复由客户端集成测试验证。合成签名不用于推断真实签名兼容性，短请求也不用于推断通常的缓存命中率。
 
 ### 缓存实验的边界
 

@@ -4,6 +4,7 @@ import { buildAnthropicRequest } from "../src/backends/anthropic.ts";
 import { buildDeepSeekRequest } from "../src/backends/deepseek.ts";
 import { responsesBody } from "../src/backends/responses.ts";
 import { resolveModel, validateConfig } from "../src/config.ts";
+import { handoffRequest, summaryRequest } from "../src/compaction.ts";
 import { prepareToolCall, toolCallForReplay, toolResultForReplay, writeToolCall } from "../src/tool-calls.ts";
 import type { ClientToolCall } from "../src/tool-calls.ts";
 import { buildToolSet } from "../src/tools.ts";
@@ -161,17 +162,84 @@ test("aliased image results use the original id in both the result and its image
   assert(!JSON.stringify(body.messages).includes("cxbt1_"));
 });
 
-test("GPT Responses leaves tool names, ids and error history untouched", () => {
+test("GPT projects carrier ids and diagnostics while retaining Responses tool identity", () => {
   const tools = buildToolSet(definitions);
-  const alias = committed(prepareToolCall(tools, "wire_alias", "functions.exec", { input: code }));
+  const alias = committed(prepareToolCall(tools, "wire_alias_with_a_provider_generated_suffix", "functions.exec", { input: code }));
   const unknown = committed(prepareToolCall(tools, "wire_unknown", "missing_tool", {}));
   const input = [...history(alias), ...history(unknown, "unsupported call")];
+  const original = structuredClone(input);
   const body = responsesBody(context("gpt", definitions, input));
   assert.deepEqual(body.tools, definitions);
-  for (const [actual, expected] of body.input.map((item: any, index: number) => [item, input[index]])) {
-    const { id: _id, ...withoutItemId } = expected;
-    assert.deepEqual(actual, withoutItemId);
+  for (const [callIndex, resultIndex] of [[1, 2], [4, 5]]) {
+    assert.ok(input[callIndex].call_id.length > 64);
+    const id = body.input[callIndex].call_id;
+    assert.match(id, /^[a-zA-Z0-9_-]{1,64}$/);
+    assert(!id.startsWith("cxbt1_"));
+    assert.equal(body.input[resultIndex].call_id, id);
+    const { id: _id, ...withoutItemId } = input[callIndex];
+    assert.deepEqual(body.input[callIndex], { ...withoutItemId, call_id: id });
   }
-  assert.equal(body.input[2].call_id, alias.call_id);
-  assert.equal(body.input[5].output, "unsupported call");
+  assert.deepEqual(body.input[2].output, input[2].output);
+  assert.equal(body.input[5].output, toolResultForReplay(input[5]).output);
+  assert.match(body.input[5].output, /missing_tool.*unknown/);
+  assert.match(body.input[5].output, /functions__exec/);
+  assert.deepEqual(responsesBody(context("gpt", definitions, input)).input, body.input);
+  assert.deepEqual(input, original);
+
+  // All GPT sampling paths share this projection, including native compaction
+  // delegated from another model and a later handoff using retained history.
+  const native = { model: "gpt", tools: definitions, input: [...input, { type: "compaction_trigger" }] };
+  const handoff = handoffRequest({ prefix: [], parameters: { model: "gpt", tools: definitions }, responsesLite: true },
+    input, { type: "compaction", encrypted_content: "synthetic-native-checkpoint" });
+  for (const request of [native, summaryRequest(native), handoff]) {
+    const projected = responsesBody({ ...context("gpt", definitions, []), request, compacting: true });
+    assert.deepEqual(projected.input.slice(0, input.length), body.input);
+  }
+});
+
+test("GPT preserves distinct carrier identities even when their original upstream ids coincide", () => {
+  const tools = buildToolSet(definitions);
+  const calls = ["exec", "functions.exec"].map(name =>
+    committed(prepareToolCall(tools, "wire_shared", name, { input: code })));
+  calls.push(committed(prepareToolCall(tools, "wire_shared", "clock__sleep", { duration_ms: 1 })));
+  const input = calls.flatMap(call => history(call));
+  const body = responsesBody(context("gpt", definitions, input));
+  const ids = [1, 4, 7].map(index => body.input[index].call_id);
+  assert.equal(new Set(ids).size, 3);
+  assert.equal(ids[2], "wire_shared", "A valid native id is not rewritten");
+  assert.ok(calls[0].call_id.startsWith("cxbt1_") && calls[0].call_id.length <= 64);
+  assert.equal(ids[0], calls[0].call_id, "A short carrier already accepted by GPT keeps its identity");
+  for (const [index, call] of calls.entries()) {
+    assert.equal(body.input[index * 3 + 2].call_id, ids[index]);
+    assert.equal(responsesBody(context("gpt", definitions, history(call))).input[1].call_id, ids[index],
+      "Mapping must not depend on other calls or their position in history");
+  }
+});
+
+test("GPT bounds other providers' long call ids without interpreting opaque ids or changing tool results", () => {
+  const ids = ["a".repeat(64), "a".repeat(65), "a".repeat(65) + " ", "cxbt1_unreadable", "cxbt1_" + "x".repeat(80)];
+  for (const kind of ["function", "custom_tool"]) {
+    const output = [{ type: "input_text", text: "Done" }, { type: "input_image", image_url: "data:image/png;base64,c3ludGhldGlj" }];
+    const input = ids.flatMap(call_id => [
+      { type: `${kind}_call`, call_id, namespace: "functions", name: "exec", future: "kept",
+        ...(kind === "custom_tool" ? { input: code } : { arguments: JSON.stringify({ input: code }) }) },
+      { type: `${kind}_call_output`, call_id, output, future: "kept" },
+      { type: `${kind}_call_output`, call_id, output: "Later notification" },
+    ]);
+    input.push({ type: "function_call_output", namespace: "functions", name: "exec", output: "Proactive notification" } as any);
+    const original = structuredClone(input);
+    const body = responsesBody(context("gpt", definitions, input));
+    const mapped = ids.map((id, index) => {
+      const call = body.input[index * 3];
+      assert.ok(call.call_id.length <= 64);
+      if (id.length <= 64) assert.equal(call.call_id, id);
+      for (const offset of [0, 1, 2]) {
+        assert.deepEqual(body.input[index * 3 + offset], { ...input[index * 3 + offset], call_id: call.call_id });
+      }
+      return call.call_id;
+    });
+    assert.equal(new Set(mapped).size, ids.length, "Do not trim or truncate distinct ids into one identity");
+    assert.deepEqual(body.input.at(-1), input.at(-1), "Proactive outputs do not gain an invented id");
+    assert.deepEqual(input, original);
+  }
 });

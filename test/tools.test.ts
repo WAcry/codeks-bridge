@@ -100,24 +100,18 @@ test("aliases come from complete identities, including punctuation and hashed na
   assert.equal(tools.resolve(tools.get("storage", longName)!.flatName), tools.get("storage", longName));
 });
 
-test("aliases use current declarations while inline snapshots and canonical names stay stable", () => {
-  const tools = buildToolSet([{ type: "custom", name: "exec", description: "Original." }]);
-  const original = tools.add([{ type: "namespace", name: "functions", tools: [{ type: "custom", name: "exec", description: "Inline." }] }]);
-  assert.equal(tools.entries.length, 1);
-  assert.equal(tools.resolve("functions__exec"), tools.entries[0]);
+test("aliases use the latest declaration while canonical names stay stable", () => {
+  const tools = buildToolSet([
+    { type: "custom", name: "exec", description: "Original." },
+    { type: "namespace", name: "functions", tools: [{ type: "custom", name: "exec", description: "Updated." }] },
+    { type: "namespace", name: "remote", tools: [fn("exec")] },
+  ]);
+  assert.equal(tools.entries.length, 2);
+  assert.equal(tools.resolve("functions__exec"), tools.get("functions", "exec"));
   assert.equal(tools.resolve("functions.exec")?.flatName, "exec");
-  tools.add([{ type: "custom", name: "exec", description: "Updated." }]);
   assert.match(tools.resolve("functions.exec")!.description, /^Updated\./);
-  assert.match(original[0].description, /^Inline\./);
-  tools.add([{ type: "namespace", name: "remote", tools: [fn("exec")] }]);
   assert.equal(tools.resolve("exec"), tools.get(undefined, "exec"));
   assert.equal(tools.resolve("remote.exec"), tools.get("remote", "exec"));
-
-  const named = buildToolSet([{ type: "namespace", name: "files", tools: [fn("read")] }]);
-  assert.equal(named.resolve("read"), named.get("files", "read"));
-  named.add([{ type: "namespace", name: "database", tools: [fn("read")] }]);
-  assert.equal(named.resolve("read"), undefined);
-  assert.equal(named.candidates("read").length, 2);
 });
 
 test("long tool names retain a readable prefix and distinct deterministic hashes", () => {
@@ -244,15 +238,11 @@ test("Messages and DeepSeek preserve explicit function strict without adding def
   }
 });
 
-test("strict updates replace the current value while Claude inline keeps earlier definitions", () => {
+test("Messages and DeepSeek replace strict settings with the latest declaration", () => {
   const config = validateConfig({
     upstreams: { example: { base_url: "https://api.example.com/v1" } },
     models: {
-      inline: { upstream: "example", model: "claude-sonnet-5-5", catalog: "claude-sonnet-5-5" },
-      top_level: {
-        upstream: "example", model: "claude-sonnet-5-5", catalog: "claude-sonnet-5-5",
-        adapters: { "claude-messages": { tool_updates: "top_level" } },
-      },
+      messages: { upstream: "example", model: "claude-sonnet-5-5", catalog: "claude-sonnet-5-5" },
       chat: { upstream: "example", model: "deepseek-flash", catalog: "deepseek-flash" },
     },
   });
@@ -267,22 +257,14 @@ test("strict updates replace the current value while Claude inline keeps earlier
     { role: "user", content: "Third." }, declaration(),
   ];
   const snapshot = structuredClone(input);
-  for (const model of ["inline", "top_level", "chat"]) {
+  for (const model of ["messages", "chat"]) {
     const context = { route: resolveModel(config, model), request: { model, input }, signal: new AbortController().signal };
     const body = model === "chat" ? buildDeepSeekRequest(context).body : buildAnthropicRequest(context).body;
     const wire = JSON.parse(JSON.stringify(body));
-    if (model === "inline") {
-      assert.equal(wire.tools[0].strict, true);
-      const updates = wire.messages.flatMap((message: any) => message.content)
-        .filter((block: any) => block.type === "tool_addition").map((block: any) => block.tool.definition);
-      assert.deepEqual(updates.map((tool: any) => [tool.name, Object.hasOwn(tool, "strict"), tool.strict]), [
-        ["files__read", true, false], ["files__read", false, undefined],
-      ]);
-    } else {
-      const tool = model === "chat" ? wire.tools[0].function : wire.tools[0];
-      assert.equal(tool.name, "files__read");
-      assert.equal(Object.hasOwn(tool, "strict"), false);
-    }
+    assert.equal(wire.tools.length, 1);
+    const tool = model === "chat" ? wire.tools[0].function : wire.tools[0];
+    assert.equal(tool.name, "files__read");
+    assert.equal(Object.hasOwn(tool, "strict"), false);
   }
   assert.deepEqual(input, snapshot);
 });

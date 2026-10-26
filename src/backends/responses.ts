@@ -3,6 +3,7 @@ import { BridgeError, ResponsesIncompleteError, responsesStreamError } from "../
 import { isOpaqueStateItem, prepareHistory } from "../history.ts";
 import { reasoningEffort } from "../profiles.ts";
 import { parseJsonSse } from "../sse.ts";
+import { toolItemForResponses } from "../tool-calls.ts";
 import { upstreamFetch } from "../upstream.ts";
 import type { Backend, BackendContext } from "../types.ts";
 import type { Usage } from "../writer.ts";
@@ -21,7 +22,7 @@ export function responsesBody({ request, route, compacting }: BackendContext): R
       if (typeof item.state.data !== "string") throw new BridgeError("Invalid Responses reasoning data.");
       return { type: "reasoning", summary: item.summary, encrypted_content: item.state.data };
     }
-    return item;
+    return toolItemForResponses(item);
   });
   const body: Record<string, any> = {
     ...(route.profile.max_output_tokens ? { max_output_tokens: route.profile.max_output_tokens } : {}),

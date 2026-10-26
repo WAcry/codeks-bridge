@@ -4,17 +4,15 @@ import { BridgeError, upstreamError } from "../errors.ts";
 import { isOpaqueStateItem, prepareHistory } from "../history.ts";
 import { reasoningEffort, reasoningSummaryRequested } from "../profiles.ts";
 import { parseJsonSse } from "../sse.ts";
-import { safeCallId } from "../tools.ts";
+import { buildToolSet, normalizeToolDeclarations, safeCallId } from "../tools.ts";
 import type { ToolSet } from "../tools.ts";
 import type { Backend, BackendContext } from "../types.ts";
 import { upstreamFetch } from "../upstream.ts";
-import { buildAnthropicTools } from "./anthropic-tools.ts";
 import { prepareToolCall, toolCallForReplay, toolResultForReplay, writeToolCall } from "../tool-calls.ts";
 
 type Block = Record<string, any>;
-interface Message { role: "user" | "assistant" | "system"; content: Block[] }
+interface Message { role: "user" | "assistant"; content: Block[] }
 const THINKING_BINDING_BETA = "thinking-binding-controls-2026-08-01";
-const INLINE_TOOLS_BETA = "inline-tools-2026-09-15";
 
 function contentBlocks(content: unknown): Block[] {
   if (typeof content === "string") return content ? [{ type: "text", text: content }] : [];
@@ -69,47 +67,23 @@ export function buildAnthropicRequest(context: BackendContext): {
   continuationBefore?: string;
 } {
   const { route } = context;
-  const request = context.request;
+  const request = normalizeToolDeclarations(context.request);
   const settings = resolveClaudeOptions(route);
-  const { tools, definitions, input } = buildAnthropicTools(request, settings.tool_updates);
+  const tools = buildToolSet(request.tools);
+  const definitions = tools.entries.map(tool => ({
+    name: tool.flatName, description: tool.description, input_schema: tool.parameters,
+    ...(tool.strict === undefined ? {} : { strict: tool.strict }),
+  }));
   const system: Block[] = request.instructions ? [{ type: "text", text: request.instructions }] : [];
   const messages: Message[] = [];
-  let additions: Block[] = [];
-  let hasInlineTools = false;
-  const continueAssistant = () => {
-    const tail = messages.at(-1);
-    if (tail?.role === "assistant" && !tail.content.some(block => block.type === "tool_use")) {
-      const text = "Continue.";
-      messages.push({ role: "user", content: [{ type: "text", text }] });
-      return text;
-    }
-  };
-  const flushAdditions = () => {
-    if (!additions.length) return;
-    // A persisted declaration also anchors this boundary on later replays.
-    continueAssistant();
-    if (messages.at(-1)?.role !== "user") {
-      throw new BridgeError("Inline tool declarations require a user or completed tool-result boundary.");
-    }
-    messages.push({ role: "system", content: additions });
-    additions = [];
-    hasInlineTools = true;
-  };
   const append = (role: Message["role"], blocks: Block[]) => {
     if (!blocks.length) return;
-    // Several reminders/results may share a user turn. Tool declarations take
-    // effect after that complete boundary, before the next assistant step.
-    if (role === "assistant") flushAdditions();
     const last = messages.at(-1);
     if (last?.role === role) last.content.push(...blocks);
     else messages.push({ role, content: blocks });
   };
-  for (const item of prepareHistory(input, route)) {
-    if (item.type === "additional_tools") {
-      additions.push(...item.tools.map((definition: Block) => ({
-        type: "tool_addition", tool: { type: "tool_definition", definition },
-      })));
-    } else if (isOpaqueStateItem(item)) {
+  for (const item of prepareHistory(request.input, route)) {
+    if (isOpaqueStateItem(item)) {
       // Keep unknown state opaque. The endpoint decides whether it accepts it.
       append("assistant", [item]);
     } else if (item.type === "bridge_reasoning") {
@@ -141,9 +115,8 @@ export function buildAnthropicRequest(context: BackendContext): {
       if (item.role === "developer" || item.role === "system") {
         if (blocks.some((block) => block.type !== "text")) throw new BridgeError("System messages must contain text.");
         if (!messages.length) system.push(...blocks);
-        // Inline system roles have placement restrictions that arbitrary Responses
-        // history cannot satisfy. Keep reminders in order without rewriting a
-        // signed assistant prefix or moving new instructions to the beginning.
+        // Keep reminders in order without rewriting a signed assistant prefix
+        // or moving new instructions to the beginning.
         else append("user", [{ type: "text", text: `<system-reminder>\n${blocks.map((block) => block.text).join("\n\n")}\n</system-reminder>` }]);
       } else if (item.role === "assistant" || item.role === "user") {
         append(item.role, blocks);
@@ -152,9 +125,10 @@ export function buildAnthropicRequest(context: BackendContext): {
   }
   // A failed response can leave a complete thinking/text item in codeks history.
   // Claude requires a user boundary to resume. Do not mask a missing tool result.
-  // Pending declarations already persist their own continuation boundary.
-  const continuationBefore = additions.length ? undefined : continueAssistant();
-  flushAdditions();
+  const tail = messages.at(-1);
+  const continuationBefore = tail?.role === "assistant" && !tail.content.some(block => block.type === "tool_use")
+    ? "Continue." : undefined;
+  if (continuationBefore) append("user", [{ type: "text", text: continuationBefore }]);
   // Keep stable prefixes at 1h. The one-off compaction suffix uses 5m.
   const cache = (block: Block | undefined, ttl: "1h" | "5m" = "1h") => {
     if (block) block.cache_control = { type: "ephemeral", ttl };
@@ -212,7 +186,7 @@ export function buildAnthropicRequest(context: BackendContext): {
       delete body.output_config.format;
     }
   }
-  return { body, tools, betas: [THINKING_BINDING_BETA, ...(hasInlineTools ? [INLINE_TOOLS_BETA] : [])], continuationBefore };
+  return { body, tools, betas: [THINKING_BINDING_BETA], continuationBefore };
 }
 
 function tokenCount(value: unknown): number {

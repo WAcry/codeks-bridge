@@ -17,10 +17,7 @@ export function validateAdapterConfig(value: unknown, location: string, adapter?
     if (adapter !== undefined && name !== adapter) fail(`${name} does not match the model adapter ${adapter}`);
     if (!object(settings)) fail(`${name} must be an object`);
     for (const field of Object.keys(settings)) {
-      if (field !== "tool_updates" && field !== "thinking_mismatch") fail(`unknown ${name} setting ${field}`);
-    }
-    if (settings.tool_updates !== undefined && !["inline", "top_level"].includes(settings.tool_updates as string)) {
-      fail(`${name}.tool_updates must be inline or top_level`);
+      if (field !== "thinking_mismatch") fail(`unknown ${name} setting ${field}`);
     }
     if (settings.thinking_mismatch !== undefined && !["drop_block", "error", "upstream_default"].includes(settings.thinking_mismatch as string)) {
       fail(`${name}.thinking_mismatch must be drop_block, error, or upstream_default`);
@@ -33,7 +30,6 @@ export function resolveClaudeOptions(route: Pick<ResolvedModel, "upstream" | "co
   const upstream = route.upstream.adapters?.["claude-messages"];
   const model = route.config.adapters?.["claude-messages"];
   return {
-    tool_updates: model?.tool_updates ?? upstream?.tool_updates ?? "inline",
     thinking_mismatch: model?.thinking_mismatch ?? upstream?.thinking_mismatch ?? "drop_block",
   };
 }

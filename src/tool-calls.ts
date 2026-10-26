@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { BridgeError } from "./errors.ts";
 import type { ToolSet } from "./tools.ts";
 import type { FunctionCallItem, CustomToolCallItem, ResponseWriter } from "./writer.ts";
@@ -72,4 +73,20 @@ export function toolCallForReplay(item: Record<string, any>, tools: ToolSet): { 
 export function toolResultForReplay(item: Record<string, any>): { id: string; output: unknown; isError: boolean } {
   const wire = decode(item.call_id);
   return { id: wire?.id ?? item.call_id, output: wire?.error ?? item.output, isError: wire?.error !== undefined };
+}
+
+/** Project tool history onto Responses without changing the client's stored identity. */
+export function toolItemForResponses(item: Record<string, any>): Record<string, any> {
+  if (!["function_call", "custom_tool_call", "function_call_output", "custom_tool_call_output"].includes(item.type) ||
+      typeof item.call_id !== "string") return item;
+  const wire = item.type.endsWith("_output") ? decode(item.call_id) : undefined;
+  if (item.call_id.length <= 64 && wire?.error === undefined) return item;
+  // Responses limits call_id to 64 characters. Hash the complete client id,
+  // not wire.id: distinct carriers can contain the same upstream id.
+  const call_id = item.call_id.length > 64
+    ? `call_${createHash("sha256").update(item.call_id).digest("base64url")}` : item.call_id;
+  const output = wire?.error !== undefined ? { output: wire.error } : {};
+  // Accepted aliases already have the correct Responses name/namespace/type.
+  // Failed calls retain their non-executable identity and actionable feedback.
+  return { ...item, call_id, ...output };
 }
