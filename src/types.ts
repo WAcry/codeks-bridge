@@ -30,6 +30,8 @@ export interface ModelConfig {
   catalog: string;
   /** Include this alias in the client catalog. Defaults to true. */
   expose?: boolean;
+  /** Picker visibility; hidden aliases retain their catalog metadata. Defaults to list. */
+  visibility?: "list" | "hide";
   context_window?: number;
   max_output_tokens?: number;
   input_modalities?: ("text" | "image")[];

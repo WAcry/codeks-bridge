@@ -51,6 +51,10 @@ const config = {
     gpt: { upstream: "synthetic", catalog: "gpt-6.1-sol", model: "synthetic-gpt" },
     claude: { upstream: "synthetic", catalog: "claude-sonnet-5-5", model: "synthetic-claude" },
     flash: { upstream: "synthetic", catalog: "deepseek-flash", model: "synthetic-flash" },
+    memory: { upstream: "synthetic", catalog: "gpt-5.6-luna", model: "synthetic-memory", visibility: "hide" },
+    ...Object.fromEntries(["gpt-5.5", "gpt-daybreak-blue-latest", "gpt-daybreak-red-latest", "codex-auto-review"].map(key => [
+      key, { upstream: "synthetic", catalog: key, model: key, visibility: "hide" },
+    ])),
   },
 };
 const configPath = join(directory, "bridge.json");
@@ -80,9 +84,10 @@ const command = (...args) => execFileSync(process.execPath, [cli, ...args], {
 });
 assert.match(command("--help"), /Usage: codeks-bridge/);
 const catalog = JSON.parse(command("catalog", "--config", configPath));
-assert.deepEqual(catalog.models.map((model) => model.slug), ["gpt", "claude", "flash"]);
+assert.deepEqual(catalog.models.map((model) => model.slug), Object.keys(config.models));
 for (const model of catalog.models) {
   assert(model.model_messages.instructions_template.length > 100, `Missing instructions for ${model.slug}`);
+  assert.equal(model.visibility, config.models[model.slug].visibility ?? "list");
 }
 assert.match(command("config-snippet", "--config", configPath), /remote_compaction = "v2"/);
 

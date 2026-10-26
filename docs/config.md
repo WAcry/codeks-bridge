@@ -80,6 +80,7 @@
 | `model` | 实际上游模型名；可以是部署别名 |
 | `catalog` | 必填，已审阅条目的 key；条目决定 adapter |
 | `expose` | 默认 `true`；设为 `false` 时不进入客户端 HTTP 目录和 CLI 导出的静态目录 |
+| `visibility` | 默认 `"list"`；`"hide"` 在客户端选择器中隐藏，仍保留完整目录条目；`expose: false` 时不输出条目 |
 | `context_window` | 可选窗口预算；设置时同时覆盖客户端的 `context_window` 和 `max_context_window` |
 | `max_output_tokens` | 覆盖目录的默认回答输出预算；请求中的显式值优先于模型配置 |
 | `input_modalities` | 可选，覆盖条目中的 `text`/`image` 能力声明 |
@@ -89,9 +90,18 @@
 | `options` | 原生请求参数，覆盖上游级 options |
 | `adapters` | 当前模型的桥接行为；逐字段覆盖上游级同名 adapter 设置 |
 
-`expose` 控制目录展示，不改变别名的路由、来源身份或访问权限。隐藏模型仍可用于压缩、handoff 和状态复用，显式按别名发送请求也仍可调用；inspector 保留其诊断记录。`config-snippet` 选择首个公开别名作为默认模型；全部隐藏时目录为空，该命令明确报错。
+`visibility: "hide"` 适合 Memory、已有会话等仍需完整模型元数据的用途。它保留提示词、窗口和工具能力，仅设置客户端的选择器可见性。`expose: false` 则完全省略目录条目，适合只由 bridge 内部调用的压缩预设。
 
-不设置窗口时，原条目的两个窗口字段各自保留。当前 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；Opus 5.5、Sonnet 5.5 和 Haiku 5.5 为 `context_window: 400000`、`max_context_window: 1000000`；DeepSeek Flash 的两个字段均为 `1000000`。压缩阈值沿用模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 必须提供 `max_tokens`，对应目录外层默认预算为 `128000`；GPT 和 DeepSeek 使用请求、模型配置或上游提供的默认值。原生 options 也可调整预算，实际限制由部署端点裁决。
+两个字段都不改变别名的路由、来源身份或访问权限。显式按别名发送请求仍可调用，也可用于压缩、handoff 和状态复用；inspector 保留诊断记录。`config-snippet` 选择首个进入目录且 `visibility` 为 `"list"` 的别名作为默认模型；没有可见别名时该命令明确报错，服务和目录导出仍可使用。
+
+```json
+"memory": {
+  "catalog": "gpt-5.6-luna", "upstream": "primary", "model": "gpt-5.6-luna",
+  "visibility": "hide"
+}
+```
+
+不设置窗口时，原条目的两个窗口字段各自保留。多数 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；GPT-5.5 的两个字段均为 `272000`，Daybreak Red 均为 `372000`。Opus 5.5、Sonnet 5.5 和 Haiku 5.5 为 `context_window: 400000`、`max_context_window: 1000000`；DeepSeek Flash 的两个字段均为 `1000000`。压缩阈值沿用模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 必须提供 `max_tokens`，对应目录外层默认预算为 `128000`；GPT 和 DeepSeek 使用请求、模型配置或上游提供的默认值。原生 options 也可调整预算，实际限制由部署端点裁决。
 
 请求先由 adapter 转换，再浅层合并 `upstream.options`、`model.options`；后者优先，嵌套对象整体替换。例如模型 `options.output_config` 会替换推导值和上游同名对象。由此可以显式调整 thinking budget、原生 effort 或端点专有字段。
 
