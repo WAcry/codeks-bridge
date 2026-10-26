@@ -32,8 +32,10 @@ export interface ToolSet {
   flatFor(namespace: string | undefined, name: string): string;
   /** Looks up the original identity, including codeks' default namespace. */
   get(namespace: string | undefined, name: string): ToolEntry | undefined;
-  /** Resolves a call made by the upstream model. */
-  resolve(flatName: string): ToolEntry | undefined;
+  /** Exact declared name first, otherwise all matching original-name aliases. */
+  candidates(name: string): readonly ToolEntry[];
+  /** Resolves only an exact name or an unambiguous alias. */
+  resolve(name: string): ToolEntry | undefined;
 }
 
 function sanitize(name: string): string {
@@ -196,6 +198,18 @@ export function buildToolSet(tools: unknown[] | undefined): ToolSet {
   };
   addTools(tools ?? []);
 
+  const candidates = (name: string): ToolEntry[] => {
+    const exact = byFlat.get(name);
+    if (exact) return [exact];
+    // Read the current definitions so Lite updates cannot leave stale aliases.
+    // Do not split or guess names: punctuation and namespaces may overlap.
+    return entries.filter((entry) => {
+      const namespace = entry.namespace || "functions";
+      return name === entry.name || name === `${namespace}.${entry.name}` ||
+        name === `${namespace}__${entry.name}`;
+    });
+  };
+
   return {
     entries,
     add: addTools,
@@ -206,8 +220,10 @@ export function buildToolSet(tools: unknown[] | undefined): ToolSet {
     get(namespace, name) {
       return byIdentity.get(identity(namespace, name));
     },
-    resolve(flatName) {
-      return byFlat.get(flatName);
+    candidates,
+    resolve(name) {
+      const matches = candidates(name);
+      return matches.length === 1 ? matches[0] : undefined;
     },
   };
 }

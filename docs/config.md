@@ -159,7 +159,7 @@ token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次�
 
 ## Adapter 专用行为
 
-`adapters` 与 `options` 分工不同：前者控制 bridge 怎样转换协议，后者是发送给上游的原生请求参数。命名空间使用目录已有的 adapter ID；以后新增协议专用行为时，在对应命名空间增加字段，无需向模型目录或连接顶层添加协议特例。目前有专用设置的是 `claude-messages`：
+`adapters` 与 `options` 分工不同：前者控制 bridge 怎样转换协议，后者是发送给上游的原生请求参数。命名空间使用目录已有的 adapter ID；以后新增协议专用行为时，在对应命名空间增加字段，无需向模型目录或连接顶层添加协议特例。`claude-messages` 的设置：
 
 | 字段 | 值与默认行为 |
 | --- | --- |
@@ -186,6 +186,16 @@ token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次�
 ```
 
 省略 `thinking_mismatch` 表示 bridge 默认的 `drop_block`，与显式 `upstream_default` 不同。对最终 `thinking.type` 为 `adaptive` 或 `enabled` 的请求，bridge 补充 `block_binding.prefix_mismatch_behavior`；原生 `options.thinking.block_binding` 中明确设置的同名值优先。`between_tools` 等不支持该字段的模式不补充策略，不擅自换 thinking 模式。`options` 本身仍按前述浅层规则合并，不进行通用递归合并。
+
+`deepseek-chat.structured_output` 默认 `native`，将客户端 schema 转成原生 `response_format.json_schema`。对于只支持 JSON mode 的端点，可以显式配置：
+
+```json
+"adapters": {
+  "deepseek-chat": { "structured_output": "json_mode" }
+}
+```
+
+该模式只在客户端要求 JSON Schema 时发送 `json_object`，并在请求末尾追加完整 schema 说明，适用于自动标题等任务。它保证 JSON 语法，不提供原生 strict schema 的同等保证；不在失败后自动降级或重试。显式 `options.response_format` 优先；压缩和普通文字请求不受影响。详见 [DeepSeek Chat](backends-deepseek-chat.md#结构化输出)。
 
 专用设置不作为请求参数发给上游，不改变状态来源身份或客户端目录。共享连接可以配置供不同模型使用的 adapter；模型级只接受自身 adapter 的设置。未知命名空间、字段及枚举会报配置错误；尚无专用字段的 adapter 无需配置空对象。`inline` 需要上游支持相关协议，不兼容时直接返回错误，应在该连接显式选择 `top_level`。恢复代价及端点行为见 [Claude Messages](backends-anthropic.md#失配策略与故障续接)。
 

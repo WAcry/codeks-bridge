@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildAnthropicRequest } from "../src/backends/anthropic.ts";
 import { buildDeepSeekRequest } from "../src/backends/deepseek.ts";
+import { encodeReasoning } from "../src/carrier.ts";
 import { resolveModel, validateConfig } from "../src/config.ts";
 import { prepareHistory } from "../src/history.ts";
 import { translateToolHistory } from "../src/tool-history.ts";
@@ -88,6 +89,75 @@ test("translation preserves model block order, separate exchanges, and incomplet
   const missing = [call("a"), message("user", "Cancelled.")];
   assert.deepEqual(translateToolHistory(missing), missing);
   assert.deepEqual(translateToolHistory([result("unknown")]), [result("unknown")]);
+});
+
+test("late results return to their original batch without merging later assistant steps", () => {
+  const thought = { type: "bridge_reasoning", state: { data: "Later reasoning" } };
+  const input = [
+    message("user", "Inspect the files."), call("a"), call("b"), result("b"),
+    thought, message("assistant", "Inspecting one more file."), call("c"), result("c"), result("a"),
+  ];
+  const before = structuredClone(input);
+  const expected = [input[0], input[1], input[2], input[3], input[8], ...input.slice(4, 8)];
+  assert.deepEqual(translateToolHistory(input), expected);
+  assert.deepEqual(translateToolHistory(expected), expected);
+  assert.deepEqual(input, before);
+  assert.deepEqual(prepareHistory(input.filter((item) => item !== thought), resolveModel(config, "gpt")), input.filter((item) => item !== thought));
+});
+
+test("late first results move once and subsequent notifications remain at their arrival position", () => {
+  const input = [
+    call("a"), call("b"), result("b"), call("c"), result("c"),
+    result("a", "First progress"), result("a", "Final progress"),
+  ];
+  const translated = translateToolHistory(input);
+  assert.deepEqual(translated.slice(0, 6), [input[0], input[1], input[2], input[5], input[3], input[4]]);
+  assert.equal(translated[6].role, "user");
+  assert.equal(translated[6].content[1].text, "Final progress");
+});
+
+test("late repair does not cross user messages, checkpoints, or ambiguous call identities", () => {
+  const start = [call("a"), call("b"), result("b")];
+  const next = [call("c"), result("c")];
+  const histories = [
+    [...start, message("user", "Next task."), ...next, result("a")],
+    [...start, ...next, message("user", "Next task."), result("a")],
+    [...start, ...next],
+    [...start, message("assistant", "Another step."), call("a"), result("a")],
+    [...start, ...next, { type: "compaction", encrypted_content: "opaque_checkpoint" }, result("a")],
+  ];
+  for (const input of histories) assert.deepEqual(translateToolHistory(input), input);
+});
+
+test("Chat and Messages keep delayed parallel results adjacent and later reasoning separate", () => {
+  for (const model of ["claude", "deepseek"]) {
+    const route = resolveModel(config, model);
+    const data = model === "claude"
+      ? { type: "thinking", thinking: "Later reasoning", signature: "synthetic_later_signature" }
+      : "Later reasoning";
+    const thought = { type: "reasoning", encrypted_content: encodeReasoning({ source: route.origin, format: route.profile.reasoning_format, data }) };
+    const input = [message("user", "Inspect the files."), call("a"), call("b"), result("b"), thought, call("c"), result("c"), result("a")];
+    const original = structuredClone(input);
+    const context = { route, request: { model, input, tools }, signal: new AbortController().signal };
+    if (model === "claude") {
+      const { body } = buildAnthropicRequest(context);
+      assert.deepEqual(body.messages.map((item: any) => item.role), ["user", "assistant", "user", "assistant", "user"]);
+      assert.deepEqual(body.messages[1].content.map((part: any) => part.id), ["a", "b"]);
+      assert.deepEqual(body.messages[2].content.map((part: any) => part.tool_use_id), ["b", "a"]);
+      assert.deepEqual(body.messages[3].content[0], data);
+      assert.equal(body.messages[3].content[1].id, "c");
+      assert.equal(body.messages[4].content[0].tool_use_id, "c");
+    } else {
+      const { body } = buildDeepSeekRequest(context);
+      assert.deepEqual(body.messages.map((item: any) => item.role), ["user", "assistant", "tool", "tool", "assistant", "tool"]);
+      assert.deepEqual(body.messages[1].tool_calls.map((tool: any) => tool.id), ["a", "b"]);
+      assert.deepEqual(body.messages.slice(2, 4).map((item: any) => item.tool_call_id), ["b", "a"]);
+      assert.equal(body.messages[4].reasoning_content, "Later reasoning");
+      assert.deepEqual(body.messages[4].tool_calls.map((tool: any) => tool.id), ["c"]);
+      assert.equal(body.messages[5].tool_call_id, "c");
+    }
+    assert.deepEqual(input, original);
+  }
 });
 
 test("translated backend requests have adjacent results followed by reminder and image content", () => {

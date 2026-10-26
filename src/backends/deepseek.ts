@@ -1,4 +1,5 @@
 import { BridgeError } from "../errors.ts";
+import { resolveDeepSeekOptions } from "../adapter-options.ts";
 import { reasoningEffort } from "../profiles.ts";
 import type { Backend, BackendContext } from "../types.ts";
 import { buildChatRequest, runChat } from "./chat.ts";
@@ -11,6 +12,23 @@ const deepseek: ChatDialect = {
     return effort === "none"
       ? { thinking: { type: "disabled" } }
       : { thinking: { type: "enabled" }, reasoning_effort: effort };
+  },
+  configureStructuredOutput({ request, route }, body) {
+    const format = request.text?.format;
+    if (format?.type !== "json_schema" || resolveDeepSeekOptions(route).structured_output !== "json_mode") return;
+    // Explicit native options own their schema and must not receive a conflicting reminder.
+    if (Object.hasOwn(route.upstream.options ?? {}, "response_format") ||
+        Object.hasOwn(route.config.options ?? {}, "response_format")) return;
+    if (!format.schema || typeof format.schema !== "object" || Array.isArray(format.schema)) {
+      throw new BridgeError("JSON schema output requires a schema object.");
+    }
+    body.response_format = { type: "json_object" };
+    // Append only to this request's suffix; keep the preceding conversation unchanged.
+    body.messages.push({
+      role: "system",
+      content: "Your final response must be a single JSON object matching the following JSON Schema. Do not wrap it in Markdown.\n" +
+        JSON.stringify(format.schema),
+    });
   },
   failureReason(reason) {
     if (reason === "insufficient_system_resource" || reason === "aborted") {

@@ -9,6 +9,7 @@ import type { ToolSet } from "../tools.ts";
 import type { Backend, BackendContext } from "../types.ts";
 import { upstreamFetch } from "../upstream.ts";
 import { buildAnthropicTools } from "./anthropic-tools.ts";
+import { prepareToolCall, toolCallForReplay, toolResultForReplay, writeToolCall } from "../tool-calls.ts";
 
 type Block = Record<string, any>;
 interface Message { role: "user" | "assistant" | "system"; content: Block[] }
@@ -125,13 +126,16 @@ export function buildAnthropicRequest(context: BackendContext): {
       }
       append("assistant", [block]);
     } else if (item.type === "function_call" || item.type === "custom_tool_call") {
+      const wire = toolCallForReplay(item, tools);
       append("assistant", [{
-        type: "tool_use", id: safeCallId(item.call_id), name: tools.flatFor(item.namespace, item.name),
+        type: "tool_use", id: safeCallId(wire.id), name: wire.name,
         input: item.type === "custom_tool_call" ? { input: item.input } : parseArguments(item.arguments),
       }]);
     } else if (item.type === "function_call_output" || item.type === "custom_tool_call_output") {
-      const content = contentBlocks(item.output);
-      append("user", [{ type: "tool_result", tool_use_id: safeCallId(item.call_id), ...(content.length ? { content } : {}) }]);
+      const result = toolResultForReplay(item);
+      const content = contentBlocks(result.output);
+      append("user", [{ type: "tool_result", tool_use_id: safeCallId(result.id),
+        ...(result.isError ? { is_error: true } : {}), ...(content.length ? { content } : {}) }]);
     } else if (item.type === "message" || item.role) {
       const blocks = contentBlocks(item.content);
       if (item.role === "developer" || item.role === "system") {
@@ -284,12 +288,7 @@ export const runAnthropic: Backend = async (context, writer) => {
       } else if (block.value.type === "tool_use") {
         if (block.json) block.value.input = parseArguments(block.json);
         const call = block.value;
-        const tool = tools.resolve(call.name);
-        if (!tool) throw new BridgeError(`Messages called an unknown tool: ${String(call.name)}.`);
-        if (tool.kind === "custom") {
-          if (typeof call.input?.input !== "string") throw new BridgeError("A custom tool call needs a string input.");
-          writer.addCustomToolCall({ call_id: call.id, name: tool.name, namespace: tool.namespace, input: call.input.input });
-        } else writer.addFunctionCall({ call_id: call.id, name: tool.name, namespace: tool.namespace, arguments: JSON.stringify(call.input ?? {}) });
+        writeToolCall(writer, prepareToolCall(tools, call.id, call.name, parseArguments(call.input ?? {})));
       } else if (block.value.type === "text") writer.closeMessage();
       blocks.delete(event.index);
     } else if (event.type === "message_delta") {
