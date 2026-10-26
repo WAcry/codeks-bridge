@@ -2,7 +2,7 @@
 
 给 [codeks](https://github.com/WAcry/codeks) 使用的本地模型桥接器。一个 Responses provider 可接入多个 GPT、Claude Messages 和 DeepSeek Chat 上游，支持工具、图片、流式回答和跨模型会话。
 
-项目维护一份有限的[模型目录](catalog/README.md)。GPT 保留 Codex 源码中各自的条目，第三方模型采用经精调的现代模板。客户端使用 Responses Lite、Code Mode Only 和多代理；配置可分别指定模型别名、目录条目和真实部署名。
+项目维护一份有限的[模型目录](catalog/README.md)。GPT 以 Codex 源码中各自的条目为基础，第三方模型采用经精调的现代模板。客户端使用 Responses Lite，工具模式和多代理设置保留各模型差异；配置可分别指定模型别名、目录条目和真实部署名。
 
 ## 安装和使用
 
@@ -24,7 +24,7 @@ codeks-bridge serve --config /absolute/path/bridge.json
 codeks-bridge config-snippet --config /absolute/path/bridge.json
 ```
 
-将输出合并到 codeks 的 `config.toml`，顶层配置放在表定义前，替换已有同名项。codeks 会从 bridge 的 `/v1/models` 读取公开模型的完整目录，然后可按配置中的别名选择模型。专用预设可设 `expose: false`，保留内部调用而不占模型列表。已有 `model_catalog_json` 会优先使用本地文件；迁移到 HTTP 目录时应移除它。修改 bridge 配置后重启服务。
+将输出合并到 codeks 的 `config.toml`，顶层配置放在表定义前，替换已有同名项。codeks 会从 bridge 的 `/v1/models` 读取公开模型的完整目录，然后可按配置中的别名选择模型。`visibility: "hide"` 在选择器中隐藏但保留完整元数据；内部专用预设可设 `expose: false`，从目录中省略。已有 `model_catalog_json` 会优先使用本地文件；迁移到 HTTP 目录时应移除它。修改 bridge 配置后重启服务。
 
 ## 使用边界
 

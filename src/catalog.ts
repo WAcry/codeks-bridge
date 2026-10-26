@@ -10,13 +10,13 @@ function exposedModels(config: BridgeConfig) {
 export function buildCatalog(config: BridgeConfig): { models: Record<string, any>[] } {
   return { models: exposedModels(config).map(([slug, model], priority) => ({
     ...modelProfile(model).model_info,
-    slug, display_name: slug, priority, visibility: "list", supported_in_api: true,
+    slug, display_name: slug, priority, visibility: model.visibility ?? "list", supported_in_api: true,
   })) };
 }
 
 export function configSnippet(config: BridgeConfig, catalogPath?: string): string {
-  const first = exposedModels(config)[0]?.[0];
-  if (first === undefined) throw new BridgeError("config-snippet requires at least one model with expose enabled");
+  const first = exposedModels(config).find(([, model]) => model.visibility !== "hide")?.[0];
+  if (first === undefined) throw new BridgeError("config-snippet requires at least one model with expose enabled and visibility list");
   const host = ["0.0.0.0", "::"].includes(config.host ?? "") ? "127.0.0.1" : config.host ?? "127.0.0.1";
   const authority = host.includes(":") ? `[${host}]` : host;
   const baseUrl = `http://${authority}:${config.port ?? 8787}/v1`;

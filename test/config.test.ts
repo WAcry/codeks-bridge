@@ -181,6 +181,36 @@ test("model exposure controls discovery and snippet defaults without changing st
   }
 });
 
+test("picker visibility retains full metadata and routing while snippets select a listed model", () => {
+  const c = config();
+  const original = buildCatalog(c).models[0];
+  const route = resolveModel(c, "first");
+  c.models.first.visibility = "hide";
+  c.models.second = { ...c.models.first, visibility: "list" };
+  c.models.third = { ...c.models.first, visibility: undefined };
+  validateConfig(c);
+  const entries = buildCatalog(c).models;
+  assert.deepEqual(entries[0], { ...original, visibility: "hide" });
+  assert.deepEqual(entries.map(({ slug, visibility }) => [slug, visibility]), [
+    ["first", "hide"], ["second", "list"], ["third", "list"],
+  ]);
+  assert.deepEqual(resolveModel(c, "first").origin, route.origin);
+  assert.deepEqual(resolveModel(c, "first").profile, route.profile);
+  for (const catalog of [undefined, "/tmp/catalog.json"]) {
+    assert.match(configSnippet(c, catalog), /^model = "second"\n/);
+  }
+  c.models.second.expose = false;
+  assert.match(configSnippet(c), /^model = "third"\n/);
+  c.models.third.visibility = "hide";
+  validateConfig(c);
+  assert.equal(buildCatalog(c).models.length, 2);
+  assert.throws(() => configSnippet(c), /expose enabled and visibility list/);
+  for (const value of ["hidden", "", true, null]) {
+    c.models.first.visibility = value as any;
+    assert.throws(() => validateConfig(c), /visibility must be list or hide/);
+  }
+});
+
 test("native compaction generation and replay are independently configured", () => {
   const c = config();
   c.models.first.catalog = "gpt-6.1-sol";

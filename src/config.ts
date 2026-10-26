@@ -55,6 +55,7 @@ export function validateConfig(value: unknown): BridgeConfig {
     if (!slug || !object(model) || typeof model.model !== "string" || !model.model || typeof model.upstream !== "string" || !Object.hasOwn(value.upstreams, model.upstream)) fail(`model ${slug}: model and an existing upstream are required`);
     if (typeof model.catalog !== "string" || !model.catalog) fail(`model ${slug}: catalog is required`);
     if (model.expose !== undefined && typeof model.expose !== "boolean") fail(`model ${slug}: expose must be boolean`);
+    if (model.visibility !== undefined && !["list", "hide"].includes(model.visibility)) fail(`model ${slug}: visibility must be list or hide`);
     for (const field of ["context_window", "max_output_tokens"]) {
       if (model[field] !== undefined && (!Number.isSafeInteger(model[field]) || model[field] <= 0)) fail(`model ${slug}: ${field} must be a positive integer`);
     }

@@ -312,11 +312,23 @@ test("catalog ETags identify the same metadata on reads and both response transp
   const response = await post(f.url, { model: "gpt", input: "Hello" });
   assert.equal(response.headers.get("x-models-etag"), newEtag);
   await response.text();
+  f.config.models.gpt.visibility = "hide";
+  await f.restart();
+  const hiddenCatalog = await fetch(`${f.url}/v1/models`);
+  const hiddenEtag = hiddenCatalog.headers.get("etag");
+  assert.notEqual(hiddenEtag, newEtag);
+  assert.deepEqual(await responseJson(hiddenCatalog), {
+    models: catalog.models.map((model: any) => model.slug === "gpt" ? { ...model, visibility: "hide" } : model),
+  });
+  const hiddenResponse = await post(f.url, { model: "gpt", input: "Hidden alias remains usable" });
+  assert.equal(hiddenResponse.status, 200);
+  assert.equal(hiddenResponse.headers.get("x-models-etag"), hiddenEtag);
+  await hiddenResponse.text();
   f.config.models.gpt.expose = false;
   await f.restart();
   const filtered = await fetch(`${f.url}/v1/models`);
   const filteredEtag = filtered.headers.get("etag");
-  assert.notEqual(filteredEtag, newEtag);
+  assert.notEqual(filteredEtag, hiddenEtag);
   assert.deepEqual((await responseJson(filtered)).models.map((model: any) => model.slug), ["gpt-region", "claude", "flash"]);
   const hidden = await post(f.url, { model: "gpt", input: "Explicit alias remains usable" });
   assert.equal(hidden.status, 200);
