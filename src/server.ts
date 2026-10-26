@@ -11,6 +11,7 @@ import { runDeepSeek } from "./backends/deepseek.ts";
 import { compact, isCompactionRequest } from "./compaction.ts";
 import { CompactionHandoffStore } from "./compaction-handoff.ts";
 import { Inspector, withCaptureLabel, type Exchange } from "./inspect/capture.ts";
+import type { StandaloneKind } from "./inspect/capture.ts";
 import { isInspectorPath, serveInspector } from "./inspect/http.ts";
 import { forwardResponseHeaders, incomingHeaders, type HeaderRecord } from "./headers.ts";
 import type { AdapterId, Backend, BridgeConfig, BridgeServerOptions, ResponsesRequest } from "./types.ts";
@@ -27,7 +28,7 @@ function upstreamHttpFailure(res: ServerResponse, error: UpstreamHttpError): voi
   res.writeHead(error.status, forwardResponseHeaders(error.headers, false));
   res.end(error.body);
 }
-async function readRequest(req: IncomingMessage, maxMiB: number, exchange?: Exchange, kind?: "search"): Promise<ResponsesRequest> {
+async function readRequest(req: IncomingMessage, maxMiB: number, exchange?: Exchange, kind?: StandaloneKind): Promise<ResponsesRequest> {
   const maxBytes = maxMiB * 1024 * 1024;
   let size = 0;
   const chunks: Buffer[] = [];
@@ -45,7 +46,7 @@ async function readRequest(req: IncomingMessage, maxMiB: number, exchange?: Exch
   if (!request || typeof request !== "object" || Array.isArray(request)) throw new BridgeError("Request must be an object");
   exchange?.parsed(request, kind);
   if (typeof request.model !== "string") throw new BridgeError("model is required");
-  if (kind === "search") return request;
+  if (kind) return request;
   if (request.input !== undefined && typeof request.input !== "string" && !Array.isArray(request.input)) throw new BridgeError("input must be a string or an array");
   if (Array.isArray(request.input) && request.input.some((x: unknown) => !x || typeof x !== "object" || Array.isArray(x))) throw new BridgeError("input items must be objects");
   if (request.tools !== undefined && !Array.isArray(request.tools)) throw new BridgeError("tools must be an array");
@@ -94,14 +95,19 @@ export function createBridgeServer(value: BridgeConfig, options: BridgeServerOpt
         res.writeHead(200, { "content-type": "application/json", "cache-control": "no-cache", etag: catalogEtag });
         res.end(catalog); return;
       }
-      if (req.method === "POST" && path === "/alpha/search") {
-        if (!config.web_search) { json(res, 404, { error: { code: "invalid_prompt", message: "Standalone web search is not configured" } }); return; }
-        const request = await readRequest(req, config.request_max_mib ?? 512, inspector.begin(req, res), "search");
-        const upstream = config.upstreams[config.web_search.upstream];
-        // Search is a standalone JSON protocol; inference adapters and history
-        // conversion do not apply, even when the working model is Claude.
-        const response = await withCaptureLabel("search", () => upstreamFetch(
-          { upstream, profile: { api: "responses" } }, "alpha/search", request,
+      const standalone: StandaloneKind | undefined = path === "/alpha/search" ? "search"
+        : path === "/images/generations" || path === "/images/edits" ? "image_generation" : undefined;
+      if (req.method === "POST" && standalone) {
+        const service = standalone === "search" ? config.web_search : config.image_generation;
+        if (!service) {
+          json(res, 404, { error: { code: "invalid_prompt", message: `${standalone === "search" ? "Standalone web search" : "Image generation"} is not configured` } });
+          return;
+        }
+        const request = await readRequest(req, config.request_max_mib ?? 512, inspector.begin(req, res), standalone);
+        const upstream = config.upstreams[service.upstream];
+        // Standalone JSON protocols do not use inference adapters or history conversion.
+        const response = await withCaptureLabel(standalone, () => upstreamFetch(
+          { upstream, profile: { api: "responses" } }, path, request,
           controller.signal, incomingHeaders(req.headers), undefined, options.fetch,
         ));
         const body = Buffer.from(await response.arrayBuffer());

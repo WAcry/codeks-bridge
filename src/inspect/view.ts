@@ -144,10 +144,16 @@ function header(exchange: Exchange, name: string): string | null {
   return exchange.headers[name] ?? null;
 }
 
+function standaloneConnection(exchange: Exchange) {
+  const { config } = exchange.inspector;
+  if (exchange.meta.kind === "search") return config.web_search;
+  if (exchange.meta.kind === "image_generation") return config.image_generation;
+}
+
 export function summary(exchange: Exchange) {
   const { outcome, error, usage } = result(exchange);
   const route = exchange.route;
-  const search = exchange.meta.kind === "search" ? exchange.inspector.config.web_search : undefined;
+  const standalone = standaloneConnection(exchange);
   return {
     id: exchange.id,
     seq: exchange.seq,
@@ -157,9 +163,9 @@ export function summary(exchange: Exchange) {
     active: !exchange.closed,
     model: exchange.meta.model,
     adapter: route?.profile.id ?? null,
-    api: route?.profile.api ?? (search ? "responses" : null),
-    upstream: route?.config.upstream ?? search?.upstream ?? null,
-    upstream_model: route?.config.model ?? (search ? exchange.meta.model : null),
+    api: route?.profile.api ?? (standalone ? "responses" : null),
+    upstream: route?.config.upstream ?? standalone?.upstream ?? null,
+    upstream_model: route?.config.model ?? (standalone ? exchange.meta.model : null),
     kind: exchange.meta.kind,
     stream: exchange.meta.stream,
     status: exchange.response.status ?? null,
@@ -279,6 +285,7 @@ function outputNote(inspector: Inspector, item: any, target: Pick<Annotation, "t
 }
 
 function annotations(exchange: Exchange, client: ReturnType<typeof messageView>): Annotation[] {
+  if (!exchange.route) return [];
   const notes: Annotation[] = [];
   const { inspector, route } = exchange;
   const request = route ? parse(exchange.requestText) : undefined;
@@ -309,12 +316,12 @@ function annotations(exchange: Exchange, client: ReturnType<typeof messageView>)
 
 export function detail(exchange: Exchange) {
   const client = messageView(exchange.response);
-  const search = exchange.meta.kind === "search" ? exchange.inspector.config.web_search : undefined;
+  const standalone = standaloneConnection(exchange);
   return {
     ...summary(exchange),
-    route: exchange.route ? routeView(exchange.inspector, exchange.route, exchange.responsesLite) : search ? {
-      alias: exchange.meta.model, api: "responses", upstream: search.upstream,
-      base_url: upstreamBaseUrl(exchange.inspector.config.upstreams[search.upstream]), upstream_model: exchange.meta.model,
+    route: exchange.route ? routeView(exchange.inspector, exchange.route, exchange.responsesLite) : standalone ? {
+      alias: exchange.meta.model, api: "responses", upstream: standalone.upstream,
+      base_url: upstreamBaseUrl(exchange.inspector.config.upstreams[standalone.upstream]), upstream_model: exchange.meta.model,
     } : null,
     client: {
       request: {

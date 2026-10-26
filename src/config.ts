@@ -64,11 +64,12 @@ export function validateConfig(value: unknown): BridgeConfig {
     if (up.options !== undefined && !object(up.options)) fail(`upstream ${name}: options must be an object`);
     validateAdapterConfig(up.adapters, `upstream ${name}`);
   }
-  if (value.web_search !== undefined) {
-    const search = value.web_search;
-    if (!object(search) || typeof search.upstream !== "string" || !Object.hasOwn(value.upstreams, search.upstream)) fail("web_search.upstream must name an existing connection");
-    if (Object.keys(search).some(key => key !== "upstream")) fail("unknown web_search option");
-    if (value.upstreams[search.upstream].auth?.type !== "chatgpt") fail("web_search requires a ChatGPT subscription connection");
+  for (const name of ["web_search", "image_generation"] as const) {
+    const service = value[name];
+    if (service === undefined) continue;
+    if (!object(service) || typeof service.upstream !== "string" || !Object.hasOwn(value.upstreams, service.upstream)) fail(`${name}.upstream must name an existing connection`);
+    if (Object.keys(service).some(key => key !== "upstream")) fail(`unknown ${name} option`);
+    if (value.upstreams[service.upstream].auth?.type !== "chatgpt") fail(`${name} requires a ChatGPT subscription connection`);
   }
   for (const [slug, model] of Object.entries(value.models)) {
     if (!slug || !object(model) || typeof model.model !== "string" || !model.model || typeof model.upstream !== "string" || !Object.hasOwn(value.upstreams, model.upstream)) fail(`model ${slug}: model and an existing upstream are required`);

@@ -52,6 +52,8 @@ export interface BridgeConfig {
   compaction_cache_dir?: string;
   /** Optional subscription search connection, shared by all working models. */
   web_search?: { upstream: string };
+  /** Optional subscription image connection, shared by all working models. */
+  image_generation?: { upstream: string };
   /** Debug capture for the /inspect/ page. */
   inspect?: { capture?: boolean; max_mib?: number };
   upstreams: Record<string, UpstreamConfig>;

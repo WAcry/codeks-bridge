@@ -10,6 +10,7 @@ const MIB = 1024 * 1024;
 export const DEFAULT_CAPTURE_MIB = 256;
 
 export type EndKind = "active" | "complete" | "cancelled" | "error" | "unread";
+export type StandaloneKind = "search" | "image_generation";
 export type HeaderMap = Record<string, string>;
 export interface Part { t: number; text: string }
 
@@ -164,7 +165,7 @@ export class Call {
 
 export interface RequestMeta {
   model: string | null;
-  kind: "turn" | "compaction" | "search" | "invalid";
+  kind: "turn" | "compaction" | StandaloneKind | "invalid";
   stream: boolean | null;
   input_items: number | null;
   preview: string | null;
@@ -229,15 +230,16 @@ export class Exchange {
     this.account(this.requestBytes);
   }
 
-  parsed(request: ResponsesRequest, kind?: "search"): void {
+  parsed(request: ResponsesRequest, kind?: StandaloneKind): void {
     if (this.closed) return;
     const input = request.input;
     this.meta = {
       model: typeof request.model === "string" ? request.model : null,
       kind: kind ?? (Array.isArray(input) && input.some(item => item?.type === "compaction_trigger") ? "compaction" : "turn"),
-      stream: kind === "search" ? false : typeof request.stream === "boolean" ? request.stream : null,
-      input_items: Array.isArray(input) ? input.length : null,
-      preview: kind === "search" ? JSON.stringify(request.commands ?? {}).slice(0, 200) : previewOf(request),
+      stream: kind ? false : typeof request.stream === "boolean" ? request.stream : null,
+      input_items: kind === "image_generation" ? null : Array.isArray(input) ? input.length : null,
+      preview: kind === "image_generation" ? typeof request.prompt === "string" ? request.prompt.slice(0, 200) : null
+        : kind === "search" ? JSON.stringify(request.commands ?? {}).slice(0, 200) : previewOf(request),
     };
     this.touch();
   }

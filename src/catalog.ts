@@ -23,11 +23,13 @@ export function configSnippet(config: BridgeConfig, catalogPath?: string): strin
   const lines = [
     `model = ${JSON.stringify(first)}`, 'model_provider = "bridge"',
     ...(catalogPath ? [`model_catalog_json = ${JSON.stringify(catalogPath)}`] : []),
-    `web_search = "${config.web_search ? "live" : "disabled"}"`, "", "[features]", "image_generation = false", "",
+    `web_search = "${config.web_search ? "live" : "disabled"}"`, "", "[features]", `image_generation = ${!!config.image_generation}`, "",
     // Outside the reserved "collaboration" namespace, codeks sends multi-agent task messages as plaintext.
     "[features.multi_agent_v2]", 'tool_namespace = "agents"', "",
     "[model_providers.bridge]", 'name = "Local bridge"',
     `base_url = ${JSON.stringify(baseUrl)}`, 'wire_api = "responses"',
+    // Codex exposes the native image tool only with a local ChatGPT login.
+    `requires_openai_auth = ${!!config.image_generation}`,
   ];
   if (!catalogPath) lines.push(`model_catalog_url = ${JSON.stringify(`${baseUrl}/models`)}`);
   if (config.web_search) lines.push("supports_standalone_web_search = true");
