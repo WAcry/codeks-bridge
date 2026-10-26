@@ -14,6 +14,8 @@ npm install -g @wacry/codeks-bridge
 
 把[示例配置](examples/config.json)复制到仓库外，填写端点与 API key 环境变量，保留需要的模型。`catalog` 选择受支持的模型，`upstream` 选择连接，`model` 是实际发给上游的部署名；窗口与参数可以覆盖目录默认值。
 
+GPT 也可使用 ChatGPT 订阅：先运行 `codex login`（已有文件登录可直接复用），再给连接设置 `"auth": { "type": "chatgpt" }`。bridge 自动读取登录凭据和账号 ID、刷新 token，订阅端点可省略。见[订阅配置](docs/config.md#chatgpt-订阅)和[ChatGPT＋Claude 示例](examples/chatgpt-claude.json)。
+
 ```sh
 codeks-bridge serve --config /absolute/path/bridge.json
 ```
@@ -28,7 +30,7 @@ codeks-bridge config-snippet --config /absolute/path/bridge.json
 
 ## 使用边界
 
-- 上游错误保留原始详情交给客户端；bridge 不自动换端点、重试或更换压缩方式。
+- 普通模型错误保留原始详情交给客户端决定重试；ChatGPT 订阅 HTTP 401 最多进行一次鉴权恢复并重发。bridge 不自动换端点或更换压缩方式。
 - bridge 封装的 reasoning 默认只回放给原目标，原生压缩与 reasoning 的跨目标复用分别配置。无法识别的历史状态默认透传，也可配置[过滤或报错](docs/config.md#未识别的历史状态)；实际兼容性由上游决定。
 - GPT 默认使用 `compaction.mode: "native"`：先做原生加密压缩，需要文字表示时再向原来源复述并缓存。其他模型默认使用标准文字压缩，也可通过 [`compaction.model`](docs/config.md#压缩模式与执行模型) 委托常用 GPT 执行原生压缩，直接复用已有模型配置；见 [GPT＋Claude 双模型示例](examples/gpt-claude.json)。
 - 历史由 codeks 保存；按需复述的成功结果另存本地缓存。封装只是编码，文字 reasoning、摘要及复述配方可读。

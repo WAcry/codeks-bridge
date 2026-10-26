@@ -2,9 +2,10 @@ import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { modelProfile } from "./profiles.ts";
 import { getCatalogEntry } from "./model-catalog.ts";
-import type { BridgeConfig, ModelConfig, ResolvedModel, StateOrigin } from "./types.ts";
+import type { BridgeConfig, ModelConfig, ResolvedModel, StateOrigin, UpstreamConfig } from "./types.ts";
 import { BridgeError } from "./errors.ts";
 import { validateAdapterConfig } from "./adapter-options.ts";
+import { CHATGPT_BASE_URL } from "./chatgpt-auth.ts";
 
 function object(value: unknown): value is Record<string, any> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -15,9 +16,15 @@ function strings(value: unknown): value is string[] {
 }
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
+export function upstreamBaseUrl(upstream: UpstreamConfig): string {
+  const url = upstream.base_url ?? (upstream.auth?.type === "chatgpt" ? CHATGPT_BASE_URL : undefined);
+  if (!url) fail("upstream base_url is required");
+  return url;
+}
+
 /** Record provenance, never policy or credentials, in portable history. */
 function origin(config: BridgeConfig, model: ModelConfig): StateOrigin {
-  const connection = hash([model.upstream, config.upstreams[model.upstream].base_url.replace(/\/+$/, "")]);
+  const connection = hash([model.upstream, upstreamBaseUrl(config.upstreams[model.upstream]).replace(/\/+$/, "")]);
   const { adapter } = getCatalogEntry(model.catalog);
   return { connection, model: model.model, adapter, id: hash([connection, adapter, model.model]) };
 }
@@ -38,8 +45,14 @@ export function validateConfig(value: unknown): BridgeConfig {
   }
   for (const [name, up] of Object.entries(value.upstreams)) {
     if (!object(up)) fail(`upstream ${name}: expected a connection object`);
+    if (up.auth !== undefined) {
+      if (!object(up.auth) || up.auth.type !== "chatgpt") fail(`upstream ${name}: auth.type must be chatgpt`);
+      if (Object.keys(up.auth).some(key => !["type", "codex_home"].includes(key))) fail(`upstream ${name}: unknown ChatGPT auth option`);
+      if (up.auth.codex_home !== undefined && (typeof up.auth.codex_home !== "string" || !up.auth.codex_home.trim())) fail(`upstream ${name}: auth.codex_home must be a nonempty path`);
+      if ([up.api_key_env, up.api_key_command, up.auth_header].some(value => value !== undefined)) fail(`upstream ${name}: ChatGPT auth cannot be combined with api_key_env, api_key_command or auth_header`);
+    }
     let url: URL;
-    try { url = new URL(up.base_url); } catch { fail(`upstream ${name}: invalid base_url`); }
+    try { url = new URL(upstreamBaseUrl(up)); } catch { fail(`upstream ${name}: invalid base_url`); }
     if (!["https:", "http:"].includes(url.protocol) || url.username || url.password || url.search || url.hash) fail(`upstream ${name}: base_url must be an HTTP(S) URL without credentials, query, or fragment`);
     if (up.api_key_env !== undefined && (typeof up.api_key_env !== "string" || !up.api_key_env)) fail(`upstream ${name}: invalid api_key_env`);
     if (up.api_key_env && up.api_key_command) fail(`upstream ${name}: choose api_key_env or api_key_command`);

@@ -3,13 +3,20 @@ import { promisify } from "node:util";
 import type { Api, UpstreamConfig } from "./types.ts";
 import { BridgeError } from "./errors.ts";
 import { forwardRequestHeaders } from "./headers.ts";
+import { getChatgptCredentials } from "./chatgpt-auth.ts";
 const execute = promisify(execFile);
 
-export async function upstreamHeaders(config: UpstreamConfig, api: Api, signal: AbortSignal, clientHeaders?: Headers): Promise<Headers> {
+export async function upstreamHeaders(config: UpstreamConfig, api: Api, signal: AbortSignal, clientHeaders?: Headers, fetch: typeof globalThis.fetch = globalThis.fetch): Promise<Headers> {
   const headers = forwardRequestHeaders(clientHeaders, config.auth_header);
   for (const [name, value] of Object.entries(config.headers ?? {})) headers.set(name, value);
   if (!headers.has("content-type")) headers.set("content-type", "application/json");
   if (api === "anthropic" && !headers.has("anthropic-version")) headers.set("anthropic-version", "2023-06-01");
+  if (config.auth?.type === "chatgpt") {
+    const credential = await getChatgptCredentials(config.auth, fetch);
+    headers.set("authorization", `Bearer ${credential.accessToken}`);
+    headers.set("chatgpt-account-id", credential.accountId);
+    return headers;
+  }
   let credential: string | undefined;
   if (config.api_key_env) {
     credential = process.env[config.api_key_env]?.trim();
