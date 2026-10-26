@@ -46,6 +46,12 @@ Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于
 
 底层 Chat 负责消息、工具、图片和 SSE；DeepSeek 方言只负责 thinking 参数、reasoning 字段和 usage。新增方言时复用稳定的协议部分，把差异留在对应 adapter。协议相同的模型版本可共用 adapter，参数差异先在新的目录条目中表达；真正改变载荷结构时再增加转换代码和格式版本。当前实现三类 adapter，不为尚未接入的模型维护空接口或版本矩阵。
 
+## 订阅鉴权复用文件登录
+
+ChatGPT 订阅鉴权放在连接层，由 `auth.type: "chatgpt"` 显式启用。用户继续使用 `codex login`，bridge 复用其默认文件存储，在发送请求时从同一快照取得 token 与所选账号并处理续期。它不改模型目录、协议 adapter 或历史载荷，也不要求新增 codeks 补丁。API key 连接保留原来的环境变量和命令接口。
+
+选择文件存储，是为了保持零依赖及一致的跨平台行为。系统 keyring 有多套平台和后端实现，单独复制其中一套无法完整复用 codeks；现有 app-server `getAuthStatus` 已弃用，且不返回同一快照的账号 ID，依赖它还会引入额外进程和生命周期。明确的文件登录比这些隐含依赖更易维护。若以后需要完整支持其他存储，优先评估 codeks 提供稳定的原子凭据导出接口，再决定是否替换这层实现。[配置与刷新边界](backends-responses.md#订阅凭据与续期)
+
 ## 历史保存事实，配置决定恢复
 
 Reasoning 载荷记录来源、格式和原始数据；压缩载荷保存文字摘要及可选原生状态，或保存原生状态与按需复述配方。它们写入 Responses item 的 `encrypted_content`，由 codeks 原样持久化。bridge 不维护完整会话或响应 ID 索引；按需复述的成功结果及独立 usage 另存本地文件缓存，避免重复付费和服务重启后重复生成。
@@ -68,7 +74,7 @@ bridge 检查自身必须维持的不变量：配置引用存在、历史能转�
 
 Claude 默认主动请求服务端对前缀失配 thinking 使用 `drop_block`，保留其余可接受的块。这是已配置的请求策略，不是在收到错误后重试或改写已存历史。它允许流式故障后的部分回答继续工作，但丢失 reasoning 仍可能影响质量或增加重新推理的开销，不能视作无损。检查器展示上游实际报告的丢弃位置和原因，区分 bridge 的来源过滤与服务端判断。协议与恢复时序见 [Claude Messages](backends-anthropic.md#失配策略与故障续接)。
 
-GPT 原生 HTTP 失败保留 status、body 和诊断 header，流内失败保留 error 对象。下游 HTTP 200 推迟到上游接受请求后，避免把 HTTP 失败变成 SSE 错误而改变 codeks 的重试判断；等待响应头期间没有 keepalive，是这一选择的明确代价。Claude/DeepSeek 只在协议转换边界映射错误分类。重试和退避由客户端控制，bridge 不叠加第二层重试。详见 [Responses 流](responses-stream.md)。
+GPT 原生 HTTP 失败保留 status、body 和诊断 header，流内失败保留 error 对象。下游 HTTP 200 推迟到上游接受请求后，避免把 HTTP 失败变成 SSE 错误而改变 codeks 的重试判断；等待响应头期间没有 keepalive，是这一选择的明确代价。Claude/DeepSeek 只在协议转换边界映射错误分类。普通模型请求的重试和退避由客户端控制；ChatGPT 订阅仅在尚未开始下游 SSE 的 HTTP 401 上进行一次鉴权恢复，之后失败照常返回。详见 [Responses 流](responses-stream.md)。
 
 ## 压缩的生成和恢复分开
 
@@ -84,7 +90,7 @@ GPT 原生 HTTP 失败保留 status、body 和诊断 header，流内失败保留
 
 ## 调试捕获只观察
 
-[检查器](inspect.md)记录 bridge 真正收发的字节，不重新构造请求。入口请求在解析前保存原文；所有上游请求都经过 `upstreamFetch`，在这里保存实际发送的 JSON 和逐块到达的响应；写回 codeks 的内容在 `writeHead`/`write`/`end` 处记录。每条请求在 AsyncLocalStorage 中持有自己的记录，上游调用按用途附加 `main`、`summary`、`native` 或 `handoff` 标签，因此并发会话和子代理不会混在一起，后端代码不需要传递捕获参数。需要生成文字摘要时，`handoff` 先完成，再执行目标调用；命中摘要缓存时没有辅助上游调用。客户端响应只报告对应 main、summary 或 native 调用的 usage；handoff 用量留在缓存与独立上游记录，避免把辅助消耗当作客户端当前上下文。
+[检查器](inspect.md)记录 bridge 真正收发的模型请求字节，不重新构造请求。入口请求在解析前保存原文；所有模型上游请求都经过 `upstreamFetch`，在这里保存实际发送的 JSON 和逐块到达的响应；写回 codeks 的内容在 `writeHead`/`write`/`end` 处记录。每条请求在 AsyncLocalStorage 中持有自己的记录，上游调用按用途附加 `main`、`summary`、`native` 或 `handoff` 标签，因此并发会话和子代理不会混在一起，后端代码不需要传递捕获参数。需要生成文字摘要时，`handoff` 先完成，再执行目标调用；命中摘要缓存时没有辅助上游调用。客户端响应只报告对应 main、summary 或 native 调用的 usage；handoff 用量留在缓存与独立上游记录，避免把辅助消耗当作客户端当前上下文。OAuth 刷新正文含凭据，不进入模型调用捕获；401 与其后的模型重发分别保留记录。
 
 服务端保存完整正文，折叠、截断和格式化都在页面完成，避免字段白名单遗漏协议新增内容。状态标注调用与 `prepareHistory` 相同的回放判断函数，显示的决定不会与实际转换分叉。页面是零依赖的静态文件，和运行时一样不引入第三方包。捕获关闭时不保存任何内容，每条请求只多一个 AsyncLocalStorage 作用域。
 

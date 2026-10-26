@@ -282,7 +282,7 @@ test("HTTP model catalogs expose reviewed client metadata without connection or 
   assert(catalog.models.every((model: any) => model.model_messages.instructions_template.length > 100));
   assert(catalog.models.every((model: any) => model.tool_mode === "code_mode_only" && model.use_responses_lite));
   for (const value of [
-    f.config.upstreams.native.base_url, "synthetic-secret-value", "synthetic-private-deployment",
+    f.config.upstreams.native.base_url!, "synthetic-secret-value", "synthetic-private-deployment",
     "synthetic-private-option", "catalog-must-not-run-auth", "api_key_command", "x-synthetic-auth",
   ]) assert(!body.includes(value), `Client catalog leaked ${value}`);
   assert.equal(f.seen.length, 0);

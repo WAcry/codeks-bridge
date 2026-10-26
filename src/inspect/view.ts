@@ -2,7 +2,7 @@
 // much to show. Annotations use the same replay rules as prepareHistory.
 import type { ServerResponse } from "node:http";
 import { decodeCompaction, decodeReasoning, type CompactionCarrier } from "../carrier.ts";
-import { resolveModel } from "../config.ts";
+import { resolveModel, upstreamBaseUrl } from "../config.ts";
 import { replaysReasoning, restoresNativeCompaction } from "../history.ts";
 import type { ResolvedModel, StateOrigin } from "../types.ts";
 import type { Exchange, Inspector, Message, Part } from "./capture.ts";
@@ -196,7 +196,7 @@ function routeView(inspector: Inspector, route: ResolvedModel, responsesLite: bo
     adapter: route.profile.id,
     api: route.profile.api,
     upstream: route.config.upstream,
-    base_url: route.upstream.base_url,
+    base_url: upstreamBaseUrl(route.upstream),
     upstream_model: route.config.model,
     origin_id: route.origin.id,
     reasoning_format: route.profile.reasoning_format,

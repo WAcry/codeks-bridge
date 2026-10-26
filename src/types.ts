@@ -1,4 +1,5 @@
 import type { ResponseWriter, Usage } from "./writer.ts";
+import type { ChatgptAuthConfig } from "./chatgpt-auth.ts";
 
 export type Api = "responses" | "anthropic" | "chat";
 export type AdapterId = "gpt-responses" | "claude-messages" | "deepseek-chat";
@@ -12,7 +13,9 @@ export interface AdapterConfig {
   "claude-messages"?: Partial<ClaudeMessagesOptions>;
 }
 export interface UpstreamConfig {
-  base_url: string;
+  /** ChatGPT subscription auth supplies its native endpoint by default. */
+  base_url?: string;
+  auth?: ChatgptAuthConfig;
   api_key_env?: string;
   /** An argv array. The command writes a short-lived credential to stdout. */
   api_key_command?: string[];
@@ -91,7 +94,7 @@ export interface ResponsesRequest {
   [key: string]: any;
 }
 export interface BridgeServerOptions {
-  /** Used by every upstream call, including compaction and handoffs. */
+  /** Used by all model calls and ChatGPT token refreshes. */
   fetch?: typeof globalThis.fetch;
   /** Runs once before routing. Return a replacement or change the request in place. */
   transformRequest?: (request: ResponsesRequest, context: { headers: Headers }) =>

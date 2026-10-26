@@ -2,11 +2,15 @@ import { upstreamHeaders } from "./auth.ts";
 import { BridgeError, transportError, upstreamError, UpstreamHttpError } from "./errors.ts";
 import { captureUpstream } from "./inspect/capture.ts";
 import type { ResolvedModel } from "./types.ts";
+import { upstreamBaseUrl } from "./config.ts";
+import { refreshChatgptCredentials } from "./chatgpt-auth.ts";
 
 /** base_url includes any API version prefix; path is appended, never resolved from /. */
-export async function upstreamFetch(route: ResolvedModel, path: string, body: unknown, signal: AbortSignal, requestHeaders?: Headers, protocolHeaders?: Record<string, string | string[]>, fetch: typeof globalThis.fetch = globalThis.fetch): Promise<Response> {
-  const url = route.upstream.base_url.replace(/\/+$/, "") + "/" + path.replace(/^\/+/, "");
-  const headers = await upstreamHeaders(route.upstream, route.profile.api, signal, requestHeaders);
+export async function upstreamFetch(route: ResolvedModel, path: string, body: unknown, signal: AbortSignal, requestHeaders?: Headers, protocolHeaders?: Record<string, string | string[]>, fetch: typeof globalThis.fetch = globalThis.fetch, recoverAuth = true): Promise<Response> {
+  signal.throwIfAborted();
+  const url = upstreamBaseUrl(route.upstream).replace(/\/+$/, "") + "/" + path.replace(/^\/+/, "");
+  const headers = await upstreamHeaders(route.upstream, route.profile.api, signal, requestHeaders, fetch);
+  signal.throwIfAborted();
   for (const [name, value] of Object.entries(protocolHeaders ?? {})) {
     // A protocol may require additional comma-separated feature flags without
     // replacing the endpoint's configured flags. Scalar headers still replace.
@@ -66,6 +70,15 @@ export async function upstreamFetch(route: ResolvedModel, path: string, body: un
   if (!response.ok) {
     const text = await response.text();
     if (combined.aborted) throw combined.reason;
+    if (response.status === 401 && recoverAuth && route.upstream.auth?.type === "chatgpt") {
+      // Authentication recovery only: no stream has been accepted, and model
+      // failures keep the client's existing retry policy.
+      await refreshChatgptCredentials(route.upstream.auth, {
+        accessToken: headers.get("authorization")!.slice("Bearer ".length),
+        accountId: headers.get("chatgpt-account-id")!,
+      }, fetch);
+      return upstreamFetch(route, path, body, signal, requestHeaders, protocolHeaders, fetch, false);
+    }
     if (route.profile.api === "responses") throw new UpstreamHttpError(response.status, text, response.headers);
     let payload: unknown = text;
     try { payload = JSON.parse(text); } catch { /* Non-JSON error bodies are still useful diagnostics. */ }

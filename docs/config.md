@@ -60,7 +60,8 @@
 
 | 字段 | 含义 |
 | --- | --- |
-| `base_url` | 包含版本前缀的 HTTP(S) URL；adapter 在其后追加请求路径 |
+| `base_url` | 包含版本前缀的 HTTP(S) URL；adapter 在其后追加请求路径；ChatGPT 订阅鉴权可省略，使用订阅端点 |
+| `auth` | `{"type":"chatgpt"}` 使用 codeks 的文件登录凭据；可选 `codex_home` 指定登录目录 |
 | `api_key_env` | API key 环境变量名称 |
 | `api_key_command` | 与 `api_key_env` 二选一；argv 数组，程序 stdout 返回当前凭据 |
 | `auth_header` | 覆盖鉴权 header 名；默认 GPT/DeepSeek 用 `authorization: Bearer …`，Claude 用 `x-api-key` |
@@ -71,6 +72,37 @@
 | `adapters` | 按 adapter ID 分组的桥接行为；供使用该连接的模型继承 |
 
 `api_key_command` 不经过 shell，每条上游请求执行一次，最多 30 秒，适合短期凭据。命令错误不会把 stdout/stderr 回传客户端。连接无需 key 的服务时可省略凭据设置。Claude 默认版本 header 为 `anthropic-version: 2023-06-01`。客户端 metadata 默认透传，鉴权使用上游配置；覆盖顺序及必要过滤见 [header 边界](responses-stream.md#header-与转发边界)。
+
+### ChatGPT 订阅
+
+先用 codeks 登录 ChatGPT，并明确选择文件存储：
+
+```sh
+codex -c 'cli_auth_credentials_store="file"' login
+```
+
+远程或无浏览器的机器可使用 `login --device-auth`。已有有效的文件登录可以直接复用。bridge 读取 `auth.codex_home` 指定目录中的 `auth.json`；省略时依次使用 bridge 进程的 `CODEX_HOME`、`~/.codex`。自定义目录须与登录时的 `CODEX_HOME` 一致，例如：
+
+```json
+{
+  "upstreams": {
+    "chatgpt": {
+      "auth": { "type": "chatgpt", "codex_home": "/absolute/path/to/codex-home" }
+    }
+  },
+  "models": {
+    "gpt": { "upstream": "chatgpt", "catalog": "gpt-6.1-sol", "model": "gpt-6.1-sol" }
+  }
+}
+```
+
+使用默认登录目录时只需 `"auth": { "type": "chatgpt" }`。默认 `base_url` 为 `https://chatgpt.com/backend-api/codex`，显式值可覆盖。`auth` 与 `api_key_env`、`api_key_command`、`auth_header` 互斥；API key 连接继续使用原有配置。完整的[ChatGPT＋Claude 示例](../examples/chatgpt-claude.json)可同时使用订阅和 Anthropic API key。
+
+无需复制 access token、refresh token 或账号 ID。每次请求从同一份登录记录读取 token 与所选账号，写入 `Authorization` 和 `ChatGPT-Account-ID`，覆盖同名客户端及静态 header。登录文件中的 `tokens.account_id` 是权威值，不能用 JWT 中的账号声明代替用户选择的 workspace。重新登录或切换账号后，后续请求会读取新记录；显式换账号也可能改变上游对已有历史密文的接受范围。
+
+bridge 使用文件存储，不读取系统 keyring。只有 keyring 登录时，运行上面的文件登录命令；缺少登录、凭据失效或刷新写回失败会明确报错。它不会从 API key 登录或其他存储中猜测一份备用凭据。
+
+token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次鉴权恢复，再重发尚未被接受的请求。普通模型错误的重试仍由 codeks 控制。具体刷新、并发与取消边界见 [GPT 订阅鉴权](backends-responses.md#订阅凭据与续期)。
 
 ## 模型
 
