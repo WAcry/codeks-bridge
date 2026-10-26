@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 import { promisify } from "node:util";
-import { configSnippet } from "../src/catalog.ts";
+import { buildCatalog, configSnippet } from "../src/catalog.ts";
 import { createBridgeServer } from "../src/server.ts";
 import { formatSse } from "../src/sse.ts";
 import type { BridgeConfig } from "../src/types.ts";
@@ -135,6 +135,7 @@ async function scenario(t: TestContext, adapter: Adapter, denied = false): Promi
         }, { headers: { "x-codex-imagegen-request-id": `synthetic-image-request-${imageRequests.length}` } });
       }
       assert.equal(String(url), adapter === "claude" ? "https://inference.example/v1/messages" : "https://inference.example/v1/chat/completions");
+      assert.equal(new Headers(init?.headers).get("chatgpt-account-id"), null, "The local login must not become inference credentials");
       modelRequests.push(body);
       assert.equal(body.model, "synthetic-working-model");
       if (modelRequests.length === 1) {
@@ -183,10 +184,12 @@ async function scenario(t: TestContext, adapter: Adapter, denied = false): Promi
   } });
   config.port = await listen(bridge);
   t.after(async () => { bridge.closeAllConnections(); await new Promise<void>(resolve => bridge.close(() => resolve())); });
+  const catalogPath = adapter === "claude" && !denied ? join(home, "catalog.json") : undefined;
+  if (catalogPath) await writeFile(catalogPath, JSON.stringify(buildCatalog(config)));
   await writeFile(join(home, "config.toml"), [
     "check_for_update_on_startup = false",
     `chatgpt_base_url = "http://127.0.0.1:${config.port}"`,
-    configSnippet(config).replace("[model_providers.bridge.capabilities]",
+    configSnippet(config, catalogPath).replace("[model_providers.bridge.capabilities]",
       "request_max_retries = 0\nstream_max_retries = 0\n[model_providers.bridge.capabilities]"),
   ].join("\n"));
   const env: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: home, RUST_LOG: "warn" };

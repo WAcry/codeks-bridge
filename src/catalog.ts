@@ -34,8 +34,9 @@ export function configSnippet(config: BridgeConfig, catalogPath?: string): strin
   if (!catalogPath) lines.push(`model_catalog_url = ${JSON.stringify(`${baseUrl}/models`)}`);
   if (config.web_search) lines.push("supports_standalone_web_search = true");
   if (config.token_env) lines.push(`env_key = ${JSON.stringify(config.token_env)}`);
-  // Codex requires API-key auth mode for provider catalog discovery, even on loopback.
-  else if (!catalogPath) lines.push('experimental_bearer_token = "codeks-bridge-local"');
+  // Keep local subscription credentials out of bridge requests; this bearer
+  // also enables API-key catalog discovery on loopback.
+  else if (!catalogPath || config.image_generation) lines.push('experimental_bearer_token = "codeks-bridge-local"');
   lines.push("", "[model_providers.bridge.capabilities]", 'remote_compaction = "v2"', "");
   return lines.join("\n");
 }

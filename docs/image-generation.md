@@ -53,6 +53,6 @@ Codex `0.164.0` 使用固定图片模型 `gpt-image-2`，默认 `quality: "auto"
 
 另用真实 codeks `0.164.0` 二进制、合成登录和本地模拟上游验证工具门槛：开启 feature 但没有 provider 登录声明时工具不可见；加入 `requires_openai_auth` 与非 Free 登录后，静态目录和动态目录均可生成图片，并将图片带入下一次模型请求。动态目录覆盖仅登录、显式 bearer token 和 `env_key` 三种入口鉴权配置；纯文本模型仍不暴露图片工具。该项没有调用真实推理模型。
 
-[客户端联动测试](../test/image-generation-e2e.test.ts)使用生成的配置片段和动态目录，分别验证 Claude、DeepSeek 的 Code Mode 生成 → 保存 PNG → 读取保存路径编辑 → 新图片回到模型历史；客户端与 bridge 使用不同的合成订阅账号。另验证图片 HTTP 400 作为工具错误返回模型，bridge 只发出一次图片请求。这些测试使用真实 codeks，模型与图片上游均为模拟服务。
+[客户端联动测试](../test/image-generation-e2e.test.ts)使用生成的配置片段，覆盖静态及动态目录，分别验证 Claude、DeepSeek 的 Code Mode 生成 → 保存 PNG → 读取保存路径编辑 → 新图片回到模型历史；客户端与 bridge 使用不同的合成订阅账号，并验证普通推理请求不携带本地订阅账号信息。另验证图片 HTTP 400 作为工具错误返回模型，bridge 只发出一次图片请求。这些测试使用真实 codeks，模型与图片上游均为模拟服务。
 
 实际 bridge HTTP 转发另完成一次订阅编辑请求：发送已有蓝色圆形图片，要求改为橙色，约 13 秒返回 HTTP 200 和约 1.37 MB PNG。Inspector 记录一次图片上游调用，usage、图片正文和请求 ID 与实际响应一致。真实凭据、原始响应和图片留在仓库外；公开测试仅含合成数据。

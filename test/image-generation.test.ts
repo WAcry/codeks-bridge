@@ -70,6 +70,7 @@ test("subscription images are opt-in, independent of search, and change no model
     const snippet = configSnippet(enabled, catalogPath);
     assert.match(snippet, /\[features\]\nimage_generation = true/);
     assert.match(snippet, /\[model_providers\.bridge\][\s\S]*requires_openai_auth = true/);
+    assert.match(snippet, /experimental_bearer_token = "codeks-bridge-local"/);
     assert.match(snippet, /web_search = "disabled"/);
   }
   enabled.web_search = { upstream: "subscription" };
