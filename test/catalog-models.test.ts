@@ -40,6 +40,34 @@ test("legacy GPT catalogs retain their protocol, window, and reasoning differenc
   }
 });
 
+test("GPT-Reserve reuses the Luna template with only identity and upgrade changes", () => {
+  const reserve = getCatalogEntry("gpt-reserve");
+  const luna = getCatalogEntry("gpt-5.6-luna");
+  assert.equal(reserve.source.tag, "rust-v0.164.0");
+  assert.equal(reserve.source.model, "gpt-5.6-luna");
+  assert.equal(reserve.adapter, "gpt-responses");
+  const changed = Object.keys(luna.model).filter(key => JSON.stringify(reserve.model[key]) !== JSON.stringify(luna.model[key]));
+  assert.deepEqual(changed, ["slug", "display_name", "description", "visibility", "upgrade", "priority"]);
+  assert.deepEqual(Object.keys(reserve.model), Object.keys(luna.model));
+  assert.equal(reserve.model.visibility, "hide");
+  assert.equal(reserve.model.upgrade, null);
+
+  const config = validateConfig({
+    upstreams: { test: { base_url: "https://example.com/v1" } },
+    models: { "gpt-reserve": { catalog: "gpt-reserve", upstream: "test", model: "gpt-reserve", visibility: "hide" } },
+  });
+  const [entry] = buildCatalog(config).models;
+  assert.equal(entry.slug, "gpt-reserve");
+  assert.equal(entry.visibility, "hide");
+  assert.equal(entry.description, reserve.model.description);
+  assert.equal(entry.upgrade, null);
+  assert.equal(entry.multi_agent_version, "v1");
+  assert.equal(entry.default_reasoning_level, "medium");
+  const route = resolveModel(config, "gpt-reserve");
+  assert.equal(route.profile.id, "gpt-responses");
+  assert.equal(reasoningEffort(route), "medium");
+});
+
 test("GPT-5.5 preserves Lite declarations and Responses forwards explicit Daybreak access", () => {
   const config = validateConfig({
     upstreams: { test: { base_url: "https://example.com/v1" } },

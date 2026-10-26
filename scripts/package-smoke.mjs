@@ -52,7 +52,7 @@ const config = {
     claude: { upstream: "synthetic", catalog: "claude-sonnet-5-5", model: "synthetic-claude" },
     flash: { upstream: "synthetic", catalog: "deepseek-flash", model: "synthetic-flash" },
     memory: { upstream: "synthetic", catalog: "gpt-5.6-luna", model: "synthetic-memory", visibility: "hide" },
-    ...Object.fromEntries(["gpt-5.5", "gpt-daybreak-blue-latest", "gpt-daybreak-red-latest", "codex-auto-review"].map(key => [
+    ...Object.fromEntries(["gpt-5.5", "gpt-daybreak-blue-latest", "gpt-daybreak-red-latest", "codex-auto-review", "gpt-reserve"].map(key => [
       key, { upstream: "synthetic", catalog: key, model: key, visibility: "hide" },
     ])),
   },

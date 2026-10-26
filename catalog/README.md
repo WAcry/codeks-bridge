@@ -2,7 +2,7 @@
 
 这里保存运行时使用的完整模型条目。每个文件对应一个受支持的 catalog key；显示别名、连接和实际发给上游的模型名由用户配置。未知 key 直接报错，不使用通用模板猜测模型能力。
 
-来源是 OpenAI Codex 的 `codex-rs/models-manager/models.json`，每份 JSON 独立记录版本。原有条目来自 [`rust-v0.163.0`](https://github.com/openai/codex/tree/rust-v0.163.0)，commit `83086188ae0614bd882818ff1aa23f3194962012`；GPT-5.5、两个 Daybreak 条目及 Codex Auto Review 来自 [`rust-v0.164.0`](https://github.com/openai/codex/tree/rust-v0.164.0)，commit `6aaac694803004a63c6f393d153c96d22521a6b9`。不从订阅账号请求远端目录，也不在用户启动时读取本机 codeks 的最新模板。
+来源是 OpenAI Codex 的 `codex-rs/models-manager/models.json`，每份 JSON 独立记录版本。原有条目来自 [`rust-v0.163.0`](https://github.com/openai/codex/tree/rust-v0.163.0)，commit `83086188ae0614bd882818ff1aa23f3194962012`；GPT-5.5、两个 Daybreak 条目、Codex Auto Review 及 GPT-Reserve 的模板来自 [`rust-v0.164.0`](https://github.com/openai/codex/tree/rust-v0.164.0)，commit `6aaac694803004a63c6f393d153c96d22521a6b9`。不从订阅账号请求远端目录，也不在用户启动时读取本机 codeks 的最新模板。
 
 | Catalog key | 来源条目 | Adapter |
 | --- | --- | --- |
@@ -17,6 +17,7 @@
 | `gpt-daybreak-blue-latest` | 同名条目 | `gpt-responses` |
 | `gpt-daybreak-red-latest` | 同名条目 | `gpt-responses` |
 | `codex-auto-review` | 同名条目 | `gpt-responses` |
+| `gpt-reserve` | `gpt-5.6-luna`，经精调 | `gpt-responses` |
 | `claude-opus-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
 | `claude-sonnet-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
 | `claude-haiku-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
@@ -38,6 +39,8 @@
 GPT 的 `model` 对象以对应上游完整条目为基础，包括各自的提示词、默认 effort、摘要设置、服务档位和多代理设置；GPT-5.5 仅对 Lite 作下述调整。GPT-5.6 Terra 保留原生多代理 v2；GPT-5.6 Luna 按用户选择跟随上游保留 v1，不额外添加 `ultra` 档位。运行时从各自的 `supported_reasoning_levels` 推导普通档位；`ultra` 是客户端模式，按 `multi_agent_reasoning_effort` 解析，源条目未指定时使用 `max`，不会把 `ultra` 直接作为 GPT 原生 effort。不能用 GPT-6.1 Sol 的默认值覆盖 Luna 或其他 GPT 的差异。
 
 GPT-5.5 按用户选择将 `use_responses_lite` 从 `false` 改为 `true`，统一工具声明传输；其他字段完整保留上游值，包括未指定的工具模式与多代理版本、272K 窗口和 `comp_hash: "2911"`，不套用 GPT-5.6 的整份配置。多代理版本由客户端配置和 feature 决定，不强制 v2。Daybreak Blue 保留 Lite、多代理 v2 和 272K/872K 窗口；Daybreak Red 为 Lite、多代理 v2 和 372K 窗口。Codex Auto Review 保留 Lite、多代理 v1 和 272K/872K 窗口。两个旧 Daybreak key 继续按独立模型路由；新版 Codex 的 `access_programs.cyber` 请求参数也由 Responses adapter 原样转发，不把二者自动互换。模型、Lite 或访问模式是否可用由具体上游和账号决定，错误直接返回。
+
+GPT-Reserve 是客户端在普通额度用尽、后端授权后切换的回退模型。该 tag 的源码目录没有 `gpt-reserve` 条目，客户端只在 TUI 中按这个模型名处理额度回退和模型选择器。目录以同一 tag 的 GPT-5.6 Luna 完整条目为模板，只改写 slug、展示名、描述和排序，设为 `visibility: "hide"`，并清空指向 GPT-6 Luna 的 `upgrade`，避免回退期间提示迁回额度已用尽的模型；提示词、Lite、多代理 v1、272K/872K 窗口、reasoning 和 `comp_hash` 均与 Luna 相同。与其他条目一样，客户端目录中的 slug、展示名、排序和可见性由别名配置决定；要在选择器中隐藏，需在别名上设置 `visibility: "hide"`。
 
 Claude 和 DeepSeek 从 GPT-6.1 Sol 的完整条目开始，只做各自 JSON 中列出的修改：底层模型与展示信息、工作窗口、reasoning 档位，以及当前 adapter 尚未转换的参数和 GPT 专属的服务展示信息。提示词仅将首句的 `based on GPT-6` 换成 `based on Claude` 或 `based on DeepSeek`；`You are Codex`、`As Codex` 和其余客户端指令保留。`default_reasoning_summary` 保持源条目的 `none`，由用户在 codeks 中选择摘要展示方式。
 
