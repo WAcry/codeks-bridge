@@ -3,7 +3,9 @@ import { BridgeError } from "./errors.ts";
 import type { AdapterId } from "./types.ts";
 
 export interface CatalogEntry {
-  source: { repository: string; tag: string; commit: string; path: string; model: string };
+  source:
+    | { repository: string; tag: string; commit: string; path: string; model: string }
+    | { endpoint: string; client_version: string; retrieved: string; model: string };
   adjustments: string[];
   adapter: AdapterId;
   effort_map?: Record<string, string>;

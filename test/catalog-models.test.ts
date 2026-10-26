@@ -3,7 +3,7 @@ import test from "node:test";
 import { responsesBody } from "../src/backends/responses.ts";
 import { buildCatalog } from "../src/catalog.ts";
 import { resolveModel, validateConfig } from "../src/config.ts";
-import { getCatalogEntry } from "../src/model-catalog.ts";
+import { catalogKeys, getCatalogEntry } from "../src/model-catalog.ts";
 import { reasoningEffort } from "../src/profiles.ts";
 
 test("legacy GPT catalogs retain their protocol, window, and reasoning differences", () => {
@@ -21,7 +21,7 @@ test("legacy GPT catalogs retain their protocol, window, and reasoning differenc
   for (const [key, lite, multiAgent, window, maxWindow, compHash, defaultEffort, highestEffort] of cases) {
     const entry = catalog.find(entry => entry.slug === key)!;
     const original = getCatalogEntry(key);
-    assert.equal(original.source.tag, "rust-v0.164.0");
+    assert.equal("tag" in original.source && original.source.tag, "rust-v0.164.0");
     if (key === "gpt-5.5") assert.match(original.adjustments[0], /Responses Lite/);
     else assert.deepEqual(original.adjustments, []);
     assert.deepEqual(entry.model_messages, original.model.model_messages);
@@ -40,15 +40,22 @@ test("legacy GPT catalogs retain their protocol, window, and reasoning differenc
   }
 });
 
-test("GPT-Reserve reuses the Luna template with only identity and upgrade changes", () => {
+test("GPT-Reserve keeps the subscription entry without names absent from public sources", () => {
   const reserve = getCatalogEntry("gpt-reserve");
   const luna = getCatalogEntry("gpt-5.6-luna");
-  assert.equal(reserve.source.tag, "rust-v0.164.0");
-  assert.equal(reserve.source.model, "gpt-5.6-luna");
+  assert.deepEqual(reserve.source, {
+    endpoint: "https://chatgpt.com/backend-api/codex/models", client_version: "0.164.0", retrieved: "2026-10-25", model: "gpt-reserve",
+  });
   assert.equal(reserve.adapter, "gpt-responses");
-  const changed = Object.keys(luna.model).filter(key => JSON.stringify(reserve.model[key]) !== JSON.stringify(luna.model[key]));
-  assert.deepEqual(changed, ["slug", "display_name", "description", "visibility", "upgrade", "priority"]);
-  assert.deepEqual(Object.keys(reserve.model), Object.keys(luna.model));
+  const subscriptionOnly = Object.keys(reserve.model).filter(key => !Object.hasOwn(luna.model, key));
+  assert.deepEqual(subscriptionOnly, ["base_instructions", "available_access_programs"]);
+  const publicPlans = new Set(catalogKeys.map(getCatalogEntry).filter(entry => "tag" in entry.source)
+    .flatMap(entry => entry.model.available_in_plans ?? []));
+  assert.deepEqual(reserve.model.available_in_plans.filter((plan: string) => !publicPlans.has(plan)), []);
+  for (const key of ["context_window", "max_context_window", "comp_hash", "multi_agent_version", "supported_reasoning_levels"]) {
+    assert.deepEqual(reserve.model[key], luna.model[key], key);
+  }
+  assert.equal(reserve.model.model_messages.instructions_template, luna.model.model_messages.instructions_template);
   assert.equal(reserve.model.visibility, "hide");
   assert.equal(reserve.model.upgrade, null);
 
