@@ -43,7 +43,8 @@ test("legacy GPT catalogs retain their protocol, window, and reasoning differenc
     const original = getCatalogEntry(key);
     assert.equal("tag" in original.source && original.source.tag, "rust-v0.164.0");
     if (key === "gpt-5.5") assert.match(original.adjustments[0], /Responses Lite/);
-    else assert.deepEqual(original.adjustments, []);
+    assert.ok(original.adjustments.some(note => note.includes("shell_type")));
+    assert.equal(entry.shell_type, "unified_exec");
     assert.deepEqual(entry.model_messages, original.model.model_messages);
     assert.equal(entry.use_responses_lite, lite);
     assert.equal(entry.tool_mode, key === "gpt-5.5" ? null : "code_mode_only");
@@ -67,6 +68,7 @@ test("GPT-Reserve keeps the subscription entry without names absent from public 
     endpoint: "https://chatgpt.com/backend-api/codex/models", client_version: "0.164.0", retrieved: "2026-10-25", model: "gpt-reserve",
   });
   assert.equal(reserve.adapter, "gpt-responses");
+  assert.equal(reserve.model.shell_type, "unified_exec");
   const subscriptionOnly = Object.keys(reserve.model).filter(key => !Object.hasOwn(luna.model, key));
   assert.deepEqual(subscriptionOnly, ["base_instructions", "available_access_programs"]);
   const publicPlans = new Set(catalogKeys.map(getCatalogEntry).filter(entry => "tag" in entry.source)
