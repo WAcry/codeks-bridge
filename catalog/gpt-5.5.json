@@ -7,7 +7,8 @@
     "model": "gpt-5.5"
   },
   "adjustments": [
-    "按用户选择启用 Responses Lite，与现代 GPT 条目统一工具声明传输；保留原始提示词、窗口、reasoning、工具模式、多代理版本和 comp_hash。真实上游是否接受 Lite 由端点决定，不自动回退。"
+    "按用户选择启用 Responses Lite，与现代 GPT 条目统一工具声明传输；保留原始提示词、窗口、reasoning、工具模式、多代理版本和 comp_hash。真实上游是否接受 Lite 由端点决定，不自动回退。",
+    "按用户选择将 shell_type 从 shell_command 统一为 unified_exec；当前 codeks 将旧名称解析为相同类型，不改变工具行为。"
   ],
   "adapter": "gpt-responses",
   "model": {
@@ -67,7 +68,7 @@
         "description": "Extra high reasoning depth for complex problems"
       }
     ],
-    "shell_type": "shell_command",
+    "shell_type": "unified_exec",
     "visibility": "list",
     "minimal_client_version": "0.124.0",
     "supported_in_api": true,

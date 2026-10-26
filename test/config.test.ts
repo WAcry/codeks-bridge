@@ -308,6 +308,7 @@ test("curated GPT entries preserve each model's instructions and reasoning choic
     assert.equal(entry.multi_agent_reasoning_effort, curated.multi_agent_reasoning_effort);
     assert.equal(entry.context_window, curated.context_window);
     assert.equal(entry.max_context_window, curated.max_context_window);
+    assert.equal(entry.shell_type, "unified_exec");
     assert.equal(entry.tool_mode, "code_mode_only");
     assert.equal(entry.use_responses_lite, true);
     const route = resolveModel(c, entry.slug);

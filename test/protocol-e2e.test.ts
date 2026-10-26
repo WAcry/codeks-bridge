@@ -33,7 +33,7 @@ async function stop(server: Server) {
   await new Promise<void>(resolve => server.close(() => resolve()));
 }
 
-async function fixture(t: TestContext, catalog: "gpt-6.1-sol" | "deepseek-flash", reply: (body: any, index: number) => unknown[]) {
+async function fixture(t: TestContext, catalog: "gpt-6.1-sol" | "gpt-6.1-terra" | "deepseek-flash", reply: (body: any, index: number) => unknown[]) {
   const requests: any[] = [];
   const clientRequests: any[] = [];
   const failures: unknown[] = [];
@@ -83,11 +83,11 @@ async function fixture(t: TestContext, catalog: "gpt-6.1-sol" | "deepseek-flash"
   const env: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: home, RUST_LOG: "warn" };
   delete env.OPENAI_API_KEY;
   delete env.CODEX_API_KEY;
-  const invoke = async () => {
+  const invoke = async (options: string[] = []) => {
     let stdout = "";
     let code: unknown = 0;
     try {
-      const pending = run(binary!, ["exec", "--skip-git-repo-check", "--json", "-C", work, "--", "Complete the synthetic protocol task."], {
+      const pending = run(binary!, ["exec", "--skip-git-repo-check", "--json", "-C", work, ...options, "--", "Complete the synthetic protocol task."], {
         cwd: work, env, timeout: 90_000, maxBuffer: 8 * 1024 * 1024,
       });
       pending.child.stdin?.end();
@@ -108,7 +108,12 @@ async function fixture(t: TestContext, catalog: "gpt-6.1-sol" | "deepseek-flash"
     return (await Promise.all(paths.map(path => readFile(join(sessions, path), "utf8"))))
       .flatMap(text => text.trim().split("\n").filter(Boolean).map(line => JSON.parse(line)));
   };
-  return { requests, clientRequests, invoke, records };
+  const discover = async () => {
+    const pending = run(binary!, ["debug", "models"], { cwd: work, env, timeout: 30_000, maxBuffer: 8 * 1024 * 1024 });
+    pending.child.stdin?.end();
+    return JSON.parse((await pending).stdout);
+  };
+  return { requests, clientRequests, invoke, records, discover };
 }
 
 function responseEvents(text: string, reason?: string): unknown[] {
@@ -130,6 +135,27 @@ function responseEvents(text: string, reason?: string): unknown[] {
     },
   ];
 }
+
+test("real codeks: GPT-6.1 Terra is discovered and runs with its own window and Ultra defaults", { skip: !binary, timeout: 120_000 }, async (t) => {
+  const { requests, clientRequests, discover, invoke } = await fixture(t, "gpt-6.1-terra", () => responseEvents("TERRA_COMPLETE"));
+  const { models } = await discover();
+  assert.equal(models.length, 1);
+  assert.equal(models[0].slug, "protocol-probe");
+  assert.equal(models[0].context_window, 272000);
+  assert.equal(models[0].max_context_window, 872000);
+  assert.equal(models[0].multi_agent_reasoning_effort, "xhigh");
+  for (const options of [[], ["-c", 'model_reasoning_effort="ultra"']]) {
+    const result = await invoke(options);
+    assert.equal(result.code, 0);
+    assert.ok(result.events.some(event => event.type === "turn.completed"));
+  }
+  assert.deepEqual(requests.map(request => request.reasoning.effort), ["low", "xhigh"]);
+  assert.ok(requests.every(request => request.model === "synthetic-deployment" && request.reasoning.context === "all_turns"));
+  assert.ok(clientRequests.every(request => request.tools === undefined && request.input.some((item: any) =>
+    item.type === "additional_tools" && item.tools.some((tool: any) =>
+      tool.type === "namespace" && tool.tools.some((member: any) => member.type === "custom" && member.name === "exec")))));
+  assert.match(JSON.stringify(clientRequests[1].input), /<multi_agent_mode>Proactive multi-agent delegation is active\./);
+});
 
 test("real codeks: native interrupted response continues with the delivered history", { skip: !binary, timeout: 120_000 }, async (t) => {
   const { requests, invoke } = await fixture(t, "gpt-6.1-sol", (_body, index) => index === 1

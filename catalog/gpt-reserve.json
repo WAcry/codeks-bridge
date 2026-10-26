@@ -7,7 +7,8 @@
   },
   "adjustments": [
     "Codex 源码目录没有 gpt-reserve 条目；model 取自 ChatGPT 订阅端点的同名条目，保留其字段顺序和值，包括提示词、Code Mode Only、Responses Lite、多代理 v1、272K/872K 窗口、reasoning、comp_hash、visibility、upgrade 和 available_access_programs。",
-    "删除两个公开 Codex 源码未定义、值为 false 的布尔字段，并从 available_in_plans 删除两个源码目录未出现的方案名；客户端不读取这些字段，删除不改变行为。"
+    "删除两个公开 Codex 源码未定义、值为 false 的布尔字段，并从 available_in_plans 删除两个源码目录未出现的方案名；客户端不读取这些字段，删除不改变行为。",
+    "按用户选择将 shell_type 从 shell_command 统一为 unified_exec；当前 codeks 将旧名称解析为相同类型，不改变工具行为。"
   ],
   "adapter": "gpt-responses",
   "model": {
@@ -71,7 +72,7 @@
         "description": "Maximum reasoning depth for the hardest problems"
       }
     ],
-    "shell_type": "shell_command",
+    "shell_type": "unified_exec",
     "visibility": "hide",
     "minimal_client_version": "0.144.0",
     "supported_in_api": true,
