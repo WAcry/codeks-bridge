@@ -44,7 +44,7 @@ Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于
 
 `GET /v1/models` 提供 Codex 原生目录响应，CLI 默认生成显式 `model_catalog_url`；也可导出静态文件。两种目录都只包含 `expose` 未关闭的别名；`visibility: "hide"` 保留完整条目但在客户端选择器中隐藏，默认 `"list"`。目录省略与选择器隐藏分开，让内部压缩预设和仍需客户端元数据的 Memory、已有会话各取所需；两者都不改变调用权限或状态身份。服务启动时展开配置，目录与普通响应通过 ETag 关联，客户端看到新版本后刷新。目录只包含客户端需要的公开模型元数据，不包含连接或凭据配置。
 
-底层 Chat 负责消息、工具、图片和 SSE；DeepSeek 方言只负责 thinking 参数、reasoning 字段和 usage。新增方言时复用稳定的协议部分，把差异留在对应 adapter。协议相同的模型版本可共用 adapter，参数差异先在新的目录条目中表达；真正改变载荷结构时再增加转换代码和格式版本。当前实现三类 adapter，不为尚未接入的模型维护空接口或版本矩阵。
+底层 Chat 负责消息、工具、图片和 SSE；DeepSeek 方言负责 thinking 参数、reasoning 字段、结构化输出转换和 usage。新增方言时复用稳定的协议部分，把差异留在对应 adapter。协议相同的模型版本可共用 adapter，参数差异先在新的目录条目中表达；真正改变载荷结构时再增加转换代码和格式版本。当前实现三类 adapter，不为尚未接入的模型维护空接口或版本矩阵。
 
 ## 订阅鉴权复用文件登录
 
@@ -76,7 +76,7 @@ Reasoning 载荷记录来源、格式和原始数据；压缩载荷保存文字�
 
 bridge 检查自身必须维持的不变量：配置引用存在、历史能转换、工具调用完整、usage 可用、压缩检查点完整。这些检查避免静默丢失上下文或执行半段工具调用。Messages/Chat 的短名、点名与声明名使用确定性的工具别名映射；名字歧义属于可由模型纠正的工具错误，保留诊断并走客户端已有工具循环，不由 bridge 发起额外推理请求。[工具身份与反馈](tools.md#名字)
 
-不支持原生 JSON Schema 的 DeepSeek 端点可显式选择 JSON mode 加完整 schema 提示。配置表达的是不同的输出保证，不是在遇到 400 后猜测能力并逐级降级；Claude/GPT 继续使用各自原生 schema。这一选择保留错误透明性，同时让已知协议差异有清晰的适配入口。[DeepSeek 结构化输出](backends-deepseek-chat.md#结构化输出)
+用户选择让 DeepSeek 专用 adapter 默认适配官方协议：JSON Schema 请求转为 JSON mode 加完整 schema 提示，常见的官方端点无需额外配置。JSON 语法由上游保证，schema 约束由模型遵循；Claude/GPT 继续使用各自原生 schema。转换在发送前确定，上游错误直接返回。[DeepSeek 结构化输出](backends-deepseek-chat.md#结构化输出)
 
 上游负责判定模型能力：effort、thinking、强制工具选择、schema、图片以及允许复用的密文是否可接受。bridge 不预先维护这些能力的限制列表，也不在失败后自动移除 reasoning、关闭 thinking、换端点或改压缩模式。原生参数可通过 options 显式覆盖。
 

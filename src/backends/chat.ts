@@ -13,7 +13,7 @@ import { prepareToolCall, toolCallForReplay, toolResultForReplay, writeToolCall 
 export interface ChatDialect {
   reasoningField: string;
   requestParameters(context: BackendContext): Record<string, unknown>;
-  configureStructuredOutput?(context: BackendContext, body: Record<string, any>): void;
+  configureStructuredOutput(context: BackendContext, body: Record<string, any>): void;
   readUsage(value: any): Usage;
   failureReason(reason: string): BridgeError | undefined;
 }
@@ -154,14 +154,9 @@ export function buildChatRequest(context: BackendContext, dialect: ChatDialect):
   }
   const choice = toolChoice(request.tool_choice, tools);
   if (choice !== undefined) body.tool_choice = choice;
-  const format = request.text?.format;
-  if (format?.type === "json_object") body.response_format = { type: "json_object" };
-  else if (format?.type === "json_schema") {
-    body.response_format = { type: "json_schema", json_schema: { name: format.name, schema: format.schema, strict: format.strict } };
-  } else if (format && format.type !== "text") throw new BridgeError(`Chat does not support text format ${String(format.type)}.`);
   const messages = convertHistory(context, tools, dialect.reasoningField);
   body.messages = messages;
-  if (!context.compacting) dialect.configureStructuredOutput?.(context, body);
+  if (!context.compacting) dialect.configureStructuredOutput(context, body);
   Object.assign(body, route.upstream.options, route.config.options, {
     model: route.config.model,
     messages,

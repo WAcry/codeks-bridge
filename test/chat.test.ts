@@ -162,7 +162,7 @@ test("Chat preserves system updates and places tool images after all parallel re
   assert.equal(body.messages[6].content, "Updated instruction.");
 });
 
-test("DeepSeek maps efforts for any deployment name and forwards forced tools and JSON schema", () => {
+test("DeepSeek maps efforts for any deployment name, forced tools and JSON output", () => {
   const ctx = context();
   for (const [incoming, outgoing] of [["minimal", "low"], ["medium", "high"], ["xhigh", "high"], ["ultra", "max"]]) {
     ctx.request.reasoning = { effort: incoming };
@@ -171,9 +171,7 @@ test("DeepSeek maps efforts for any deployment name and forwards forced tools an
   ctx.request.tool_choice = { type: "function", namespace: "agents", name: "spawn_agent" };
   assert.deepEqual(buildDeepSeekRequest(ctx).body.tool_choice, { type: "function", function: { name: "agents__spawn_agent" } });
   ctx.request.text = { format: { type: "json_schema", name: "answer", schema: { type: "object" }, strict: true } };
-  assert.deepEqual(buildDeepSeekRequest(ctx).body.response_format, {
-    type: "json_schema", json_schema: { name: "answer", schema: { type: "object" }, strict: true },
-  });
+  assert.deepEqual(buildDeepSeekRequest(ctx).body.response_format, { type: "json_object" });
   ctx.request.reasoning = { effort: "none" };
   const { body } = buildDeepSeekRequest(ctx);
   assert.deepEqual(body.thinking, { type: "disabled" });
