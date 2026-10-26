@@ -1,13 +1,13 @@
 # 调试检查器
 
-检查器是 bridge 内置的网页，用来确认一条请求在 bridge 里实际经过了什么转换。打开捕获后，每条 `POST /v1/responses` 记录为一次交换（exchange），包含四段原始内容：
+检查器是 bridge 内置的网页，用来确认一条请求在 bridge 里实际经过了什么转换。打开捕获后，每条 `POST /v1/responses` 或已启用的 `POST /v1/alpha/search` 记录为一次交换（exchange），包含四段原始内容：
 
 1. codeks 发给 bridge 的请求；
 2. bridge 发给上游的每个请求；
 3. 上游返回的原始响应，含 SSE 事件和到达时间；
 4. bridge 写回 codeks 的响应。
 
-普通轮次使用上游调用 `main`。压缩请求按模式使用文字摘要调用 `summary` 或原生调用 `native`。委托压缩仍标为 `native` 或 `summary`，上游请求中的模型和连接来自实际执行别名。请求需要按需复述且缓存尚无结果时，先执行 `handoff`，成功后再执行目标调用；命中缓存时不产生这条辅助调用。路由前失败的请求（例如 JSON 无效或模型别名未知）没有上游调用，只有前后两段。
+普通轮次使用上游调用 `main`，独立搜索使用 `search`。搜索记录保留原始 JSON 请求和响应，可核对实际订阅连接、请求模型与引用。压缩请求按模式使用文字摘要调用 `summary` 或原生调用 `native`。委托压缩仍标为 `native` 或 `summary`，上游请求中的模型和连接来自实际执行别名。请求需要按需复述且缓存尚无结果时，先执行 `handoff`，成功后再执行目标调用；命中缓存时不产生这条辅助调用。路由前失败的请求（例如 JSON 无效或模型别名未知）没有上游调用，只有前后两段。
 
 ## 打开
 
@@ -41,9 +41,9 @@ codeks-bridge serve --config /absolute/path/bridge.json --capture
 
 ## 使用页面
 
-左侧列表每行是一次交换，显示开始时间、模型别名和 adapter、类型（轮次或压缩）、每个上游调用的状态、token 用量、子代理与父线程标记和预览。顶部可以按文字筛选（按 `/` 聚焦），或只看错误、压缩、进行中的交换；“按线程分组”把同一线程的请求放在一起。`↑`/`↓` 切换选中项。列表每 1.5 秒刷新，标签页隐藏时暂停。
+左侧列表每行是一次交换，显示开始时间、模型别名和 adapter、类型（轮次、压缩或搜索）、每个上游调用的状态、token 用量、子代理与父线程标记和预览。顶部可以按文字筛选（按 `/` 聚焦），或只看错误、压缩、进行中的交换；“按线程分组”把同一线程的请求放在一起。`↑`/`↓` 切换选中项。列表每 1.5 秒刷新，标签页隐藏时暂停。
 
-右侧顶部的卡片按数据流排列：① codeks → bridge，② bridge → 上游，③ 上游 → bridge，④ bridge → codeks。每个实际上游调用各占一行，并显示 `main`、`summary`、`native` 或 `handoff` 标签。点击卡片查看这一段的正文，Shift+点击在右侧并排打开第二段。每段正文有几种视图：
+右侧顶部的卡片按数据流排列：① codeks → bridge，② bridge → 上游，③ 上游 → bridge，④ bridge → codeks。每个实际上游调用各占一行，并显示 `main`、`summary`、`native`、`handoff` 或 `search` 标签。点击卡片查看这一段的正文，Shift+点击在右侧并排打开第二段。每段正文有几种视图：
 
 | 视图 | 内容 |
 | --- | --- |
@@ -55,7 +55,7 @@ codeks-bridge serve --config /absolute/path/bridge.json --capture
 
 大内容只在显示时折叠，记录本身完整。长字符串显示开头和结尾，中间注明省略的字符数，可以展开全部、复制或下载；`cxbr1:` 与 `cxbc1:` 载荷可以直接解码。很长的列表分批显示，可以继续加载。Responses Lite 的终止事件可能省略完整 `output`；结构视图会用之前的 `response.output_item.done` 还原输出，原始事件保持不变。
 
-列表和详情顶部的 token 用量取自写回 codeks 的响应，只代表该次 main、summary 或 native 调用。handoff 的独立 usage 可在它的上游响应中查看：SSE 事件、结构或 JSON 视图保留原始字段，不累加进客户端用量。缓存命中不产生新的 handoff 调用，也不重复展示为本次消耗。检查器没有跨调用的计费总额；上游没有报告的字段不能按零消耗理解。
+列表和详情顶部的 token 用量取自写回 codeks 的响应，只代表该次 main、summary 或 native 调用。handoff 的独立 usage 可在它的上游响应中查看：SSE 事件、结构或 JSON 视图保留原始字段，不累加进客户端用量。缓存命中不产生新的 handoff 调用，也不重复展示为本次消耗。搜索保留上游原始响应，不补造模型 usage。检查器没有跨调用的计费总额；上游没有报告的字段不能按零消耗理解。
 
 “概要”给出实际执行模型的路由配置、每个调用的时间线和上游调用表；客户端模型字段仍保留用户请求的工作别名。“标注”列出全部回放决定，点击可定位到对应项。“对比”选择任意两次交换的任意一段做结构比较，常用的是和同一线程上一轮的客户端请求或上游请求比较；数组按类型和角色对齐，新增、删除的项单独标出。
 
@@ -93,7 +93,7 @@ codeks-bridge serve --config /absolute/path/bridge.json --capture
 | `cancelled` | 客户端断开；仍在进行的上游调用随之标记为 `cancelled` |
 | `error` | 传输出错，`error` 字段给出原因 |
 
-交换的 `outcome` 来自写回 codeks 的内容：流式响应取最后一个终止事件（`response.completed`、`response.incomplete`、`response.failed`、`error`），非流式响应取 JSON 的 `status`。客户端断开为 `aborted`；没有写出响应或流没有终止事件时为 `error`。
+交换的 `outcome` 来自写回 codeks 的内容：流式响应取最后一个终止事件（`response.completed`、`response.incomplete`、`response.failed`、`error`），非流式 Responses 响应取 JSON 的 `status`，独立搜索等普通 JSON 响应按 HTTP 状态判断。客户端断开为 `aborted`；没有写出响应或流没有终止事件时为 `error`。
 
 ## 状态标注
 

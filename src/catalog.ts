@@ -23,13 +23,14 @@ export function configSnippet(config: BridgeConfig, catalogPath?: string): strin
   const lines = [
     `model = ${JSON.stringify(first)}`, 'model_provider = "bridge"',
     ...(catalogPath ? [`model_catalog_json = ${JSON.stringify(catalogPath)}`] : []),
-    'web_search = "disabled"', "", "[features]", "image_generation = false", "",
+    `web_search = "${config.web_search ? "live" : "disabled"}"`, "", "[features]", "image_generation = false", "",
     // Outside the reserved "collaboration" namespace, codeks sends multi-agent task messages as plaintext.
     "[features.multi_agent_v2]", 'tool_namespace = "agents"', "",
     "[model_providers.bridge]", 'name = "Local bridge"',
     `base_url = ${JSON.stringify(baseUrl)}`, 'wire_api = "responses"',
   ];
   if (!catalogPath) lines.push(`model_catalog_url = ${JSON.stringify(`${baseUrl}/models`)}`);
+  if (config.web_search) lines.push("supports_standalone_web_search = true");
   if (config.token_env) lines.push(`env_key = ${JSON.stringify(config.token_env)}`);
   // Codex requires API-key auth mode for provider catalog discovery, even on loopback.
   else if (!catalogPath) lines.push('experimental_bearer_token = "codeks-bridge-local"');

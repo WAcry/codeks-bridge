@@ -1,12 +1,12 @@
 import { upstreamHeaders } from "./auth.ts";
 import { BridgeError, transportError, upstreamError, UpstreamHttpError } from "./errors.ts";
 import { captureUpstream } from "./inspect/capture.ts";
-import type { ResolvedModel } from "./types.ts";
+import type { Api, UpstreamConfig } from "./types.ts";
 import { upstreamBaseUrl } from "./config.ts";
 import { refreshChatgptCredentials } from "./chatgpt-auth.ts";
 
 /** base_url includes any API version prefix; path is appended, never resolved from /. */
-export async function upstreamFetch(route: ResolvedModel, path: string, body: unknown, signal: AbortSignal, requestHeaders?: Headers, protocolHeaders?: Record<string, string | string[]>, fetch: typeof globalThis.fetch = globalThis.fetch, recoverAuth = true): Promise<Response> {
+export async function upstreamFetch(route: { upstream: UpstreamConfig; profile: { api: Api } }, path: string, body: unknown, signal: AbortSignal, requestHeaders?: Headers, protocolHeaders?: Record<string, string | string[]>, fetch: typeof globalThis.fetch = globalThis.fetch, recoverAuth = true): Promise<Response> {
   signal.throwIfAborted();
   const url = upstreamBaseUrl(route.upstream).replace(/\/+$/, "") + "/" + path.replace(/^\/+/, "");
   const headers = await upstreamHeaders(route.upstream, route.profile.api, signal, requestHeaders, fetch);

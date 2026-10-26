@@ -164,7 +164,7 @@ export class Call {
 
 export interface RequestMeta {
   model: string | null;
-  kind: "turn" | "compaction" | "invalid";
+  kind: "turn" | "compaction" | "search" | "invalid";
   stream: boolean | null;
   input_items: number | null;
   preview: string | null;
@@ -229,15 +229,15 @@ export class Exchange {
     this.account(this.requestBytes);
   }
 
-  parsed(request: ResponsesRequest): void {
+  parsed(request: ResponsesRequest, kind?: "search"): void {
     if (this.closed) return;
     const input = request.input;
     this.meta = {
       model: typeof request.model === "string" ? request.model : null,
-      kind: Array.isArray(input) && input.some(item => item?.type === "compaction_trigger") ? "compaction" : "turn",
-      stream: typeof request.stream === "boolean" ? request.stream : null,
+      kind: kind ?? (Array.isArray(input) && input.some(item => item?.type === "compaction_trigger") ? "compaction" : "turn"),
+      stream: kind === "search" ? false : typeof request.stream === "boolean" ? request.stream : null,
       input_items: Array.isArray(input) ? input.length : null,
-      preview: previewOf(request),
+      preview: kind === "search" ? JSON.stringify(request.commands ?? {}).slice(0, 200) : previewOf(request),
     };
     this.touch();
   }

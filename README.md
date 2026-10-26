@@ -34,10 +34,10 @@ codeks-bridge config-snippet --config /absolute/path/bridge.json
 - bridge 封装的 reasoning 默认只回放给原目标，原生压缩与 reasoning 的跨目标复用分别配置。无法识别的历史状态默认透传，也可配置[过滤或报错](docs/config.md#未识别的历史状态)；实际兼容性由上游决定。
 - GPT 默认使用 `compaction.mode: "native"`：先做原生加密压缩，需要文字表示时再向原来源复述并缓存。其他模型默认使用标准文字压缩，也可通过 [`compaction.model`](docs/config.md#压缩模式与执行模型) 委托常用 GPT 执行原生压缩，直接复用已有模型配置；见 [GPT＋Claude 双模型示例](examples/gpt-claude.json)。
 - 历史由 codeks 保存；按需复述的成功结果另存本地缓存。封装只是编码，文字 reasoning、摘要及复述配方可读。
-- Lark/regex 转为工具描述约束。图片理解由模型支持，客户端配置关闭网页搜索和图片生成。
+- Lark/regex 转为工具描述约束。图片理解由模型支持，客户端配置关闭图片生成。网页搜索默认关闭；配置 `"web_search": { "upstream": "chatgpt" }` 后，所有模型可共用该订阅连接的 `web.run` 搜索、打开网页等能力。见[订阅搜索](docs/web-search.md)。
 
 ## 调试
 
 `serve` 加 `--capture` 后打开日志里的 `/inspect/` 地址，可以逐条查看 codeks 请求、发往上游的请求、上游原始响应和写回 codeks 的响应，以及 reasoning 与压缩状态的回放决定。记录只在内存中，也可以在页面上开关捕获、清空或导出。详见[调试检查器](docs/inspect.md)。
 
-[配置与模型目录](docs/config.md) · [嵌入现有服务](docs/embedding.md) · [整体设计](docs/design.md) · [Reasoning](docs/reasoning.md) · [压缩](docs/compaction.md) · [工具](docs/tools.md) · [调试检查器](docs/inspect.md) · [验证](docs/testing.md) · [发布](docs/releasing.md)
+[配置与模型目录](docs/config.md) · [嵌入现有服务](docs/embedding.md) · [整体设计](docs/design.md) · [Reasoning](docs/reasoning.md) · [压缩](docs/compaction.md) · [工具](docs/tools.md) · [订阅搜索](docs/web-search.md) · [调试检查器](docs/inspect.md) · [验证](docs/testing.md) · [发布](docs/releasing.md)

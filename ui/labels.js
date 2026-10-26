@@ -2,7 +2,7 @@
 import { h, kvTable, shortId, strBlock, put } from './dom.js';
 import { jsonTree } from './tree.js';
 
-export const CALL_LABEL = { main: '主请求', summary: '压缩·文字摘要', native: '压缩·原生', handoff: '压缩·交接复述' };
+export const CALL_LABEL = { main: '主请求', summary: '压缩·文字摘要', native: '压缩·原生', handoff: '压缩·交接复述', search: '独立搜索' };
 export const callLabel = (l) => CALL_LABEL[l] ?? l;
 
 export const INPUT_TRANSFORMATION_LABEL = {
@@ -10,7 +10,7 @@ export const INPUT_TRANSFORMATION_LABEL = {
   thinking_mismatch_allowed: '允许失配，保留 thinking',
 };
 
-export const KIND_LABEL = { turn: '轮次', compaction: '压缩', invalid: '无效' };
+export const KIND_LABEL = { turn: '轮次', compaction: '压缩', search: '独立搜索', invalid: '无效' };
 export const OUTCOME_LABEL = { active: '进行中', completed: '完成', incomplete: '未完成', failed: '失败', error: '错误', aborted: '中止' };
 export const END_LABEL = { active: '传输中', complete: '完整', cancelled: '已取消', error: '出错', unread: '终止事件后停止读取' };
 

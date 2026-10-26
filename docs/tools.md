@@ -23,7 +23,7 @@ Claude 的 `adapters.claude-messages.tool_updates` 有两种明确模式：
 
 `supports_search_tool` 表示客户端的工具发现能力，与网页搜索不同。当前源目录的 GPT 条目显式设为 `true`，bridge 保留它。是否出现独立 `tool_search` 还取决于客户端工具模式和功能开关，不能只从目录字段推断。
 
-当前目录采用 Code Mode Only：大多数工具通过 `exec` 中的函数调用，模型从 `ALL_TOOLS` 读取目录；外层不会因此增加一个独立搜索工具。网页搜索对应 `web_search`，由客户端配置单独关闭；图片生成也有独立开关，均不通过 `supports_search_tool` 控制。
+当前目录采用 Code Mode Only：大多数工具通过 `exec` 中的函数调用，模型从 `ALL_TOOLS` 读取目录；外层不会因此增加一个独立搜索工具。网页搜索由客户端 `web_search` 配置和 provider 能力控制；启用[订阅搜索](web-search.md)后，`web.run` 的明文结果通过普通工具结果路径返回各模型。图片生成也有独立开关，均不通过 `supports_search_tool` 控制。
 
 ## 名字
 
@@ -69,4 +69,4 @@ Responses 允许主动工具通知和一次调用的多次输出，而 Messages/
 
 从第一个输出工具调用开始，bridge 按原顺序缓存该调用及之后的输出，只有上游完整成功后才交给客户端。这样保留 thinking、文字与调用的交错顺序，后续回放不会改变签名前缀。截断、容量错误和断流不会释放部分调用；代价是工具之后的进度文字也要等响应成功后才显示。
 
-Messages/Chat 不提供 hosted web search、image generation 等工具。默认定义中出现这些项时不放入上游工具表；显式 `tool_choice` 选择不支持的工具会报错。生成的客户端配置关闭 web search 和 image generation。当前不转换历史搜索/图片生成结果，遇到这类不支持的历史项会提示错误。
+Messages/Chat 不提供 hosted web search、image generation 等工具。默认定义中出现这些项时不放入上游工具表；显式 `tool_choice` 选择不支持的工具会报错。生成的客户端配置关闭 image generation，网页搜索则按可选的订阅搜索配置启用。当前不转换 hosted 搜索/图片生成的特殊历史项，遇到这类不支持的历史项会提示错误；独立 `web.run` 返回普通工具结果，不受此限制。
