@@ -101,6 +101,19 @@ test("portable summaries and string input normalize to user messages", () => {
   assert.deepEqual(prepareHistory("Hello", defaults.a), [{ type: "message", role: "user", content: [{ type: "input_text", text: "Hello" }] }]);
 });
 
+test("tool pairing cannot move a translated checkpoint or borrow results from its next epoch", () => {
+  const call = { type: "function_call", call_id: "before_checkpoint", name: "read", arguments: "{}" };
+  const output = { type: "function_call_output", call_id: call.call_id, output: "Late result" };
+  const compacted = { type: "compaction", encrypted_content: encodeCompaction({ summary: "Checkpoint boundary" }) };
+  for (const route of [defaults.claude, defaults.deepseek]) {
+    const history = prepareHistory([call, compacted, output], route);
+    assert.equal(history[0].type, "function_call");
+    assert.equal(history[1].role, "user");
+    assert.match(history[1].content[0].text, /Checkpoint boundary/);
+    assert.deepEqual(history[2], output);
+  }
+});
+
 test("stored references and internal reasoning inputs remain unsupported", () => {
   assert.throws(() => prepareHistory([{ type: "item_reference", id: "msg_stored" }], defaults.a), /complete conversation/);
   assert.throws(() => prepareHistory([{ type: "bridge_reasoning", state: { data: "unselected" } }], defaults.a), /Internal reasoning/);

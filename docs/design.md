@@ -20,7 +20,7 @@ flowchart LR
 
 ## 客户端协议跟随 Codex
 
-优先匹配最新 Codex 的 GPT 默认行为，以 OpenAI 订阅、AWS 和 Azure 的使用场景为基准。当前模型条目使用 Responses Lite，现代条目保留 Code Mode Only 和多代理字段；GPT-5.5 显式启用 Lite，其余工具与多代理元数据仍跟随源条目。目录固定到明确的 Codex 源码版本，不随用户本机二进制或订阅账号变化。
+优先匹配最新 Codex 的 GPT 默认行为，以 OpenAI 订阅、AWS 和 Azure 的使用场景为基准。当前模型条目使用 Responses Lite，现代条目保留 Code Mode Only 和多代理字段；GPT-5.5 显式启用 Lite，其余工具与多代理元数据仍跟随源条目。目录固定到已审阅的来源版本，不随用户本机二进制或订阅账号变化。
 
 Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于历史中的 `additional_tools` 项，普通函数和 custom 工具归入默认 `functions` namespace。GPT 路径保留这些声明的位置、顺序、schema 和 grammar，并发送 `x-openai-internal-codex-responses-lite: true`。Claude 默认将初始声明放到顶部，增量声明转换为原生中途工具更新；DeepSeek 及 Claude 的显式兼容模式将各批定义合并到顶部。声明不会变成 user reminder。中途提醒保留所在对话位置；若插在一次完整的工具交换内，则移至该批结果之后，以满足目标协议的配对要求。
 
@@ -30,7 +30,7 @@ Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于
 
 ## 有限目录与显式精调
 
-项目只支持明确列出的模型。`catalog/` 保存每个模型的完整条目及来源；GPT 分别使用 Codex 源码中各自的版本，保留提示词、默认 effort、摘要、窗口和工具元数据的差异，GPT-5.5 的 Lite 调整单独记录在 `adjustments`。Claude 与 DeepSeek 从 GPT-6.1 Sol 模板开始，只替换底层模型身份（如 `You are Codex, an agent based on Claude.`），保留 Codex 代理角色及 `As Codex` 人格说明；参数和确有差异的能力逐项精调，记录在条目的 `adjustments`。摘要默认值继续使用模板的 `none`，是否展示由客户端配置决定，不为第三方模型强制打开。
+项目只支持明确列出的模型。`catalog/` 保存每个模型的完整条目及来源；GPT 分别使用 Codex 源码中各自的版本，保留提示词、默认 effort、摘要、窗口和工具元数据的差异，GPT-5.5 的 Lite 调整单独记录在 `adjustments`。源码没有的 GPT-Reserve 使用手工取得并审阅的订阅目录条目，记录取得日期与客户端版本；具体来源与公开信息处理见[模型目录](../catalog/README.md)。Claude 与 DeepSeek 从 GPT-6.1 Sol 模板开始，只替换底层模型身份（如 `You are Codex, an agent based on Claude.`），保留 Codex 代理角色及 `As Codex` 人格说明；参数和确有差异的能力逐项精调，记录在条目的 `adjustments`。摘要默认值继续使用模板的 `none`，是否展示由客户端配置决定，不为第三方模型强制打开。
 
 导入脚本只生成独立候选文件，供人或 Agent 对比审阅。运行时使用已提交的完整条目，不自动导入、不猜测未知模型，也不从 ChatGPT 订阅获取目录。这样更新仍有工具辅助，同时提示词和能力变化可审查、可追踪。来源及更新步骤见[模型目录](../catalog/README.md)。
 
@@ -74,7 +74,9 @@ Reasoning 载荷记录来源、格式和原始数据；压缩载荷保存文字�
 
 这是快速迭代的协议桥接器。用户选择默认透传、尽早暴露不兼容：请求、响应、header 和错误中的新增字段不应因为桥接器未认识它们而静默消失。GPT 路径保留原始 body 和事件，只修改桥接必需字段；header 采用排除必要边界字段的方式转发，不维护白名单。Claude/DeepSeek 仍需转换消息、工具及错误结构，不能机械地把 Responses 字段搬进另一套协议；原生扩展参数通过 options 保留。具体 HTTP 与鉴权边界见 [Responses 流](responses-stream.md#header-与转发边界)。
 
-bridge 检查自身必须维持的不变量：配置引用存在、历史能转换、工具调用完整、usage 可用、压缩检查点完整。这些检查避免静默丢失上下文或执行半段工具调用。
+bridge 检查自身必须维持的不变量：配置引用存在、历史能转换、工具调用完整、usage 可用、压缩检查点完整。这些检查避免静默丢失上下文或执行半段工具调用。Messages/Chat 的短名、点名与声明名使用确定性的工具别名映射；名字歧义属于可由模型纠正的工具错误，保留诊断并走客户端已有工具循环，不由 bridge 发起额外推理请求。[工具身份与反馈](tools.md#名字)
+
+不支持原生 JSON Schema 的 DeepSeek 端点可显式选择 JSON mode 加完整 schema 提示。配置表达的是不同的输出保证，不是在遇到 400 后猜测能力并逐级降级；Claude/GPT 继续使用各自原生 schema。这一选择保留错误透明性，同时让已知协议差异有清晰的适配入口。[DeepSeek 结构化输出](backends-deepseek-chat.md#结构化输出)
 
 上游负责判定模型能力：effort、thinking、强制工具选择、schema、图片以及允许复用的密文是否可接受。bridge 不预先维护这些能力的限制列表，也不在失败后自动移除 reasoning、关闭 thinking、换端点或改压缩模式。原生参数可通过 options 显式覆盖。
 

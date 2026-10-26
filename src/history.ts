@@ -40,6 +40,13 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
   rejectUnrecognizedState(input, route);
 
   const result: Record<string, any>[] = [];
+  let toolSegmentStart = 0;
+  const finishToolSegment = () => {
+    if (route.profile.api !== "responses") {
+      result.push(...translateToolHistory(result.splice(toolSegmentStart)));
+      toolSegmentStart = result.length;
+    }
+  };
   const unrecognized = (item: Record<string, any>) => {
     if (route.replay.unrecognized === "passthrough") result.push(item);
   };
@@ -84,9 +91,13 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
       continue;
     }
     if (item.type === "compaction" || item.type === "compaction_summary") {
+      // Pair tools only within one checkpoint epoch, including when the
+      // checkpoint becomes a plain-text user summary below.
+      finishToolSegment();
       const carrier = decodeCompaction(item.encrypted_content);
       if (!carrier) {
         unrecognized(item);
+        toolSegmentStart = result.length;
         continue;
       }
       if (restoresNativeCompaction(carrier, route)) {
@@ -101,9 +112,11 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
           content: [{ type: "input_text", text: `${SUMMARY_PREFIX}\n\n${carrier.summary}` }],
         });
       }
+      toolSegmentStart = result.length;
       continue;
     }
     result.push(item);
   }
-  return route.profile.api === "responses" ? result : translateToolHistory(result);
+  finishToolSegment();
+  return result;
 }

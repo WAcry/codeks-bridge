@@ -7,11 +7,13 @@ import type { ToolSet } from "../tools.ts";
 import type { BackendContext, BackendResult } from "../types.ts";
 import { upstreamFetch } from "../upstream.ts";
 import type { ResponseWriter, Usage } from "../writer.ts";
+import { prepareToolCall, toolCallForReplay, toolResultForReplay, writeToolCall } from "../tool-calls.ts";
 
 /** A wire dialect supplies only the parts that differ from Chat Completions. */
 export interface ChatDialect {
   reasoningField: string;
   requestParameters(context: BackendContext): Record<string, unknown>;
+  configureStructuredOutput?(context: BackendContext, body: Record<string, any>): void;
   readUsage(value: any): Usage;
   failureReason(reason: string): BridgeError | undefined;
 }
@@ -97,21 +99,23 @@ function convertHistory(context: BackendContext, tools: ToolSet, reasoningField:
       flushImages();
       if (typeof item.call_id !== "string" || typeof item.name !== "string") throw new BridgeError("Invalid Chat tool call history.");
       const a = getAssistant();
+      const wire = toolCallForReplay(item, tools);
       a.tool_calls ??= [];
       a.tool_calls.push({
-        id: item.call_id, type: "function", function: {
-          name: tools.flatFor(item.namespace, item.name),
+        id: wire.id, type: "function", function: {
+          name: wire.name,
           arguments: item.type === "custom_tool_call" ? JSON.stringify({ input: item.input }) : item.arguments,
         },
       });
     } else if (item.type === "function_call_output" || item.type === "custom_tool_call_output") {
       flushAssistant();
       if (typeof item.call_id !== "string") throw new BridgeError("Chat tool output has no call_id.");
-      const parts = contentParts(item.output);
+      const result = toolResultForReplay(item);
+      const parts = contentParts(result.output);
       const images = parts.filter((p) => p.type === "image_url");
-      messages.push({ role: "tool", tool_call_id: item.call_id, content: messageContent(parts.filter((p) => p.type === "text")) });
+      messages.push({ role: "tool", tool_call_id: result.id, content: messageContent(parts.filter((p) => p.type === "text")) });
       if (images.length) {
-        pendingImages.push({ type: "text", text: `Images from tool call ${item.call_id}:` }, ...images);
+        pendingImages.push({ type: "text", text: `Images from tool call ${result.id}:` }, ...images);
       }
     } else {
       throw new BridgeError(`Chat does not support history item ${String(item.type)}.`);
@@ -155,9 +159,12 @@ export function buildChatRequest(context: BackendContext, dialect: ChatDialect):
   else if (format?.type === "json_schema") {
     body.response_format = { type: "json_schema", json_schema: { name: format.name, schema: format.schema, strict: format.strict } };
   } else if (format && format.type !== "text") throw new BridgeError(`Chat does not support text format ${String(format.type)}.`);
+  const messages = convertHistory(context, tools, dialect.reasoningField);
+  body.messages = messages;
+  if (!context.compacting) dialect.configureStructuredOutput?.(context, body);
   Object.assign(body, route.upstream.options, route.config.options, {
     model: route.config.model,
-    messages: convertHistory(context, tools, dialect.reasoningField),
+    messages,
     stream: true,
   });
   body.stream_options = { ...body.stream_options, include_usage: true };
@@ -245,17 +252,11 @@ export async function runChat(context: BackendContext, writer: ResponseWriter, d
   closeReasoning();
   // Validate every call before exposing any of them for execution.
   const completed = [...calls.entries()].sort(([a], [b]) => a - b).map(([, call]) => {
-    const tool = tools.resolve(call.name);
-    if (!tool || !call.id) throw new BridgeError("Chat returned an unknown or incomplete tool call.", "upstream_error", 502);
     let args: any;
     try { args = JSON.parse(call.arguments); } catch { throw new BridgeError("Chat returned invalid tool arguments.", "upstream_error", 502); }
     if (!args || typeof args !== "object" || Array.isArray(args)) throw new BridgeError("Chat tool arguments must be an object.", "upstream_error", 502);
-    if (tool.kind === "custom" && typeof args.input !== "string") throw new BridgeError("Chat custom tool call has no string input.", "upstream_error", 502);
-    return { call, tool, args };
+    return prepareToolCall(tools, call.id, call.name, args, call.arguments);
   });
-  for (const { call, tool, args } of completed) {
-    if (tool.kind === "custom") writer.addCustomToolCall({ call_id: call.id, name: tool.name, namespace: tool.namespace, input: args.input });
-    else writer.addFunctionCall({ call_id: call.id, name: tool.name, namespace: tool.namespace, arguments: call.arguments });
-  }
+  for (const call of completed) writeToolCall(writer, call);
   return { usage, endTurn: calls.size === 0 };
 }

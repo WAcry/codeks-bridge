@@ -8,9 +8,13 @@ export interface ClaudeMessagesOptions {
   tool_updates: "inline" | "top_level";
   thinking_mismatch: "drop_block" | "error" | "upstream_default";
 }
+export interface DeepSeekChatOptions {
+  structured_output: "native" | "json_mode";
+}
 /** Bridge behavior, distinct from native request-body options. */
 export interface AdapterConfig {
   "claude-messages"?: Partial<ClaudeMessagesOptions>;
+  "deepseek-chat"?: Partial<DeepSeekChatOptions>;
 }
 export interface UpstreamConfig {
   /** ChatGPT subscription auth supplies its native endpoint by default. */

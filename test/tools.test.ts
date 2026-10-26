@@ -26,6 +26,100 @@ test("tool names remain readable, with suffixes only for actual collisions", () 
   assert.equal(tools.resolve("unknown"), undefined);
 });
 
+test("tool calls accept flat, dotted and unique bare names without changing declarations", () => {
+  const tools = buildToolSet([
+    { type: "namespace", name: "functions", tools: [{ type: "custom", name: "exec" }, fn("wait")] },
+    { type: "namespace", name: "agents", tools: [fn("spawn_agent")] },
+    { type: "namespace", name: "clock", tools: [fn("sleep")] },
+    { type: "namespace", name: "inventory", tools: [fn("lookup")] },
+    fn("request_user_input"),
+  ]);
+  const declared = structuredClone(tools.entries);
+  for (const [namespace, name] of [
+    ["functions", "exec"], ["functions", "wait"], ["agents", "spawn_agent"],
+    ["clock", "sleep"], ["inventory", "lookup"], ["functions", "request_user_input"],
+  ]) {
+    const expected = tools.get(namespace, name);
+    for (const spelling of [`${namespace}__${name}`, `${namespace}.${name}`, name]) {
+      assert.equal(tools.resolve(spelling), expected);
+      assert.deepEqual(tools.candidates(spelling), [expected]);
+    }
+  }
+  assert.equal(tools.resolve("exec")?.kind, "custom");
+  assert.equal(tools.resolve("spawn_agent")?.namespace, "agents");
+  assert.equal(tools.resolve("request_user_input")?.namespace, undefined);
+  assert.equal(tools.resolve("agents__spawn_agnt"), undefined);
+  assert.equal(tools.resolve("AGENTS.spawn_agent"), undefined);
+  assert.deepEqual(tools.entries, declared);
+});
+
+test("ambiguous aliases expose every candidate and never choose a default namespace", () => {
+  const tools = buildToolSet([
+    { type: "namespace", name: "functions", tools: [fn("read")] },
+    { type: "namespace", name: "files", tools: [fn("read")] },
+    { type: "namespace", name: "database", tools: [fn("read")] },
+  ]);
+  assert.equal(tools.resolve("read"), undefined);
+  assert.deepEqual(tools.candidates("read").map((tool) => tool.flatName), ["functions__read", "files__read", "database__read"]);
+  assert.equal(tools.resolve("functions.read"), tools.get("functions", "read"));
+  assert.equal(tools.resolve("files__read"), tools.get("files", "read"));
+  assert.equal(tools.resolve("database.read"), tools.get("database", "read"));
+  assert.deepEqual(tools.candidates("missing"), []);
+});
+
+test("declared flat names take precedence over aliases even after a name collision", () => {
+  const tools = buildToolSet([
+    fn("read"),
+    { type: "namespace", name: "files", tools: [fn("read")] },
+    fn("files__read"),
+  ]);
+  assert.equal(tools.resolve("read"), tools.get(undefined, "read"));
+  assert.deepEqual(tools.candidates("read"), [tools.get(undefined, "read")]);
+  assert.equal(tools.resolve("files__read"), tools.get("files", "read"));
+  assert.equal(tools.resolve("files__read_2"), tools.get(undefined, "files__read"));
+  assert.equal(tools.resolve("functions.files__read"), tools.get(undefined, "files__read"));
+});
+
+test("aliases come from complete identities, including punctuation and hashed names", () => {
+  const longName = "long_".repeat(20);
+  const tools = buildToolSet([
+    { type: "namespace", name: "files", tools: [fn("read.part")] },
+    { type: "namespace", name: "files.read", tools: [fn("part")] },
+    { type: "namespace", name: "mcp__files_", tools: [fn("write")] },
+    { type: "namespace", name: "storage", tools: [fn(longName)] },
+  ]);
+  assert.equal(tools.resolve("files.read.part"), undefined);
+  assert.equal(tools.candidates("files.read.part").length, 2);
+  assert.equal(tools.resolve("files__read_part"), tools.get("files", "read.part"));
+  assert.equal(tools.resolve("mcp__files_.write"), tools.get("mcp__files_", "write"));
+  assert.equal(tools.resolve("mcp__files_write"), tools.get("mcp__files_", "write"));
+  assert.equal(tools.resolve("mcp__files___write"), tools.get("mcp__files_", "write"));
+  assert.equal(tools.resolve(`storage.${longName}`), tools.get("storage", longName));
+  assert.equal(tools.resolve(`storage__${longName}`), tools.get("storage", longName));
+  assert.equal(tools.resolve(longName), tools.get("storage", longName));
+  assert.equal(tools.resolve(tools.get("storage", longName)!.flatName), tools.get("storage", longName));
+});
+
+test("aliases use current declarations while inline snapshots and canonical names stay stable", () => {
+  const tools = buildToolSet([{ type: "custom", name: "exec", description: "Original." }]);
+  const original = tools.add([{ type: "namespace", name: "functions", tools: [{ type: "custom", name: "exec", description: "Inline." }] }]);
+  assert.equal(tools.entries.length, 1);
+  assert.equal(tools.resolve("functions__exec"), tools.entries[0]);
+  assert.equal(tools.resolve("functions.exec")?.flatName, "exec");
+  tools.add([{ type: "custom", name: "exec", description: "Updated." }]);
+  assert.match(tools.resolve("functions.exec")!.description, /^Updated\./);
+  assert.match(original[0].description, /^Inline\./);
+  tools.add([{ type: "namespace", name: "remote", tools: [fn("exec")] }]);
+  assert.equal(tools.resolve("exec"), tools.get(undefined, "exec"));
+  assert.equal(tools.resolve("remote.exec"), tools.get("remote", "exec"));
+
+  const named = buildToolSet([{ type: "namespace", name: "files", tools: [fn("read")] }]);
+  assert.equal(named.resolve("read"), named.get("files", "read"));
+  named.add([{ type: "namespace", name: "database", tools: [fn("read")] }]);
+  assert.equal(named.resolve("read"), undefined);
+  assert.equal(named.candidates("read").length, 2);
+});
+
 test("long tool names retain a readable prefix and distinct deterministic hashes", () => {
   const first = baseFlatName("namespace", "x".repeat(100) + "a");
   const second = baseFlatName("namespace", "x".repeat(100) + "b");

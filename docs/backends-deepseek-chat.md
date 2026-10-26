@@ -7,7 +7,10 @@
   "upstreams": {
     "deepseek": {
       "base_url": "https://api.deepseek.com",
-      "api_key_env": "DEEPSEEK_API_KEY"
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "adapters": {
+        "deepseek-chat": { "structured_output": "json_mode" }
+      }
     }
   },
   "models": {
@@ -39,13 +42,26 @@
 
 codeks 的 `ultra` 由客户端注入多代理提示词，并使用原生 `max` effort。映射可由 `reasoning.effort_map` 整体替换，目录中可选档位来自同一配置。未映射的显式 effort 原样发送。上游和模型 `options` 随后覆盖推导参数，允许直接设置端点专有选项；桥接器最终固定 model、messages、工具定义、流模式和 usage 开关。
 
-强制工具选择、JSON Schema 与 thinking 能否组合由上游判断。bridge 转换可表达的请求后直接发送，上游不支持时保留错误，不自动关闭 thinking 或改成普通文本输出。
+强制工具选择、输出格式与 thinking 能否组合由上游判断。bridge 转换可表达的请求后直接发送，上游不支持时保留错误，不自动关闭 thinking 或改成普通文本输出。
+
+## 结构化输出
+
+`adapters.deepseek-chat.structured_output` 可放在连接或模型配置，模型覆盖连接，默认 `native`。模式明确选择转换方式，不根据 URL 或部署名猜测能力，也不在收到错误后重试或逐级降级。
+
+| 模式 | 请求中的 JSON Schema | 保证与用途 |
+| --- | --- | --- |
+| `native`（默认） | 转为 Chat `response_format.json_schema`，保留 schema 和 strict | 交给支持该格式的端点裁决；不降低原请求的严格语义 |
+| `json_mode` | 发送 `response_format: {"type":"json_object"}`，把完整原 schema 作为末尾 system 消息追加到本次请求 | 上游保证 JSON 语法，schema 约束由模型遵循，不等同原生 strict schema |
+
+官方 DeepSeek Chat 当前只列出 `text`、`json_object`。真实自动标题请求使用 `json_schema` 时被拒绝，因此上面的官方端点示例显式选择 `json_mode`。标题的 `required`、`minLength`、`maxLength` 等全部保留在格式说明里；bridge 不实现另一套 JSON Schema 校验器，也不承诺模型总能遵守全部约束。需要严格 schema 保证时使用支持原生格式的端点。见[官方 JSON Output](https://api-docs.deepseek.com/guides/json_mode/)及[Chat 参数](https://api-docs.deepseek.com/api/create-chat-completion/)。
+
+格式说明只追加在请求末尾，已有消息前缀和客户端保存的历史不变。没有 schema 的普通请求及已有 `json_object` 请求保持原样；压缩不携带格式参数或格式说明。原生 `options.response_format` 仍优先于适配规则：显式设置该字段时，bridge 不再转换格式或添加可能冲突的 schema 提示。
 
 ## 消息、工具与图片
 
 Responses instructions 成为开头的 system 消息；历史 developer 在原位置转为 system。user、assistant、工具调用和结果保留顺序。同一次 assistant 输出的 reasoning、文字和并行工具调用合并为一条 Chat assistant 消息。
 
-工具结果使用 `role: "tool"` 和原 `tool_call_id`。namespace、自由文本工具及语法使用[共享工具转换](tools.md)。Responses JSON Schema 转为 Chat `response_format.json_schema`，JSON object 转为 `response_format: {type: "json_object"}`；schema 由上游验证。
+工具结果使用 `role: "tool"` 和原 `tool_call_id`。namespace、自由文本工具及语法使用[共享工具转换](tools.md)。JSON object 转为 `response_format: {type: "json_object"}`；JSON Schema 按上面的显式模式处理。
 
 用户图片转为 `image_url`，支持 HTTP(S) 和 image data URL，`detail: "original"` 转为 `high`。工具结果文本保持 tool 消息，图片放在同组所有 tool 结果之后的 user 消息，标注来源 call ID；这样不打断并行调用与结果的配对。这会增加一个 user 边界，是转换的代价。
 
@@ -53,7 +69,7 @@ assistant/system/developer 图片、文件 ID、音频和视频没有本轮转�
 
 ## 流、用量与压缩
 
-出站开启 `stream: true`、`stream_options.include_usage: true`。文字和启用展示的 reasoning 随到随发，工具参数按索引拼接，只有流结束且所有调用完整时才交给 codeks。未结束的连接、缺失 usage、未知工具或不完整参数不能构成成功响应。
+出站开启 `stream: true`、`stream_options.include_usage: true`。文字和启用展示的 reasoning 随到随发，工具参数按索引拼接，只有流结束且所有调用完整时才交给 codeks。未结束的连接、缺失 usage 或不完整参数不能构成成功响应。未知或有歧义的名字走[工具错误反馈](tools.md#名字)，让模型收到候选后自行纠正，不触发 bridge 重试。
 
 `stop` 完成，`tool_calls` 要求继续执行工具。`length` 和内容过滤返回错误；DeepSeek 的 `insufficient_system_resource`、`aborted` 归为容量错误。HTTP 与流内错误保留原始上游详情，bridge 不叠加重试。[错误结构](responses-stream.md)
 
@@ -68,8 +84,8 @@ reasoning 不重复加到总量中。压缩只生成文字摘要，仍由客户�
 
 ## 扩展方言
 
-[`src/backends/chat.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/backends/chat.ts) 负责 Chat 消息、工具和流转换，定义小型 `ChatDialect` 接口；[`src/backends/deepseek.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/backends/deepseek.ts) 提供 DeepSeek 的 reasoning 字段、thinking 参数、usage 和特殊结束原因。`deepseek-flash` 目录条目选择 `deepseek-chat` adapter，由后者调用前者。
+[`src/backends/chat.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/backends/chat.ts) 负责 Chat 消息、工具和流转换，定义小型 `ChatDialect` 接口；[`src/backends/deepseek.ts`](https://github.com/WAcry/codeks-bridge/blob/main/src/backends/deepseek.ts) 提供 DeepSeek 的 reasoning 字段、thinking 参数、结构化输出模式、usage 和特殊结束原因。`deepseek-flash` 目录条目选择 `deepseek-chat` adapter，由后者调用前者。
 
 当前 Chat 转换层按单个文本字段读写 reasoning，包括为没有 reasoning 的 assistant 历史写入空字符串。这是现有 DeepSeek 路径需要的行为；接入其他模型时须按其协议决定能否复用。参数差异优先使用 profile 和 options；如果 reasoning 改为内容块或其他结构，再调整转换边界。当前没有其他 Chat 方言实现。
 
-验证见 [`test/chat.test.ts`](https://github.com/WAcry/codeks-bridge/blob/main/test/chat.test.ts)。协议参考：[Chat API](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion)、[思考模式](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode)、[图片](https://api-docs.deepseek.com/zh-cn/guides/vision)。
+验证见 [`test/chat.test.ts`](https://github.com/WAcry/codeks-bridge/blob/main/test/chat.test.ts) 和 [`test/deepseek-format.test.ts`](https://github.com/WAcry/codeks-bridge/blob/main/test/deepseek-format.test.ts)。协议参考：[Chat API](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion)、[思考模式](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode)、[图片](https://api-docs.deepseek.com/zh-cn/guides/vision)。
