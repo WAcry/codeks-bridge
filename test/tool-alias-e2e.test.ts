@@ -71,7 +71,21 @@ function callName(call: any, api: Api): string {
   return api === "chat" ? call.function.name : call.name;
 }
 
-async function fixture(t: TestContext, api: Api, ambiguous: boolean, respond: (body: any, index: number) => Reply) {
+function responsesReply(): Response {
+  const item = { type: "message", id: "msg_gpt", role: "assistant", phase: "final_answer",
+    content: [{ type: "output_text", text: "ALIAS_DONE" }] };
+  const events = [
+    { type: "response.output_item.done", output_index: 0, item },
+    { type: "response.completed", response: { id: "resp_gpt", status: "completed", output: [item],
+      usage: { input_tokens: 100, output_tokens: 5, total_tokens: 105 } } },
+  ];
+  return new Response(events.map(event => formatSse(event)).join(""), {
+    headers: { "content-type": "text/event-stream" },
+  });
+}
+
+async function fixture(t: TestContext, api: Api, ambiguous: boolean, respond: (body: any, index: number) => Reply,
+  checkGpt?: (body: any) => void) {
   const scratch = await mkdtemp(join(tmpdir(), "codeks-tool-alias-e2e-"));
   t.diagnostic(`Scratch directory: ${scratch}`);
   const home = join(scratch, "home");
@@ -79,13 +93,19 @@ async function fixture(t: TestContext, api: Api, ambiguous: boolean, respond: (b
   await Promise.all([mkdir(home), mkdir(work)]);
   const failures: unknown[] = [];
   const requests: any[] = [];
+  const gptRequests: any[] = [];
+  const clientRequests: any[] = [];
   const delivered: any[] = [];
   const config: BridgeConfig = {
     upstreams: { fake: { base_url: "https://fixture.example/v1" } },
-    models: { "alias-model": { upstream: "fake", model: "synthetic-model", catalog: api === "chat" ? "deepseek-flash" : "claude-sonnet-5-5" } },
+    models: {
+      "alias-model": { upstream: "fake", model: "synthetic-model", catalog: api === "chat" ? "deepseek-flash" : "claude-sonnet-5-5" },
+      "gpt-model": { upstream: "fake", model: "synthetic-gpt", catalog: "gpt-6-luna" },
+    },
   };
   const bridge = createBridgeServer(config, {
     transformRequest(request) {
+      clientRequests.push(structuredClone(request));
       if (!ambiguous) return;
       assert.ok(Array.isArray(request.input));
       const declaration = request.input.find(item => item.type === "additional_tools");
@@ -100,8 +120,15 @@ async function fixture(t: TestContext, api: Api, ambiguous: boolean, respond: (b
     },
     fetch: async (url, init) => {
       try {
-        assert.equal(String(url), `https://fixture.example/v1/${api === "chat" ? "chat/completions" : "messages"}`);
         const body = JSON.parse(String(init?.body));
+        if (body.model === "synthetic-gpt") {
+          assert.equal(String(url), "https://fixture.example/v1/responses");
+          assert.ok(checkGpt, "A model switch must be explicitly exercised by this fixture");
+          gptRequests.push(body);
+          checkGpt(body);
+          return responsesReply();
+        }
+        assert.equal(String(url), `https://fixture.example/v1/${api === "chat" ? "chat/completions" : "messages"}`);
         requests.push(body);
         return response(api, respond(body, requests.length));
       } catch (error) {
@@ -141,6 +168,23 @@ async function fixture(t: TestContext, api: Api, ambiguous: boolean, respond: (b
     assert.deepEqual(failures, [], "Persisted history replay assertions");
     assert.match(resumedOutput.stdout, /ALIAS_DONE/);
     assert.match(JSON.stringify(requests.at(-1).messages), /SYNTHETIC_ALIAS_RESUME/);
+    if (checkGpt) {
+      for (const [model, prompt] of [
+        ["gpt-model", "SYNTHETIC_GPT_SWITCH: confirm the completed work."],
+        ["gpt-model", "SYNTHETIC_GPT_RESUME: confirm the same history again."],
+        ["alias-model", "SYNTHETIC_SWITCH_BACK: confirm the completed work."],
+      ]) {
+        const switched = run(binary!, ["exec", "resume", "--last", "--model", model, "--skip-git-repo-check", "--json", prompt], {
+          cwd: work, env, timeout: 90_000, maxBuffer: 8 * 1024 * 1024,
+        });
+        switched.child.stdin?.end();
+        const output = await switched;
+        await writeFile(join(scratch, `${prompt.split(":")[0]}.stdout`), output.stdout);
+        assert.deepEqual(failures, [], "Cross-model history replay assertions");
+        assert.match(output.stdout, /ALIAS_DONE/);
+        assert.ok(output.stdout.split("\n").some(line => line && JSON.parse(line).type === "turn.completed"), output.stdout);
+      }
+    }
   } catch (error) {
     const output = error as { stdout?: string; stderr?: string };
     await writeFile(join(scratch, "failure.txt"), `${output.stdout ?? ""}\n${output.stderr ?? ""}`);
@@ -148,12 +192,12 @@ async function fixture(t: TestContext, api: Api, ambiguous: boolean, respond: (b
     throw error;
   }
   await assert.rejects(access(join(work, "wrong-tool-executed.txt")), { code: "ENOENT" });
-  return { requests, delivered, work };
+  return { requests, gptRequests, clientRequests, delivered, work };
 }
 
 for (const api of ["chat", "messages"] as const) {
-  test(`real codeks ${api}: bare and dotted exec aliases execute; unknown tools return corrective feedback`, { skip: !binary, timeout: 120_000 }, async t => {
-    const { requests, delivered } = await fixture(t, api, false, (body, step) => {
+  test(`real codeks ${api}: aliases and tool errors survive resume, GPT switch and switch back`, { skip: !binary, timeout: 120_000 }, async t => {
+    const { requests, gptRequests, clientRequests, delivered } = await fixture(t, api, false, (body, step) => {
       if (step === 1) return { name: "exec", id: "call_bare", input: 'text(await tools.exec_command({cmd: "printf BARE_ALIAS_OK", yield_time_ms: 1000}));' };
       const bare = replay(body, api, "call_bare");
       assert.equal(callName(bare.call, api), "exec", "Replay keeps the name originally returned by the model");
@@ -163,15 +207,51 @@ for (const api of ["chat", "messages"] as const) {
       assert.equal(callName(dotted.call, api), "functions.exec");
       assert.match(JSON.stringify(dotted.result), /DOTTED_ALIAS_OK/);
       if (step === 3) return { name: "missing_tool", id: "call_unknown", input: 'text(await tools.exec_command({cmd: "printf wrong > wrong-tool-executed.txt"}));' };
-      assert.ok(step === 4 || step === 5, "Only one model request is needed to resume");
+      assert.ok(step >= 4 && step <= 6, "Initial completion, persisted resume and switch back each use one request");
       const unknown = replay(body, api, "call_unknown");
       assert.equal(callName(unknown.call, api), "missing_tool");
       assert.match(JSON.stringify(unknown.result), /unknown.*No tool was executed/);
       assert.match(JSON.stringify(unknown.result), /functions__exec/);
       if (api === "messages") assert.equal(unknown.result.is_error, true);
       return { text: "ALIAS_DONE" };
+    }, body => {
+      const calls = body.input.filter((item: any) => ["function_call", "custom_tool_call"].includes(item.type));
+      const results = body.input.filter((item: any) => ["function_call_output", "custom_tool_call_output"].includes(item.type));
+      assert.equal(calls.length, 3);
+      assert.equal(results.length, 3);
+      assert.equal(new Set(calls.map((call: any) => call.call_id)).size, 3, "Distinct persisted calls remain distinct");
+      for (const item of [...calls, ...results]) {
+        assert.ok(typeof item.call_id === "string" && item.call_id.length <= 64, "Responses call_id must fit the upstream limit");
+      }
+      for (const call of calls) {
+        const result = results.find((item: any) => item.call_id === call.call_id);
+        assert.ok(result, "Responses calls and outputs must use the same projected ID");
+        if (call.type === "custom_tool_call") {
+          assert.equal(call.namespace, "functions");
+          assert.equal(call.name, "exec", "GPT keeps the canonical Responses tool identity");
+          assert.equal(result.type, "custom_tool_call_output");
+          assert.match(call.input, /(?:BARE|DOTTED)_ALIAS_OK/);
+          assert.match(JSON.stringify(result.output), /(?:BARE|DOTTED)_ALIAS_OK/);
+        } else {
+          assert.equal(call.namespace, "codeks_bridge_tool_error");
+          assert.equal(call.name, "invalid_call");
+          assert.match(JSON.stringify(result.output), /unknown.*No tool was executed/);
+          assert.match(JSON.stringify(result.output), /functions__exec/);
+        }
+      }
     });
-    assert.equal(requests.length, 5, "Four normal tool-loop requests and one persisted-history resume, without bridge retries");
+    assert.equal(requests.length, 6, "Four tool-loop requests, one persisted resume and one switch back, without retries");
+    assert.equal(gptRequests.length, 2, "The GPT switch and subsequent turn each use one request");
+    const ids = (body: any) => body.input.filter((item: any) => typeof item.call_id === "string").map((item: any) => item.call_id);
+    assert.deepEqual(ids(gptRequests[0]), ids(gptRequests[1]), "Projected IDs stay stable on later turns");
+    const persistedIds = ids(clientRequests.find(request => request.model === "gpt-model"));
+    assert.ok(persistedIds.every((id: string) => id.startsWith("cxbt1_")), "The client retains the original replay carriers");
+    ids(gptRequests[0]).forEach((id: string, index: number) => {
+      if (persistedIds[index].length <= 64) assert.equal(id, persistedIds[index], "Valid short carrier ids remain unchanged");
+      else assert.notEqual(id, persistedIds[index], "Long carrier ids are shortened before Responses replay");
+    });
+    assert.deepEqual(ids(clientRequests.at(-1)), persistedIds, "Switching to GPT must not rewrite the stored source history");
+    assert.match(JSON.stringify(requests.at(-1).messages), /SYNTHETIC_SWITCH_BACK/);
     const calls = delivered.filter(item => item.type === "custom_tool_call");
     assert.equal(calls.length, 2);
     assert.ok(calls.every(call => call.name === "exec" && call.namespace === "functions" && call.call_id.startsWith("cxbt1_")));

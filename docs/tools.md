@@ -31,11 +31,17 @@ Claude 的 `adapters.claude-messages.tool_updates` 有两种明确模式：
 
 Messages/Chat 返回的调用还接受完整的 `namespace.name` 和唯一的原始短名。例如 `functions__exec`、`functions.exec`、`exec` 都可定位同一个工具；`agents`、`clock` 及其他 namespace 使用相同规则。省略 namespace 的默认工具也接受 `functions.name` 和 `functions__name`。精确声明名优先；其他别名只有唯一对应工具时才成功，不猜后缀或拼写。exec 内的 JavaScript 原样传递，其中 `tools.*` 的解析仍由客户端负责。
 
-这一选择来自实际模型会省略声明名前缀，而提示词仍用 `functions.exec` 等原始身份。保留声明、增加确定性别名，可以修复调用而不重写工具表和 Claude 的签名前缀。GPT Responses 保留原生工具协议，不使用这层转换。
+这一选择来自实际模型会省略声明名前缀，而提示词仍用 `functions.exec` 等原始身份。保留声明、增加确定性别名，可以修复调用而不重写工具表和 Claude 的签名前缀。GPT 返回的调用保留原生工具协议，不做这种别名匹配；切换到 GPT 时，来自其他 adapter 的历史载体仍需转换为 Responses 可接受的表示。
 
 歧义或未知调用通过普通工具错误反馈，提示可用的完整声明名。例如两个 namespace 都有 `read` 时，提示 `files__read`、`database__read`，让模型下一次明确选择。bridge 不擅自执行其中一个，也不把这类错误变成网络重试。它将失败调用交给客户端不存在的保留身份 `codeks_bridge_tool_error.invalid_call`，客户端记录普通未知工具结果；后续发包恢复原始调用并将该结果替换为保存的候选诊断。真实缺失 id、损坏 JSON 或 custom 输入仍是协议错误。
 
 只有接受了别名或需要反馈的调用才将原始上游 id、名字和可选诊断编码为 `cxbt1_` call ID。客户端照常保存该 id 并配对结果，bridge 在 Messages/Chat 回放时恢复原始 id 和名字，避免把模型生成的 `exec` 悄悄改成 `functions__exec` 而改变签名前缀；诊断也随历史固定，不随以后工具表变化。载体不含参数、凭据或完整会话，不需要额外状态文件。检查器可查看原始上游调用、客户端失败身份与下一次上游收到的诊断。
+
+Responses 的 `call_id` 最长 64 字符，`cxbt1_` 载体可能超过这个限制。GPT 出站时，对超过 64 字符的工具 ID（包括载体和其他上游的原始 ID），使用完整客户端 ID 的 SHA-256 生成固定 48 字符的 `call_`＋base64url 摘要；function/custom 调用及对应结果使用同一映射。64 字符以内的 ID（包括短载体）保留原值，减少对已被 GPT 接受的历史前缀的改动；无 ID 的主动通知不生成 ID。映射不依赖调用位置、模型别名或内存状态，因此恢复会话、重试及后续 turn 都保持一致。
+
+不直接用载体内的原始 ID，是因为它本身可能超长，两个不同载体也可能包含同一个原始 ID；不直接截断或去除空白，以免合并不同调用。GPT 历史保留客户端已确定的工具类型、name、namespace、参数及正常结果，失败结果使用载体保存的原诊断。转换仅作用于请求副本：旧会话无需迁移，切回 Messages/Chat 仍能恢复原始调用。普通请求、原生压缩、文字压缩和 handoff 共用这条出站路径。
+
+这种无状态的目标协议边界处理也见于 [Magpie 的 `BoundCallID`](https://github.com/yetone/magpie/blob/11c3fbb197f17403183bdae424327aa0de7f0558/internal/provider/codex_request.go#L368)。这里额外保留 bridge 的载体诊断和规范化工具身份。回归覆盖真实 codeks 的 DeepSeek／Claude → GPT → 原模型切换；另用合成历史实测 GPT‑6‑Luna / medium，280、73、90 字符 ID 转换后均为 48 字符，未声明的失败工具身份及诊断可正常回放。该实测验证协议接受性，不评估模型质量。
 
 共享转换层将 Messages/Chat 工具名统一限制为 64 字符，沿用 Chat 端点的较小限制，不为不同后端维护两套命名规则；这不表示所有端点的原生上限都是 64。超长名称保留 55 字符可读前缀，加 `_` 与 8 位摘要，以区别同前缀工具。正常长度不加 hash。历史名称根据当前工具集映射，因此同一次工具调用的名称不依赖模型临时起名。
 
