@@ -50,6 +50,8 @@ export interface BridgeConfig {
   token_env?: string;
   request_max_mib?: number;
   compaction_cache_dir?: string;
+  /** Optional subscription search connection, shared by all working models. */
+  web_search?: { upstream: string };
   /** Debug capture for the /inspect/ page. */
   inspect?: { capture?: boolean; max_mib?: number };
   upstreams: Record<string, UpstreamConfig>;
@@ -94,9 +96,9 @@ export interface ResponsesRequest {
   [key: string]: any;
 }
 export interface BridgeServerOptions {
-  /** Used by all model calls and ChatGPT token refreshes. */
+  /** Used by model calls, standalone search and ChatGPT token refreshes. */
   fetch?: typeof globalThis.fetch;
-  /** Runs once before routing. Return a replacement or change the request in place. */
+  /** Runs once before Responses routing. Return a replacement or change the request in place. */
   transformRequest?: (request: ResponsesRequest, context: { headers: Headers }) =>
     ResponsesRequest | void | Promise<ResponsesRequest | void>;
   /** Observes committed client response events, including non-streaming responses. */

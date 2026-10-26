@@ -147,6 +147,7 @@ function header(exchange: Exchange, name: string): string | null {
 export function summary(exchange: Exchange) {
   const { outcome, error, usage } = result(exchange);
   const route = exchange.route;
+  const search = exchange.meta.kind === "search" ? exchange.inspector.config.web_search : undefined;
   return {
     id: exchange.id,
     seq: exchange.seq,
@@ -156,9 +157,9 @@ export function summary(exchange: Exchange) {
     active: !exchange.closed,
     model: exchange.meta.model,
     adapter: route?.profile.id ?? null,
-    api: route?.profile.api ?? null,
-    upstream: route?.config.upstream ?? null,
-    upstream_model: route?.config.model ?? null,
+    api: route?.profile.api ?? (search ? "responses" : null),
+    upstream: route?.config.upstream ?? search?.upstream ?? null,
+    upstream_model: route?.config.model ?? (search ? exchange.meta.model : null),
     kind: exchange.meta.kind,
     stream: exchange.meta.stream,
     status: exchange.response.status ?? null,
@@ -308,9 +309,13 @@ function annotations(exchange: Exchange, client: ReturnType<typeof messageView>)
 
 export function detail(exchange: Exchange) {
   const client = messageView(exchange.response);
+  const search = exchange.meta.kind === "search" ? exchange.inspector.config.web_search : undefined;
   return {
     ...summary(exchange),
-    route: exchange.route ? routeView(exchange.inspector, exchange.route, exchange.responsesLite) : null,
+    route: exchange.route ? routeView(exchange.inspector, exchange.route, exchange.responsesLite) : search ? {
+      alias: exchange.meta.model, api: "responses", upstream: search.upstream,
+      base_url: upstreamBaseUrl(exchange.inspector.config.upstreams[search.upstream]), upstream_model: exchange.meta.model,
+    } : null,
     client: {
       request: {
         method: exchange.method,

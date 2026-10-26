@@ -46,13 +46,14 @@
 | `host` | 默认 `127.0.0.1` |
 | `port` | 默认 `8787`；程序集成测试可用 `0` 分配端口 |
 | `token_env` | 保存 bridge 入口 Bearer token 的环境变量名称 |
-| `request_max_mib` | `POST /v1/responses` 请求体上限，单位 MiB，默认 `512`；必须是正整数且换算后的字节数可安全表示 |
+| `request_max_mib` | 模型与独立搜索 POST 请求体上限，单位 MiB，默认 `512`；必须是正整数且换算后的字节数可安全表示 |
 | `compaction_cache_dir` | 按需复述缓存目录；默认 `$XDG_CACHE_HOME/codeks-bridge/compaction`，未设置 XDG 时为 `~/.cache/codeks-bridge/compaction` |
 | `upstreams` | 上游连接配置表 |
 | `models` | 模型别名表，是否进入客户端目录由各自的 `expose` 控制 |
+| `web_search` | 可选；`{"upstream":"chatgpt"}` 让所有模型共用指定的订阅搜索连接，省略时关闭 |
 | `inspect` | 可选；`capture` 决定启动时是否捕获，`max_mib` 是内存软上限，见[调试检查器](inspect.md) |
 
-监听非 loopback 地址时必须配置 `token_env`，客户端也要设置同一个变量。它是 bridge 入口鉴权，不是上游 API key。入口没有 CORS。携带 `Origin` 的请求必须使用配置好的 bridge token，即使监听 loopback 也一样，避免网页的简单 POST 在无法读取响应时仍触发上游调用。没有 `Origin` 的 codeks 请求保持原行为。`GET /health`、`GET /v1/models` 和 `POST /v1/responses` 使用同一鉴权。`/inspect/` 页面与接口使用[自己的规则](inspect.md#访问与鉴权)。
+监听非 loopback 地址时必须配置 `token_env`，客户端也要设置同一个变量。它是 bridge 入口鉴权，不是上游 API key。入口没有 CORS。携带 `Origin` 的请求必须使用配置好的 bridge token，即使监听 loopback 也一样，避免网页的简单 POST 在无法读取响应时仍触发上游调用。没有 `Origin` 的 codeks 请求保持原行为。`GET /health`、`GET /v1/models`、`POST /v1/responses` 和启用后的 `POST /v1/alpha/search` 使用同一鉴权。`/inspect/` 页面与接口使用[自己的规则](inspect.md#访问与鉴权)。
 
 请求体上限按实际收到的字节计算，包含 JSON 和图片编码，不按字符数或声明的 `Content-Length` 判断。恰好达到上限的请求可接受，超限立即返回 HTTP 413 并关闭连接，不调用上游。默认 `512` MiB 为长截图历史留出空间；可按会话需要及可用内存调高或调低。保留上限是为了约束完整缓冲、JSON 解析和转换的内存开销，启用检查器时还会保留捕获副本；它不是进程总内存上限，也不等于模型 token 窗口。
 
@@ -103,6 +104,23 @@ codex login
 bridge 使用文件存储，不读取系统 keyring。如果曾将 `cli_auth_credentials_store` 改为 `keyring` 或 `auto`，可运行 `codex -c 'cli_auth_credentials_store="file"' login` 明确保存文件登录；默认配置不需要这个参数。缺少登录、凭据失效或刷新写回失败会明确报错。它不会从 API key 登录或其他存储中猜测一份备用凭据。
 
 token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次鉴权恢复，再重发尚未被接受的请求。普通模型错误的重试仍由 codeks 控制。具体刷新、并发与取消边界见 [GPT 订阅鉴权](backends-responses.md#订阅凭据与续期)。
+
+## 订阅搜索
+
+独立搜索需要显式指定一个使用 `auth.type: "chatgpt"` 的连接：
+
+```json
+{
+  "web_search": { "upstream": "chatgpt" },
+  "upstreams": {
+    "chatgpt": { "auth": { "type": "chatgpt" } }
+  }
+}
+```
+
+将这段配置合并到已有模型配置即可。它供全部工作模型使用，不要求另建 GPT 搜索模型，也不要求工作模型使用订阅推理；完整示例见 [ChatGPT＋Claude](../examples/chatgpt-claude.json)。没有 `web_search` 时搜索路由返回 HTTP 404，生成的客户端片段保持 `web_search = "disabled"`。
+
+配置后，`config-snippet` 生成 `web_search = "live"` 和 provider 级 `supports_standalone_web_search = true`；合并片段并重载客户端即可启用。工作模型与搜索连接独立，搜索请求的 `model` 原样传递。请求、结果、引用和鉴权边界见[订阅搜索](web-search.md)。
 
 ## 模型
 
@@ -309,7 +327,7 @@ codeks-bridge config-snippet --config /absolute/path/bridge.json
 
 配置了 `token_env` 时，片段用 `env_key` 传递 bridge 入口凭据。匿名 loopback 服务使用公开标记 `experimental_bearer_token = "codeks-bridge-local"`，让 codeks 进入 API key 目录发现流程。这个固定字符串不是密钥，也不为服务提供鉴权；需要入口鉴权时应配置 `token_env`。
 
-provider 显示名为 `Local bridge`，并显式声明 `[model_providers.bridge.capabilities] remote_compaction = "v2"`，无需借用 Azure 或 OpenAI 名称触发能力。片段关闭 `web_search` 和 `features.image_generation`，图片输入仍然支持。
+provider 显示名为 `Local bridge`，并显式声明 `[model_providers.bridge.capabilities] remote_compaction = "v2"`，无需借用 Azure 或 OpenAI 名称触发能力。片段关闭 `features.image_generation`，图片输入仍然支持。未配置订阅搜索时关闭 `web_search`；配置后启用 `web_search = "live"` 与 provider 的 `supports_standalone_web_search = true`，模型目录保持原样。
 
 片段还设置 `[features.multi_agent_v2] tool_namespace = "agents"`。在默认的保留 namespace `collaboration` 下，`spawn_agent`、`send_message` 和 `followup_task` 的 `message` 带 `encrypted` 标记，GPT 上游会把子代理任务写成密文。GPT 父代理创建的 Claude 或 DeepSeek 子代理只能收到读不懂的密文，会话记录和请求日志里也看不到任务内容。改用其他 namespace 后，codeks 去掉这个标记并按明文投递消息（见 [codeks patch 0005](https://github.com/WAcry/codeks/blob/main/fork/patches/0005-plaintext-agent-messages.md)），任何模型的子代理都能读懂任务，日志中也能看到原始 prompt。没有这个补丁的 Codex 只会改变工具名，消息仍然加密。
 
