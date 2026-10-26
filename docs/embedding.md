@@ -26,9 +26,9 @@ server.listen(8123, "127.0.0.1");
 
 | 选项 | 调用边界 |
 | --- | --- |
-| `transformRequest(request, { headers })` | 仅处理 `/responses`：入口鉴权与 JSON 解析之后、模型路由和历史转换之前，主请求调用一次。可原位修改并返回 `void`，也可返回替换请求，支持 Promise。`headers` 是该请求的 HTTP headers。辅助压缩和按需复述不会再次调用它；独立搜索不调用它。 |
-| `fetch` | 与标准 `fetch` 签名相同，承接全部模型请求，包括压缩、委托压缩及按需复述，以及已启用的独立搜索和 ChatGPT OAuth 刷新。可接入宿主的代理、凭据和传输策略；须保留每次调用传入的取消信号并返回标准 `Response`。 |
-| `onResponseEvent(request, event)` | 仅观察 `/responses` 主响应实际提交的标准 Responses 事件；`request` 是变换后的请求。缓冲后因失败丢弃的工具事件、辅助请求和 keepalive 不进入观察器。非流式 Responses 请求也产生同样的语义事件，其中每个已提交输出项有一次 `response.output_item.done`；独立搜索直接返回原始 JSON，不调用此观察器。 |
+| `transformRequest(request, { headers })` | 仅处理 `/responses`：入口鉴权与 JSON 解析之后、模型路由和历史转换之前，主请求调用一次。可原位修改并返回 `void`，也可返回替换请求，支持 Promise。`headers` 是该请求的 HTTP headers。辅助压缩和按需复述不会再次调用它；独立搜索和图片请求不调用它。 |
+| `fetch` | 与标准 `fetch` 签名相同，承接全部模型请求，包括压缩、委托压缩及按需复述，以及已启用的独立搜索、图片请求和 ChatGPT OAuth 刷新。可接入宿主的代理、凭据和传输策略；须保留每次调用传入的取消信号并返回标准 `Response`。 |
+| `onResponseEvent(request, event)` | 仅观察 `/responses` 主响应实际提交的标准 Responses 事件；`request` 是变换后的请求。缓冲后因失败丢弃的工具事件、辅助请求和 keepalive 不进入观察器。非流式 Responses 请求也产生同样的语义事件，其中每个已提交输出项有一次 `response.output_item.done`；独立搜索和图片请求直接返回原始 JSON，不调用此观察器。 |
 
 观察器应只读取参数，不修改请求或事件，也不返回 Promise。它在事件写出后同步执行；抛出的异常会进入现有请求错误处理，并停止该请求的后续观察，已经写出的事件无法撤回。如果交付终止错误时观察器自身抛错，bridge 关闭当前响应连接，不再尝试发送第二个错误；其他请求仍可继续。请求结束时取消仍在进行的模型调用，普通重试由客户端或宿主决定。原始上游帧及辅助调用的调试使用[检查器](inspect.md)。
 

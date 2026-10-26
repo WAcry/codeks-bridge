@@ -58,6 +58,12 @@ ChatGPT 订阅鉴权放在连接层，由 `auth.type: "chatgpt"` 显式启用。
 
 搜索请求的 `model` 原样透传：真实订阅探测已接受 Claude、DeepSeek 和一个合成模型别名，没有依据强制替换为固定 GPT 名称。bridge 同样保留 `id`、commands、上下文、设置、结果及未知字段，只处理现有 HTTP 与鉴权边界。固定搜索连接让切换工作模型后仍可沿用服务端引用；远端状态的期限与账号切换行为由上游决定。失败保持原状，客户端决定如何处理。[配置、协议与验证范围](web-search.md)
 
+## 图片接口复用客户端工具
+
+用户选择纯配置启用 codeks 原生图片工具：`image_generation.upstream` 选择订阅连接，片段设置 `features.image_generation = true` 与 provider 的 `requires_openai_auth = true`，保留 bridge 入口 token。已有 `codex login` 的同机使用无需额外源码补丁；代价是每个客户端仍需本地登录，工具可用性受该账号状态和模型图片输入能力影响，即使 bridge 实际使用另一份订阅凭据。
+
+图片生成和编辑是独立 JSON 接口，返回图片字节。bridge 只转发两条图片路由并记录 Inspector，由 codeks 负责输入文件、生成参数、保存结果和工具回传；无需图片模型目录、GPT 推理会话或独立图片状态存储。图像 `background` 与 Responses 后台任务不是同一语义，入口按独立协议处理。生成和编辑分别使用客户端路径，原样保留请求、错误及用量；图片 usage 留在本次独立记录，不并入后续推理。[配置、协议与验证](image-generation.md)
+
 ## 历史保存事实，配置决定恢复
 
 Reasoning 载荷记录来源、格式和原始数据；压缩载荷保存文字摘要及可选原生状态，或保存原生状态与按需复述配方。它们写入 Responses item 的 `encrypted_content`，由 codeks 原样持久化。bridge 不维护完整会话或响应 ID 索引；按需复述的成功结果及独立 usage 另存本地文件缓存，避免重复付费和服务重启后重复生成。
@@ -98,7 +104,7 @@ GPT 原生 HTTP 失败保留 status、body 和诊断 header，流内失败保留
 
 ## 调试捕获只观察
 
-[检查器](inspect.md)记录 bridge 真正收发的模型与独立搜索请求字节，不重新构造请求。入口请求在解析前保存原文；模型与搜索上游请求都经过 `upstreamFetch`，在这里保存实际发送的 JSON 和逐块到达的响应；写回 codeks 的内容在 `writeHead`/`write`/`end` 处记录。每条请求在 AsyncLocalStorage 中持有自己的记录，上游调用按用途附加 `main`、`summary`、`native`、`handoff` 或 `search` 标签，因此并发会话和子代理不会混在一起，后端代码不需要传递捕获参数。需要生成文字摘要时，`handoff` 先完成，再执行目标调用；命中摘要缓存时没有辅助上游调用。客户端响应只报告对应 main、summary 或 native 调用的 usage；handoff 用量留在缓存与独立上游记录，避免把辅助消耗当作客户端当前上下文。OAuth 刷新正文含凭据，不进入模型调用捕获；401 与其后的模型重发分别保留记录。
+[检查器](inspect.md)记录 bridge 真正收发的模型、独立搜索和图片请求字节，不重新构造请求。入口请求在解析前保存原文；这些上游请求都经过 `upstreamFetch`，在这里保存实际发送的 JSON 和逐块到达的响应；写回 codeks 的内容在 `writeHead`/`write`/`end` 处记录。每条请求在 AsyncLocalStorage 中持有自己的记录，上游调用按用途附加 `main`、`summary`、`native`、`handoff`、`search` 或 `image_generation` 标签，因此并发会话和子代理不会混在一起，后端代码不需要传递捕获参数。需要生成文字摘要时，`handoff` 先完成，再执行目标调用；命中摘要缓存时没有辅助上游调用。客户端响应只报告对应 main、summary 或 native 调用的 usage；handoff 用量留在缓存与独立上游记录，避免把辅助消耗当作客户端当前上下文。OAuth 刷新正文含凭据，不进入模型调用捕获；401 与其后的请求重发分别保留记录。
 
 服务端保存完整正文，折叠、截断和格式化都在页面完成，避免字段白名单遗漏协议新增内容。状态标注调用与 `prepareHistory` 相同的回放判断函数，显示的决定不会与实际转换分叉。页面是零依赖的静态文件，和运行时一样不引入第三方包。捕获关闭时不保存任何内容，每条请求只多一个 AsyncLocalStorage 作用域。
 

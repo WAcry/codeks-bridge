@@ -23,7 +23,7 @@ Claude 的 `adapters.claude-messages.tool_updates` 有两种明确模式：
 
 `supports_search_tool` 表示客户端的工具发现能力，与网页搜索不同。当前源目录的 GPT 条目显式设为 `true`，bridge 保留它。是否出现独立 `tool_search` 还取决于客户端工具模式和功能开关，不能只从目录字段推断。
 
-当前目录采用 Code Mode Only：大多数工具通过 `exec` 中的函数调用，模型从 `ALL_TOOLS` 读取目录；外层不会因此增加一个独立搜索工具。网页搜索由客户端 `web_search` 配置和 provider 能力控制；启用[订阅搜索](web-search.md)后，`web.run` 的明文结果通过普通工具结果路径返回各模型。图片生成也有独立开关，均不通过 `supports_search_tool` 控制。
+当前目录采用 Code Mode Only：大多数工具通过 `exec` 中的函数调用，模型从 `ALL_TOOLS` 读取目录；外层不会因此增加一个独立搜索工具。网页搜索由客户端 `web_search` 配置和 provider 能力控制；启用[订阅搜索](web-search.md)后，`web.run` 的明文结果通过普通工具结果路径返回各模型。[图片生成与编辑](image-generation.md)使用客户端 `image_gen.imagegen` 工具及独立图片接口，同样不通过 `supports_search_tool` 控制。
 
 ## 名字
 
