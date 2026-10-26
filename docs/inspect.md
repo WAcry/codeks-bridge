@@ -114,7 +114,7 @@ codeks-bridge serve --config /absolute/path/bridge.json --capture
 | compaction | `summary` / `handoff` | `source_not_allowed` | 原生检查点来源不在允许列表 |
 | compaction | `summary` / `handoff` | `format_mismatch` | 原生检查点格式与当前 adapter 不同 |
 
-`summary` 表示直接使用载荷中已有的文字，`handoff` 表示先取得文字交接：可以复用本地缓存，也可以向原来源生成。只有实际发起辅助请求时，上游调用列表才出现 `handoff`；这条状态标注本身不表示发生了额外 HTTP 请求。
+`summary` 表示直接使用载荷中已有的文字。`no_native` 的标注显示“压缩 · 使用文字摘要”：这种检查点只保存摘要，没有原生来源信息，是正常的文字压缩。无法识别的原始密文仍标为 `unrecognized_state`，按配置透传、过滤或拒绝。`handoff` 表示先取得文字交接：可以复用本地缓存，也可以向原来源生成。只有实际发起辅助请求时，上游调用列表才出现 `handoff`；这条状态标注本身不表示发生了额外 HTTP 请求。
 
 响应侧标注 bridge 新生成的 reasoning 与压缩项（决定为 `output`）。流式响应指向 `response.output_item.done` 事件里的 `/item`，非流式响应指向 `/output/k`。只有文字摘要的压缩项没有原生部分，来源和格式为空；`native` 检查点的来源和格式取原生部分。
 

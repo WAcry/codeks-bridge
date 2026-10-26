@@ -17,7 +17,7 @@ export const END_LABEL = { active: '传输中', complete: '完整', cancelled: '
 const DECISION = { replay: '回放', passthrough: '原样透传', drop: '丢弃', native: '恢复原生', summary: '文字摘要', handoff: '按需文字交接', reject: '拒绝', output: '输出' };
 const DECISION_CLASS = { replay: 'ok', passthrough: 'info', native: 'ok', drop: 'warn', summary: 'warn', handoff: 'warn', reject: 'bad', output: 'info' };
 // Verb shown before the reason text, per decision.
-const VERB = { replay: '回放', passthrough: '原样透传', drop: '丢弃', reject: '拒绝', summary: '改用文字摘要', handoff: '获取文字交接', native: '恢复原生压缩' };
+const VERB = { replay: '回放', passthrough: '原样透传', drop: '丢弃', reject: '拒绝', summary: '使用文字摘要', handoff: '获取文字交接', native: '恢复原生压缩' };
 
 const REASON = {
   reasoning: {
@@ -29,7 +29,7 @@ const REASON = {
   },
   compaction: {
     native_restored: '',
-    no_native: '检查点没有原生表示',
+    no_native: '',
     native_replay_disabled: '目标关闭了 native_replay',
     source_not_allowed: '来源未在原生压缩白名单',
     format_mismatch: '原生格式与目标不匹配',
@@ -57,7 +57,9 @@ export function sourceText(src) {
 }
 
 export function annChip(a, onClick) {
-  const parts = [KIND_TEXT[a.kind] ?? a.kind, a.source ? sourceText(a.source) : (a.decision === 'output' ? null : '来源未知'), reasonText(a)].filter(Boolean);
+  const source = a.source ? sourceText(a.source)
+    : (a.decision === 'output' || (a.kind === 'compaction' && a.reason === 'no_native') ? null : '来源未知');
+  const parts = [KIND_TEXT[a.kind] ?? a.kind, source, reasonText(a)].filter(Boolean);
   return h('span', {
     class: `chip ann ${decisionClass(a.decision)}${onClick ? ' click' : ''}`,
     title: `${a.target}${a.event != null ? ` 事件 #${a.event}` : ''} ${a.pointer ?? ''}\n原因代码：${a.reason}\n格式：${a.format ?? '–'}`,
