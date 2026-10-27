@@ -35,7 +35,7 @@ async function setup(t: TestContext, sourceBackend: Backend = succeed) {
     },
   };
   const checkpoint = { type: "compaction", id: "cmp_synthetic", encrypted_content: encodeCompaction(carrier) };
-  const backends: Record<AdapterId, Backend> = { "gpt-responses": sourceBackend, "claude-messages": never, "deepseek-chat": never };
+  const backends: Record<AdapterId, Backend> = { "gpt-responses": sourceBackend, "claude-messages": never, "deepseek-chat": never, "gemini-native": never };
   const context: BackendContext = {
     request: { model: "target", input: [message("developer", "Target instructions"), message("user", "Earlier retained work"), checkpoint, message("user", "Later work")], stream: true },
     route: resolveModel(config, "target"), signal: new AbortController().signal, responsesLite: true,

@@ -23,7 +23,7 @@ export function incomingHeaders(input: IncomingHttpHeaders): Headers {
 /** Credentials belong to the selected upstream, never to the bridge client. */
 export function forwardRequestHeaders(input?: Headers, authHeader?: string): Headers {
   const headers = withoutTransportHeaders(input);
-  for (const name of ["host", "accept-encoding", "authorization", "x-api-key", "api-key", "cookie", ...(authHeader ? [authHeader] : [])]) headers.delete(name);
+  for (const name of ["host", "accept-encoding", "authorization", "x-api-key", "x-goog-api-key", "api-key", "cookie", ...(authHeader ? [authHeader] : [])]) headers.delete(name);
   return headers;
 }
 

@@ -1,6 +1,6 @@
 // In-memory capture of complete exchanges for the inspector. A capture keeps
-// every byte the bridge received and sent. Only credential header values are
-// redacted; bodies are never filtered.
+// every byte the bridge received and sent. Credential headers and URL query
+// values are redacted; bodies are never filtered.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import type { IncomingHttpHeaders, IncomingMessage, OutgoingHttpHeaders, ServerResponse } from "node:http";
@@ -24,6 +24,20 @@ function redact(name: string, value: string, extra: ReadonlySet<string>): string
   if (!extra.has(name) && !SENSITIVE.test(name)) return value;
   const digest = createHash("sha256").update(value).digest("hex").slice(0, 8);
   return `[redacted: ${value.length} chars, sha256 ${digest}]`;
+}
+
+function redactUrl(value: string): string {
+  const url = new URL(value);
+  const query = new URLSearchParams();
+  let changed = false;
+  for (const [name, original] of url.searchParams) {
+    const filtered = redact(name.toLowerCase(), original, new Set());
+    changed ||= filtered !== original;
+    query.append(name, filtered);
+  }
+  if (!changed) return value;
+  url.search = query.toString();
+  return url.toString();
 }
 
 /** Lowercase names, join repeated values, and redact credentials. */
@@ -126,7 +140,7 @@ export class Call {
     this.index = exchange.calls.length;
     this.label = label;
     this.startedMs = exchange.now();
-    this.url = url;
+    this.url = redactUrl(url);
     this.headers = headers;
     this.text = text;
     this.bytes = Buffer.byteLength(text);

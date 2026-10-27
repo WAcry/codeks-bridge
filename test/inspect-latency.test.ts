@@ -40,6 +40,19 @@ test("Messages and Chat streams distinguish reasoning, text and tool delivery", 
   }
 });
 
+test("Gemini timings count visible parts and ignore signatures, metadata and empty text", () => {
+  const response = stream([
+    [10, { responseId: "synthetic-response", candidates: [] }],
+    [20, { candidates: [{ content: { parts: [{ text: "", thoughtSignature: "synthetic-signature" }] } }] }],
+    [30, { usageMetadata: { promptTokenCount: 100 } }],
+    [40, { candidates: [{ content: { parts: [{ text: "Plan", thought: true }] } }] }],
+    [60, { candidates: [{ content: { parts: [{ text: "Answer", thoughtSignature: "synthetic-answer-signature" }] } }] }],
+    [70, { candidates: [{ content: { parts: [{ functionCall: { name: "exec", args: {} } }] } }] }],
+  ]);
+  assert.deepEqual(responseLatency(response, 10), { content_ms: 30, text_ms: 50, reasoning_ms: 30, tool_ms: 60 });
+  assert.deepEqual(responseLatency(response, 10, true), { content_ms: 30, text_ms: 50, reasoning_ms: 30, tool_ms: 60 });
+});
+
 test("only terminal output and tool argument deltas are still meaningful content", () => {
   assert.deepEqual(responseLatency(stream([[100, {
     type: "response.completed", response: { output: [text("Answer")] },

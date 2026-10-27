@@ -40,6 +40,14 @@ Claude 续接边界的回归同时检查生成和下一轮回放：首块 thinki
 
 `test/delegated-compaction-e2e.test.ts` 通过 bridge 的真实 HTTP 入口连接本地假上游，覆盖 GPT 原生续聊 → Claude 按需复述 → Claude 委托 GPT 再压缩 → Claude 复述新检查点 → GPT 恢复新检查点。另检查 native 失败不交付部分检查点、handoff 失败不调用工作模型、工作模型失败后跨服务重启复用成功缓存，以及 inspector 的独立 handoff usage 不进入客户端响应。它不启动 codeks，也不调用真实模型；委托压缩的质量与成本不由这些测试推断。
 
+## Gemini 原生接口验证
+
+`test/gemini.test.ts` 覆盖原生 parts 和签名绑定、并行同名调用、别名错误反馈、跨来源筛选、原位提醒、图片、根引用 schema、结构化输出及失败不释放工具。中间 `usageMetadata` 可以仅有非计数字段；最终快照在终止后验证，不逐 chunk 累加。`test/gemini-e2e.test.ts` 用真实客户端检查工具执行、载体持久化与跨进程 resume，摘要开关不影响签名保存。
+
+2026-10-27 通过 Vertex AI 路由对 Gemini 3.8 Flash / 4 Argon 做原生协议与真实 bridge HTTP 验证。原生 18 个请求中，15 个成功，3 个按预期拒绝无签名当前工具轮次或末尾 model；bridge 的 9 个成功请求覆盖两个模型的工具往返、签名回放、新用户轮次、图片与 JSON Schema，以及 Flash 的标准文字压缩。另一次上游 HTTP 502 原样报错；测试脚本后来重跑成功，bridge 没有自动重试。测试也发现并修复了中间 usage 缺计数导致过早拒绝的问题。
+
+这些结果不是 AI Developer API 直连、所有区域或跨模型签名兼容的证明；没有评估压缩质量或缓存命中率。公开测试使用合成签名和内容，真实端点、鉴权及原始响应保存在仓库外。
+
 ## 使用真实 codeks 二进制
 
 可选集成测试启动已经安装的 codeks，并让它通过桥接器访问本地假上游。指定要验证的二进制即可，测试不会下载或编译 codeks：

@@ -8,6 +8,7 @@ import { ResponseWriter, usageJson } from "./writer.ts";
 import { runResponses } from "./backends/responses.ts";
 import { runAnthropic } from "./backends/anthropic.ts";
 import { runDeepSeek } from "./backends/deepseek.ts";
+import { runGemini } from "./backends/gemini.ts";
 import { compact, isCompactionRequest } from "./compaction.ts";
 import { CompactionHandoffStore } from "./compaction-handoff.ts";
 import { Inspector, withCaptureLabel, type Exchange } from "./inspect/capture.ts";
@@ -17,7 +18,7 @@ import { forwardResponseHeaders, incomingHeaders, type HeaderRecord } from "./he
 import type { AdapterId, Backend, BridgeConfig, BridgeServerOptions, ResponsesRequest } from "./types.ts";
 import { upstreamFetch } from "./upstream.ts";
 
-const BACKENDS: Record<AdapterId, Backend> = { "gpt-responses": runResponses, "claude-messages": runAnthropic, "deepseek-chat": runDeepSeek };
+const BACKENDS: Record<AdapterId, Backend> = { "gpt-responses": runResponses, "claude-messages": runAnthropic, "deepseek-chat": runDeepSeek, "gemini-native": runGemini };
 function json(res: ServerResponse, status: number, body: unknown, headers: HeaderRecord = {}): void {
   for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
   if (!res.hasHeader("cache-control")) res.setHeader("cache-control", "no-store");

@@ -46,7 +46,7 @@ export function inputTransformationReports(resp) {
   return reports;
 }
 
-/** Returns {key, text, label} for streaming delta events of Responses, Messages and Chat. */
+/** Returns {key, text, label} for streaming text deltas. */
 function deltaOf(ev) {
   const j = ev.json;
   if (!j || typeof j !== 'object') return null;
@@ -72,6 +72,14 @@ function deltaOf(ev) {
       }
     }
   }
+  if (j.candidates?.length === 1 && !j.candidates[0].finishReason) {
+    const candidate = j.candidates[0];
+    const parts = candidate.content?.parts;
+    if (parts?.length === 1 && plainGeminiText(parts[0])) {
+      const part = parts[0];
+      return { key: `gemini|${candidate.index ?? 0}|${part.thought === true}`, text: part.text, label: part.thought === true ? 'thought' : 'text' };
+    }
+  }
   return null;
 }
 
@@ -80,7 +88,7 @@ function eventType(ev) {
   return ev.event ?? ev.json?.type ?? (ev.json?.object || (ev.data === '[DONE]' ? '[DONE]' : '(data)'));
 }
 
-/** One-line description of an event, picking common fields of all three APIs. */
+/** One-line description of an event, picking common protocol fields. */
 function describe(ev) {
   const j = ev.json;
   if (j === undefined) return oneLine(ev.data, 160);
@@ -113,6 +121,15 @@ function describe(ev) {
   if (j.message && typeof j.message === 'object') out.push([j.message.model, j.message.usage && usageText(j.message.usage)].filter(Boolean).join(' '));
   if (j.delta && typeof j.delta === 'object' && !Array.isArray(j.delta) && j.type === 'message_delta') out.push(JSON.stringify(j.delta));
   if (j.usage) out.push(usageText(j.usage));
+  if (j.usageMetadata) out.push(usageText(j.usageMetadata));
+  for (const candidate of j.candidates ?? []) {
+    if (candidate.finishReason) out.push(`finish=${candidate.finishReason}`);
+    for (const part of candidate.content?.parts ?? []) {
+      if (part.text) out.push(`${part.thought === true ? 'thought: ' : ''}${oneLine(part.text, 80)}`);
+      if (part.functionCall) out.push(`functionCall ${part.functionCall.name ?? ''}`);
+      if (part.thoughtSignature) out.push(`thoughtSignature ${fmtInt(part.thoughtSignature.length)} 字符`);
+    }
+  }
   if (Array.isArray(j.choices)) {
     for (const c of j.choices) {
       if (c.finish_reason) out.push(`finish=${c.finish_reason}`);
@@ -130,11 +147,13 @@ export function usageText(u) {
   const pick = (...ks) => { for (const k of ks) { const v = k.split('.').reduce((o, p) => o?.[p], u); if (typeof v === 'number') return v; } return null; };
   const parts = [];
   const add = (label, v) => { if (v != null) parts.push(`${label} ${fmtInt(v)}`); };
-  add('in', pick('input_tokens', 'prompt_tokens'));
-  add('out', pick('output_tokens', 'completion_tokens'));
-  add('cached', pick('input_tokens_details.cached_tokens', 'cache_read_input_tokens', 'prompt_cache_hit_tokens', 'prompt_tokens_details.cached_tokens'));
+  const prompt = pick('promptTokenCount'), toolInput = pick('toolUsePromptTokenCount');
+  add('in', pick('input_tokens', 'prompt_tokens') ?? (prompt !== null ? prompt + (toolInput ?? 0) : null));
+  const candidates = pick('candidatesTokenCount'), thoughts = pick('thoughtsTokenCount');
+  add('out', pick('output_tokens', 'completion_tokens') ?? (candidates !== null || thoughts !== null ? (candidates ?? 0) + (thoughts ?? 0) : null));
+  add('cached', pick('input_tokens_details.cached_tokens', 'cache_read_input_tokens', 'prompt_cache_hit_tokens', 'prompt_tokens_details.cached_tokens', 'cachedContentTokenCount'));
   add('cache_write', pick('cache_creation_input_tokens'));
-  add('reasoning', pick('output_tokens_details.reasoning_tokens', 'completion_tokens_details.reasoning_tokens'));
+  add('reasoning', pick('output_tokens_details.reasoning_tokens', 'completion_tokens_details.reasoning_tokens', 'thoughtsTokenCount'));
   return parts.join(' / ');
 }
 
@@ -290,6 +309,7 @@ export function finalObject(resp) {
   if (data.some((e) => typeof e.json.type === 'string' && e.json.type.startsWith('response.'))) return fromResponses(data);
   if (data.some((e) => e.json.type === 'message_start')) return fromMessages(data);
   if (data.some((e) => Array.isArray(e.json.choices))) return fromChat(data);
+  if (data.some((e) => Array.isArray(e.json.candidates) || e.json.usageMetadata)) return fromGemini(data);
   return { value: data.map((e) => e.json), note: '无法识别的事件格式：显示全部事件的 data' };
 }
 
@@ -373,4 +393,37 @@ function fromChat(data) {
   out.object = 'chat.completion（由 chunk 合成）';
   out.choices = choices;
   return { value: out, note: '由 Chat SSE chunk 合成（delta 按 choice/tool_call 合并）' };
+}
+
+function plainGeminiText(part) {
+  return part && typeof part.text === 'string' && Object.keys(part).every(key => key === 'text' || key === 'thought');
+}
+
+function fromGemini(data) {
+  const out = {};
+  const candidates = new Map();
+  for (const { json: j } of data) {
+    // Usage reports are cumulative; retain the latest report without summing it.
+    const { candidates: incoming, ...metadata } = j;
+    Object.assign(out, structuredClone(metadata));
+    for (const candidate of incoming ?? []) {
+      const index = candidate.index ?? 0;
+      let value = candidates.get(index);
+      if (!value) candidates.set(index, value = { index });
+      const { content, ...fields } = candidate;
+      Object.assign(value, structuredClone(fields));
+      if (!content) continue;
+      const { parts = [], ...contentFields } = content;
+      value.content ??= { parts: [] };
+      Object.assign(value.content, structuredClone(contentFields));
+      for (const part of parts) {
+        const previous = value.content.parts.at(-1);
+        // Never join signed parts or move a signature onto another part.
+        if (plainGeminiText(previous) && plainGeminiText(part) && previous.thought === part.thought) previous.text += part.text;
+        else value.content.parts.push(structuredClone(part));
+      }
+    }
+  }
+  out.candidates = [...candidates.values()];
+  return { value: out, note: '由 Gemini SSE chunk 合成；仅合并相邻的无签名文字，保留签名所在 part；未补造终止状态。' };
 }

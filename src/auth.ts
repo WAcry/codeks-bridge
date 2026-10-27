@@ -35,7 +35,7 @@ export async function upstreamHeaders(config: UpstreamConfig, api: Api, signal: 
   }
   if (credential) {
     if (/[\r\n]/.test(credential)) throw new BridgeError("Credential must be a single line");
-    const header = config.auth_header ?? (api === "anthropic" ? "x-api-key" : "authorization");
+    const header = config.auth_header ?? (api === "anthropic" ? "x-api-key" : api === "gemini" ? "x-goog-api-key" : "authorization");
     headers.set(header, header.toLowerCase() === "authorization" ? `Bearer ${credential}` : credential);
   }
   return headers;

@@ -6,6 +6,35 @@ import { resolveModel, validateConfig } from "../src/config.ts";
 import { catalogKeys, getCatalogEntry } from "../src/model-catalog.ts";
 import { reasoningEffort } from "../src/profiles.ts";
 
+for (const key of ["gemini-3.8-flash", "gemini-4-argon"]) {
+  test(`${key} keeps the Codex working budget and exposes native thinking levels`, () => {
+    const config = validateConfig({
+      upstreams: { test: { base_url: "https://generativelanguage.googleapis.com/v1beta" } },
+      models: { gemini: { catalog: key, upstream: "test", model: "gemini-deployment" } },
+    });
+    const [entry] = buildCatalog(config).models;
+    assert.equal(entry.context_window, 272000);
+    assert.equal(entry.max_context_window, 1048576);
+    assert.equal(entry.tool_mode, "code_mode_only");
+    assert.equal(entry.multi_agent_version, "v2");
+    assert.equal(entry.use_responses_lite, true);
+    assert.equal(entry.shell_type, "unified_exec");
+    assert.equal(entry.default_reasoning_summary, "none");
+    assert.equal(entry.supports_image_detail_original, false);
+    assert.deepEqual(entry.input_modalities, ["text", "image"]);
+    assert.deepEqual(entry.supported_reasoning_levels.map((level: { effort: string }) => level.effort), ["low", "medium", "high", "ultra"]);
+    assert.match(entry.model_messages.instructions_template, /You are Codex, an agent based on Gemini/);
+    const route = resolveModel(config, "gemini");
+    assert.equal(route.profile.id, "gemini-native");
+    assert.equal(route.profile.api, "gemini");
+    assert.equal(route.profile.max_output_tokens, undefined);
+    assert.equal(route.compaction.mode, "summary");
+    assert.equal(reasoningEffort(route), "medium");
+    assert.equal(reasoningEffort(route, "ultra"), "high");
+    assert.equal(reasoningEffort(route, "minimal"), "minimal");
+  });
+}
+
 test("GPT-6.1 Terra keeps its reviewed window and resolves Ultra through xhigh", () => {
   const original = getCatalogEntry("gpt-6.1-terra");
   const config = validateConfig({

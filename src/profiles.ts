@@ -13,6 +13,9 @@ const FORMATS: Record<AdapterId, Pick<ModelProfile, "id" | "api" | "reasoning_fo
   "deepseek-chat": {
     id: "deepseek-chat", api: "chat", reasoning_format: "reasoning.text.v1",
   },
+  "gemini-native": {
+    id: "gemini-native", api: "gemini", reasoning_format: "gemini.parts.v1",
+  },
 };
 
 /** Match Codex's Ultra resolution without rewriting the original catalog metadata. */

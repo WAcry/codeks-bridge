@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const { finalObject, inputTransformationReports, parseEvents } = await import(new URL("../ui/events.js", import.meta.url).href);
+const { finalObject, inputTransformationReports, parseEvents, usageText } = await import(new URL("../ui/events.js", import.meta.url).href);
 const { INPUT_TRANSFORMATION_LABEL } = await import(new URL("../ui/labels.js", import.meta.url).href);
 
 const reasoning = { id: "rs_synthetic", type: "reasoning", summary: [{ type: "summary_text", text: "Plan" }] };
@@ -123,4 +123,43 @@ test("reports stay attached to each upstream call, including a failed auxiliary 
     { label: "main", reports: [{ event: 0, pointer: "/message/input_transformations", value: [] }] },
     { label: "summary", reports: [{ event: null, pointer: "/input_transformations", value: [allowed] }] },
   ]);
+});
+
+test("Gemini structure keeps signed parts, candidate boundaries and the latest usage report", () => {
+  const signature = { text: "", thoughtSignature: "synthetic-signature" };
+  const call = { functionCall: { name: "read", args: { path: "example.txt" } }, thoughtSignature: "synthetic-call-signature" };
+  const usage = { promptTokenCount: 100, candidatesTokenCount: 8, thoughtsTokenCount: 12, cachedContentTokenCount: 50 };
+  const resp = stream([
+    { responseId: "synthetic-response", candidates: [{ index: 0, content: { role: "model", parts: [{ text: "Plan ", thought: true }] } }] },
+    { candidates: [{ index: 0, content: { parts: [{ text: "first", thought: true }, { text: "Hello " }] } }], usageMetadata: { promptTokenCount: 100 } },
+    { candidates: [{ index: 0, content: { parts: [{ text: "world" }, signature, call] } }, { index: 1, content: { role: "model", parts: [{ text: "Other" }] } }] },
+    { candidates: [{ index: 0, finishReason: "STOP", safetyRatings: [] }], usageMetadata: usage, modelVersion: "synthetic-model" },
+  ]);
+  const before = structuredClone(resp);
+  const result = finalObject(resp);
+  assert.deepEqual(result.value, {
+    responseId: "synthetic-response", modelVersion: "synthetic-model", usageMetadata: usage,
+    candidates: [
+      { index: 0, content: { role: "model", parts: [{ text: "Plan first", thought: true }, { text: "Hello world" }, signature, call] }, finishReason: "STOP", safetyRatings: [] },
+      { index: 1, content: { role: "model", parts: [{ text: "Other" }] } },
+    ],
+  });
+  assert.match(result.note, /未补造终止状态/);
+  assert.deepEqual(resp, before);
+  assert.equal(usageText(usage), "in 100 / out 20 / cached 50 / reasoning 12");
+  assert.equal(usageText({ promptTokenCount: 100 }), "in 100");
+  assert.equal(usageText({ ...usage, toolUsePromptTokenCount: 7 }), "in 107 / out 20 / cached 50 / reasoning 12");
+});
+
+test("Gemini interrupted and blocked streams retain upstream diagnostics without a false completion", () => {
+  const error = { code: 503, message: "Synthetic overload", status: "UNAVAILABLE" };
+  const result = finalObject(stream([
+    { candidates: [{ content: { parts: [{ text: "Partial" }] } }] },
+    { error },
+  ]));
+  assert.deepEqual(result.value.error, error);
+  assert.equal(result.value.candidates[0].finishReason, undefined);
+  assert.equal(result.value.status, undefined);
+  const blocked = { promptFeedback: { blockReason: "SAFETY", safetyRatings: [] }, usageMetadata: { promptTokenCount: 10 } };
+  assert.deepEqual(finalObject(stream([blocked])).value, { ...blocked, candidates: [] });
 });

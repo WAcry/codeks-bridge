@@ -15,7 +15,7 @@ const checkpoint = { type: "compaction", id: "cmp_synthetic", encrypted_content:
 function context(adapter: AdapterId = "gpt-responses", signal = new AbortController().signal, compaction?: ModelConfig["compaction"]): BackendContext {
   const config = validateConfig({
     upstreams: { example: { base_url: "https://api.example.com/v1" } },
-    models: { "example-model": { upstream: "example", model: "example-model", catalog: { "gpt-responses": "gpt-6.1-sol", "claude-messages": "claude-sonnet-5-5", "deepseek-chat": "deepseek-flash" }[adapter], compaction } },
+    models: { "example-model": { upstream: "example", model: "example-model", catalog: { "gpt-responses": "gpt-6.1-sol", "claude-messages": "claude-sonnet-5-5", "deepseek-chat": "deepseek-flash", "gemini-native": "gemini-3.8-flash" }[adapter], compaction } },
   });
   return {
     request: {
@@ -73,7 +73,7 @@ test("native compaction stores a deferred handoff recipe and accounts only for t
   assert.deepEqual(result.usage, nativeUsage);
 });
 
-for (const adapter of ["claude-messages", "deepseek-chat"] as const) {
+for (const adapter of ["claude-messages", "deepseek-chat", "gemini-native"] as const) {
   test(`${adapter} compaction creates a portable summary with one upstream request`, async () => {
     const calls: BackendContext[] = [];
     let accepted = 0;

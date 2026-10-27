@@ -43,6 +43,7 @@ test("HTTP errors retain the original JSON or text and never retry", async (t) =
 test("non-Responses failures translate protocol semantics and preserve provider metadata", () => {
   const cases = [
     { status: 400, type: "invalid_request_error", message: "Prompt is too long", code: "context_length_exceeded" },
+    { status: 400, type: "INVALID_ARGUMENT", message: "The input token count (200) exceeds the maximum number of tokens allowed (100).", code: "context_length_exceeded" },
     { status: 429, type: "insufficient_quota", message: "Account limit reached", code: "insufficient_quota" },
     { status: 429, type: "rate_limit_error", message: "Too many requests", code: "rate_limit_exceeded" },
     { status: 503, type: "overloaded_error", message: "Busy", code: "server_is_overloaded" },
