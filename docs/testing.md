@@ -50,6 +50,8 @@ CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/cata
 
 未设置 `CODEKS_BIN` 时，这些测试自动跳过。它们为每个场景创建独立的 `CODEX_HOME` 和工作目录，监听随机的回环端口。临时目录路径会写入测试输出，保留会话和进程输出便于复查。退出时关闭本轮创建的服务器。
 
+当前错误联动测试需要基于 Codex `0.165.0` 或更新版本的 codeks：该版本新增 `model_not_found` 的终止分类。HTTP 404 与 SSE 两种用例确认原始错误由 bridge 透传，客户端保留该分类且只发一次请求。2026-10-27 使用官方 `0.165.0` Linux 二进制运行目录、错误、协议及压缩四组测试，18 项全部通过；不以此代替 fork 专属行为验证。
+
 以 `@wacry/codeks@0.162.1-codeks.10` 的现成 Linux 二进制验证了以下场景：
 
 | 场景 | 实际检查 |
@@ -60,7 +62,7 @@ CODEKS_BIN=/absolute/path/to/codex node --test test/codeks-e2e.test.ts test/cata
 
 当前测试使用仓库内已审阅目录。协议测试检查 Lite header、`additional_tools` 中的完整 schema、`reasoning.context: "all_turns"`、`parallel_tool_calls: false` 和省略顶层 tools；普通工具测试可显式覆盖工具模式，以单独检查直接调用契约。目录集成测试通过 HTTP 发现目录，检查默认 Code Mode Only 下的 `exec`、`ALL_TOOLS` 和 MCP 调用，不依赖其他 namespace 的固定拼写。
 
-最新正式版 `@openai/codex@0.163.0` 的现成二进制另外通过普通工具/图片及压缩/resume 两项测试。它用于核对最新客户端 Lite 契约；明文多代理由上述 codeks fork 二进制验证，不将原生客户端验证等同于 fork 补丁验证。
+此前 `@openai/codex@0.163.0` 的现成二进制另外通过普通工具/图片及压缩/resume 两项测试。它用于核对对应版本的客户端 Lite 契约；明文多代理由上述 codeks fork 二进制验证，不将原生客户端验证等同于 fork 补丁验证。
 
 ### 已审阅目录与 HTTP 发现验证
 

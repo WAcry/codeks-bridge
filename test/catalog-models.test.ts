@@ -6,7 +6,7 @@ import { resolveModel, validateConfig } from "../src/config.ts";
 import { catalogKeys, getCatalogEntry } from "../src/model-catalog.ts";
 import { reasoningEffort } from "../src/profiles.ts";
 
-test("GPT-6.1 Terra keeps its reviewed window and resolves subscription Ultra through xhigh", () => {
+test("GPT-6.1 Terra keeps its reviewed window and resolves Ultra through xhigh", () => {
   const original = getCatalogEntry("gpt-6.1-terra");
   const config = validateConfig({
     upstreams: { test: { base_url: "https://example.com/v1" } },
@@ -20,7 +20,9 @@ test("GPT-6.1 Terra keeps its reviewed window and resolves subscription Ultra th
   assert.equal(entry.multi_agent_version, "v2");
   assert.equal(entry.use_responses_lite, true);
   assert.deepEqual(entry.model_messages, original.model.model_messages);
-  assert.equal(Object.hasOwn(entry, "auto_compact_token_limit"), false);
+  assert.equal(entry.auto_compact_token_limit, null);
+  assert.equal(entry.default_reasoning_summary, "none");
+  assert.equal(entry.supports_image_detail_original, true);
   const route = resolveModel(config, "terra");
   assert.equal(reasoningEffort(route), "low");
   assert.equal(reasoningEffort(route, "ultra"), "xhigh");

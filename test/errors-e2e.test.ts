@@ -40,6 +40,17 @@ interface Scenario {
 
 const scenarios: Scenario[] = [
   {
+    name: "HTTP model not found stops without retrying",
+    status: 404,
+    error: { type: "invalid_request_error", code: "model_not_found", message: "Synthetic unavailable model" },
+    message: /Synthetic unavailable model/, errorInfo: "model_not_found",
+  },
+  {
+    name: "SSE model not found stops without retrying",
+    error: { type: "invalid_request_error", code: "model_not_found", message: "Synthetic unavailable model" },
+    message: /Synthetic unavailable model/, errorInfo: "model_not_found",
+  },
+  {
     name: "structured SSE policy failure stops without retrying",
     error: {
       type: "invalid_request_error", code: "misalignment_policy_violation", message: "Synthetic policy block",
