@@ -1,22 +1,20 @@
 // Exchange list: filtering, flat or thread-grouped rows, keyed row reuse and keyboard moves.
 import { h, fmtTime, fmtDur, fmtTok, fmtBytes, oneLine, shortId, hashHue, put } from './dom.js';
 import { KIND_LABEL, OUTCOME_LABEL, callLabel } from './labels.js';
+import { exchangeClass, needsAttention, responseClass, upstreamCalls } from './status.js';
 
 // Same-conversation key. Falls back to the window id prefix ("<thread>:<n>") for captures without thread headers.
 export const threadKey = (s) => s.thread?.thread_id ?? s.thread?.session_id ?? (s.thread?.window_id ? String(s.thread.window_id).split(':')[0] : null);
-export const OUTCOME_CLASS = { active: 'info', completed: 'ok', incomplete: 'warn', failed: 'bad', error: 'bad', aborted: 'bad' };
 
 // Imported Detail objects may lack the Summary-only fields (older or hand-made exports); derive them.
-const callsOf = (s) => s.upstream_calls ?? s.upstream?.map((c) => ({ label: c.label, status: c.response?.status ?? null, end: c.response?.end ?? (c.error ? 'error' : null) })) ?? [];
 const requestBytes = (s) => s.bytes?.request ?? s.client?.request?.body?.bytes ?? null;
 
-export const isErrorish = (s) => ['failed', 'error', 'aborted', 'incomplete'].includes(s.outcome) || (s.status ?? 0) >= 400 ||
-  callsOf(s).some((c) => (c.status ?? 0) >= 400 || c.end === 'error' || c.end === 'cancelled');
+export const isErrorish = needsAttention;
 
 export const byNewest = (a, b) => (b.started_at ?? 0) - (a.started_at ?? 0) || (b.seq ?? 0) - (a.seq ?? 0);
 
 export const FILTER_CHIPS = [
-  ['errors', '仅错误', '失败、错误、中止、未完成，或任一 HTTP 状态 ≥ 400'],
+  ['errors', '需关注', '失败、客户端断开、未完成，或本次输出含无效工具调用；不包含仅在历史输入中的工具诊断'],
   ['compaction', '仅压缩', 'kind = compaction'],
   ['active', '进行中', '仍在传输'],
   ['hideInvalid', '隐藏无效', '隐藏 kind = invalid（无法解析或路由失败）'],
@@ -28,8 +26,8 @@ function searchText(s) {
   if (t === undefined) {
     const th = s.thread ?? {};
     t = [s.id, s.model, s.adapter, s.api, typeof s.upstream === 'string' ? s.upstream : s.route?.upstream, s.upstream_model, s.kind, KIND_LABEL[s.kind], s.outcome, OUTCOME_LABEL[s.outcome],
-      s.status, s.error, s.preview, th.session_id, th.thread_id, th.parent_thread_id, th.subagent, th.window_id,
-      ...callsOf(s).flatMap((c) => [c.label, callLabel(c.label), c.status, c.end])]
+      s.status, s.error, s.preview, s.tool_error_count > 0 ? '无效工具调用' : null, th.session_id, th.thread_id, th.parent_thread_id, th.subagent, th.window_id,
+      ...upstreamCalls(s).flatMap((c) => [c.label, callLabel(c.label), c.status, c.end])]
       .filter((x) => x != null).join(' ').toLowerCase();
     searchCache.set(s, t);
   }
@@ -57,14 +55,12 @@ function usageLine(u) {
   return parts.length ? h('span', { class: 'x-usage', title: JSON.stringify(u, null, 1) }, parts.join(' · ')) : null;
 }
 
-const callClass = (c) => ((c.status ?? 0) >= 400 || c.end === 'error' ? 'bad' : c.end === 'active' ? 'info' : c.end === 'cancelled' ? 'warn' : c.status ? 'ok' : 'dim');
-
 function rowEl(s, flat, onSelect) {
   const th = s.thread ?? {};
   const el = h('div', { class: `xrow o-${s.outcome}${s.active ? ' active' : ''}`, dataset: { id: s.id }, title: `${s.id} · ${s.kind}` });
   const key = threadKey(s);
   if (key) { el.classList.add('hued'); el.style.setProperty('--thue', hashHue(key)); }
-  const status = s.status != null ? ` ${s.status}` : '';
+  const severity = exchangeClass(s);
   put(el,
     h('div', { class: 'x1' },
       h('span', { class: 'x-time' }, fmtTime(s.started_at)),
@@ -72,15 +68,17 @@ function rowEl(s, flat, onSelect) {
       h('span', { class: 'x-model', title: s.upstream_model ? `上游模型 ${s.upstream_model}` : '' },
         s.model ?? '（无模型）', s.adapter ? h('span', { class: 'dim' }, ` → ${s.adapter}`) : null),
       h('span', { class: 'grow' }),
-      h('span', { class: `chip ${OUTCOME_CLASS[s.outcome] ?? 'dim'}`, title: s.error ?? '' }, `${OUTCOME_LABEL[s.outcome] ?? s.outcome}${status}`),
+      h('span', { class: `chip ${severity}`, title: s.error ?? '' }, OUTCOME_LABEL[s.outcome] ?? s.outcome),
+      s.status != null ? h('span', { class: 'chip dim', title: 'HTTP 状态码不代表流式响应已完成' }, `HTTP ${s.status}`) : null,
+      s.tool_error_count > 0 ? h('span', { class: 'chip bad', title: '本次交付的无效工具调用；响应完成与工具调用有效性分别记录' }, `无效工具调用 ${s.tool_error_count}`) : null,
       h('span', { class: 'x-dur' }, s.active ? '…' : fmtDur(s.duration_ms))),
     h('div', { class: 'x2' },
-      callsOf(s).map((c) => h('span', { class: `chip sm ${callClass(c)}`, title: `end: ${c.end ?? '–'}` }, `${callLabel(c.label)} ${c.status ?? '…'}`)),
+      upstreamCalls(s).map((c) => h('span', { class: `chip sm ${responseClass(c)}`, title: c.failure?.message ?? `end: ${c.end ?? '–'}` }, `${callLabel(c.label)}${c.status != null ? ` HTTP ${c.status}` : ' …'}`)),
       flat && th.subagent ? h('span', { class: 'chip sm sub', title: '子代理（x-openai-subagent）' }, `子代理 ${th.subagent}`) : null,
       flat && th.parent_thread_id ? h('span', { class: 'chip sm dim', title: `父线程 ${th.parent_thread_id}` }, `父 ${shortId(th.parent_thread_id)}`) : null,
       usageLine(s.usage),
       requestBytes(s) != null ? h('span', { class: 'x-size dim', title: '客户端请求大小' }, fmtBytes(requestBytes(s))) : null),
-    s.error ? h('div', { class: 'x3 err' }, oneLine(s.error, 160)) : null,
+    s.error ? h('div', { class: `x3 ${severity === 'warn' ? 'warning-text' : 'err'}`, title: s.error }, severity === 'warn' && s.outcome === 'aborted' ? '客户端连接已断开，原因未确定。' : oneLine(s.error, 160)) : null,
     s.preview ? h('div', { class: 'x3' }, oneLine(s.preview, 200)) : null);
   el.addEventListener('click', (e) => onSelect(s.id, e));
   return el;

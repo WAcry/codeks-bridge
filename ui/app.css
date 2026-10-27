@@ -42,6 +42,7 @@ h3, h4 { margin: 0; }
 .mono, .tree, .raw, .sv-text, .ev-list, .diff-tree, .fields, .kv td { font-family: var(--mono); font-size: 12px; }
 .dim { color: var(--fg2); }
 .err { color: var(--bad); }
+.warning-text { color: var(--warn); }
 .grow { flex: 1 1 auto; }
 .note { padding: 4px 8px; margin: 0 0 8px; background: var(--info-bg); border-left: 3px solid var(--info); border-radius: 3px; font-size: 12px; }
 .server-transformations { margin-bottom: 12px; }

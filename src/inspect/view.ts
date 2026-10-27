@@ -4,6 +4,7 @@ import type { ServerResponse } from "node:http";
 import { decodeCompaction, decodeReasoning, type CompactionCarrier } from "../carrier.ts";
 import { resolveModel, upstreamBaseUrl } from "../config.ts";
 import { replaysReasoning, restoresNativeCompaction } from "../history.ts";
+import { toolCallDiagnostic } from "../tool-calls.ts";
 import type { ResolvedModel, StateOrigin } from "../types.ts";
 import type { Exchange, Inspector, Message, Part } from "./capture.ts";
 
@@ -11,6 +12,17 @@ export interface SseRecord { t: number; event: string | null; data: string }
 
 type Outcome = "active" | "completed" | "incomplete" | "failed" | "error" | "aborted";
 interface Result { outcome: Outcome; error: string | null; usage: unknown }
+
+interface Failure { kind: "http" | "protocol" | "transport"; message: string | null }
+interface ObservedFailure { diagnostic: Failure; result: Result }
+export interface ToolDiagnostic {
+  target: "client.request" | "client.response";
+  pointer: string;
+  event?: number;
+  call_id: string;
+  name: string;
+  message: string;
+}
 
 export interface Annotation {
   target: "client.request" | "client.response";
@@ -93,6 +105,40 @@ function terminal(data: any, status?: number): Result | undefined {
 }
 
 const results = new WeakMap<Exchange, Result>();
+const failures = new WeakMap<Message, ObservedFailure | null>();
+
+/** A connection close must not hide an error already reported on that response. */
+function responseFailure(response: Message): ObservedFailure | null {
+  if (failures.has(response)) return failures.get(response)!;
+  let failure: ObservedFailure | null = null;
+  if ((response.status ?? 0) >= 400) {
+    const body = parse(response.text());
+    const message = body?.error?.message ?? (typeof body?.error === "string" ? body.error : null);
+    const error = message ?? response.text().slice(0, 200);
+    failure = { diagnostic: { kind: "http", message: error }, result: { outcome: "error", error, usage: null } };
+  } else if (response.end === "error") {
+    const error = response.error ?? null;
+    failure = { diagnostic: { kind: "transport", message: error }, result: { outcome: "error", error, usage: null } };
+  } else {
+    const data = isSse(response)
+      ? sseEvents(response.parts, response.end === "complete" || response.end === "unread").map(event => parse(event.data))
+      : [parse(response.text())];
+    for (let i = data.length - 1; i >= 0; i--) {
+      const found = terminal(data[i], response.status);
+      if (found?.outcome === "failed" || found?.outcome === "error") {
+        failure = { diagnostic: { kind: "protocol", message: found.error }, result: found };
+        break;
+      }
+      if (typeof data[i]?.error === "string" || (data[i]?.error && typeof data[i].error === "object")) {
+        const error = typeof data[i].error === "string" ? data[i].error : data[i].error.message ?? null;
+        failure = { diagnostic: { kind: "protocol", message: error }, result: { outcome: "error", error, usage: null } };
+        break;
+      }
+    }
+  }
+  if (response.end !== "active") failures.set(response, failure);
+  return failure;
+}
 
 /** What the client saw, from its terminal event or JSON body. */
 function result(exchange: Exchange): Result {
@@ -100,8 +146,10 @@ function result(exchange: Exchange): Result {
   const cached = results.get(exchange);
   if (cached) return cached;
   const response = exchange.response;
+  const failure = responseFailure(response);
   let value: Result;
-  if (response.end === "cancelled") value = { outcome: "aborted", error: response.error ?? null, usage: null };
+  if (failure) value = failure.result;
+  else if (response.end === "cancelled") value = { outcome: "aborted", error: response.error ?? null, usage: null };
   else if (response.status === undefined) value = { outcome: "error", error: "No response was written", usage: null };
   else if (isSse(response)) {
     const events = sseEvents(response.parts);
@@ -119,6 +167,43 @@ function result(exchange: Exchange): Result {
   }
   results.set(exchange, value);
   return value;
+}
+
+const toolNotes = new WeakMap<Exchange, ToolDiagnostic[]>();
+
+function toolDiagnostics(exchange: Exchange): ToolDiagnostic[] {
+  const cached = toolNotes.get(exchange);
+  if (cached) return cached;
+  const notes: ToolDiagnostic[] = [];
+  const outputCalls = new Set<string>();
+  const add = (item: any, target: ToolDiagnostic["target"], pointer: string, event?: number) => {
+    if (!item || typeof item !== "object") return;
+    const diagnostic = toolCallDiagnostic(item);
+    if (!diagnostic) return;
+    if (target === "client.response") {
+      if (!["function_call", "custom_tool_call"].includes(item.type) || outputCalls.has(item.call_id)) return;
+      outputCalls.add(item.call_id);
+    }
+    notes.push({ target, pointer, ...(event === undefined ? {} : { event }), call_id: item.call_id, ...diagnostic });
+  };
+  if (exchange.requestText?.includes("cxbt1_")) {
+    const input = parse(exchange.requestText)?.input;
+    if (Array.isArray(input)) input.forEach((item, index) => add(item, "client.request", `/input/${index}`));
+  }
+  if (exchange.response.text().includes("cxbt1_")) {
+    if (isSse(exchange.response)) {
+      sseEvents(exchange.response.parts, exchange.response.end === "complete").forEach((event, index) => {
+        const data = parse(event.data);
+        // Added/delta events are tentative; codeks persists completed items only.
+        if (data?.type === "response.output_item.done") add(data.item, "client.response", "/item", index);
+      });
+    } else {
+      const output = parse(exchange.response.text())?.output;
+      if (Array.isArray(output)) output.forEach((item, index) => add(item, "client.response", `/output/${index}`));
+    }
+  }
+  if (exchange.closed) toolNotes.set(exchange, notes);
+  return notes;
 }
 
 const originNames = new WeakMap<Inspector, Map<string, string[]>>();
@@ -172,6 +257,7 @@ export function summary(exchange: Exchange) {
     outcome,
     error,
     usage,
+    tool_error_count: toolDiagnostics(exchange).filter(note => note.target === "client.response").length,
     thread: {
       session_id: header(exchange, "session-id") ?? header(exchange, "session_id"),
       thread_id: header(exchange, "thread-id") ?? header(exchange, "thread_id"),
@@ -185,6 +271,7 @@ export function summary(exchange: Exchange) {
       label: call.label,
       status: call.response?.status ?? null,
       end: call.response?.end ?? (call.error !== undefined ? "error" : "active"),
+      ...(call.response && responseFailure(call.response) ? { failure: responseFailure(call.response)!.diagnostic } : {}),
     })),
     bytes: {
       request: exchange.requestBytes,
@@ -228,6 +315,7 @@ function messageView(message: Message | undefined) {
     ended_ms: message.endedMs ?? null,
     end: message.end,
     error: message.error ?? null,
+    failure: responseFailure(message)?.diagnostic ?? null,
     body: { text: message.text(), bytes: message.bytes },
     events: isSse(message) ? sseEvents(message.parts, message.end !== "active") : null,
   };
@@ -344,6 +432,7 @@ export function detail(exchange: Exchange) {
       response: messageView(call.response),
     })),
     annotations: annotations(exchange, client),
+    tool_diagnostics: toolDiagnostics(exchange),
   };
 }
 
