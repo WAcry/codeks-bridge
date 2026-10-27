@@ -34,6 +34,34 @@ export function toolCallDiagnostic(item: Record<string, any>): { name: string; m
   if (wire?.error !== undefined) return { name: wire.name, message: wire.error };
 }
 
+function editDistance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let diagonal = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const previous = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, diagonal + Number(a[i - 1] !== b[j - 1]));
+      diagonal = previous;
+    }
+  }
+  return row[b.length];
+}
+
+/** Rank hints only; approximate names never participate in dispatch. */
+function suggestedNames(tools: ToolSet, name: string): string[] {
+  const fullName = name.replaceAll(".", "__");
+  const separator = fullName.lastIndexOf("__");
+  const namespace = separator < 0 ? undefined : fullName.slice(0, separator);
+  const shortName = separator < 0 ? fullName : fullName.slice(separator + 2);
+  return tools.entries.map(tool => ({
+    name: tool.flatName,
+    distance: Math.min(editDistance(fullName, tool.flatName), editDistance(shortName, tool.name)),
+    sameNamespace: namespace === (tool.namespace || "functions"),
+  })).sort((a, b) => a.distance - b.distance || Number(b.sameNamespace) - Number(a.sameNamespace))
+    .slice(0, 5).map(tool => tool.name);
+}
+
 /** Resolve a model's name without changing the declared tool table. */
 export function prepareToolCall(tools: ToolSet, id: string, name: string, args: Record<string, unknown>, argumentsText = JSON.stringify(args)): ClientToolCall {
   if (typeof id !== "string" || !id || typeof name !== "string" || !name) {
@@ -43,9 +71,17 @@ export function prepareToolCall(tools: ToolSet, id: string, name: string, args: 
   const tool = candidates.length === 1 ? candidates[0] : undefined;
   let error: string | undefined;
   if (!tool) {
-    const choices = (candidates.length ? candidates : tools.entries).map(tool => tool.flatName);
-    error = `Tool name ${JSON.stringify(name)} is ${candidates.length ? "ambiguous" : "unknown"}. No tool was executed.` +
-      (choices.length ? `\nCall one of these tools using its full name:\n${choices.map(choice => `- ${choice}`).join("\n")}` : "\nNo tools are available.");
+    const choices = candidates.length ? candidates.map(tool => tool.flatName) : suggestedNames(tools, name);
+    const partial = !candidates.length && choices.length < tools.entries.length;
+    error = `Tool name ${JSON.stringify(name)} is ${candidates.length ? "ambiguous" : "unknown"}. No tool was executed.`;
+    if (choices.length) {
+      const heading = candidates.length ? "Matching tools" : "Closest available tools";
+      const count = partial ? ` (showing ${choices.length} of ${tools.entries.length})` : "";
+      error += `\n${heading}${count}:\n${choices.map(choice => `- ${choice}`).join("\n")}` +
+        "\nUse an exact tool name from the available tool definitions.";
+    } else {
+      error += "\nNo tools are available.";
+    }
     // This identity is deliberately absent from codeks. Never dispatch an
     // ambiguous bare name: it might accidentally select a default tool.
     if (tools.get(ERROR_NAMESPACE, ERROR_NAME)) {
