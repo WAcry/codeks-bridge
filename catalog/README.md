@@ -2,13 +2,13 @@
 
 这里保存运行时使用的完整模型条目。每个文件对应一个受支持的 catalog key；显示别名、连接和实际发给上游的模型名由用户配置。未知 key 直接报错，不使用通用模板猜测模型能力。
 
-来源是 OpenAI Codex 的 `codex-rs/models-manager/models.json`，每份 JSON 独立记录版本。原有条目来自 [`rust-v0.163.0`](https://github.com/openai/codex/tree/rust-v0.163.0)，commit `83086188ae0614bd882818ff1aa23f3194962012`；GPT-5.5、两个 Daybreak 条目及 Codex Auto Review 来自 [`rust-v0.164.0`](https://github.com/openai/codex/tree/rust-v0.164.0)，commit `6aaac694803004a63c6f393d153c96d22521a6b9`。源码尚未收录的 GPT-6.1 Terra、GPT-Reserve 使用订阅快照，见下文。运行时不从订阅账号请求远端目录，也不在用户启动时读取本机 codeks 的最新模板。
+来源是 OpenAI Codex 的 `codex-rs/models-manager/models.json`，每份 JSON 独立记录版本。原有条目来自 [`rust-v0.163.0`](https://github.com/openai/codex/tree/rust-v0.163.0)，commit `83086188ae0614bd882818ff1aa23f3194962012`；GPT-5.5、两个 Daybreak 条目及 Codex Auto Review 来自 [`rust-v0.164.0`](https://github.com/openai/codex/tree/rust-v0.164.0)，commit `6aaac694803004a63c6f393d153c96d22521a6b9`。GPT-6.1 Terra 来自 [`rust-v0.165.0`](https://github.com/openai/codex/tree/rust-v0.165.0)，commit `360319d8dee62d87e2d59fc0c21805d79519cfed`。源码尚未收录的 GPT-Reserve 使用订阅快照，见下文。运行时不从订阅账号请求远端目录，也不在用户启动时读取本机 codeks 的最新模板。
 
 | Catalog key | 来源条目 | Adapter |
 | --- | --- | --- |
 | `gpt-6-astra` | 同名条目 | `gpt-responses` |
 | `gpt-6.1-sol` | 同名条目 | `gpt-responses` |
-| `gpt-6.1-terra` | 订阅目录同名条目 | `gpt-responses` |
+| `gpt-6.1-terra` | 同名条目 | `gpt-responses` |
 | `gpt-6-sol` | 同名条目 | `gpt-responses` |
 | `gpt-6-luna` | 同名条目 | `gpt-responses` |
 | `gpt-5.6-sol` | 同名条目 | `gpt-responses` |
@@ -41,9 +41,9 @@ GPT 的 `model` 对象以对应源码或订阅目录的完整条目为基础，�
 
 GPT-5.5 按用户选择将 `use_responses_lite` 从 `false` 改为 `true`，统一工具声明传输；除上述 shell 类型规范化外，其他字段完整保留上游值，包括未指定的工具模式与多代理版本、272K 窗口和 `comp_hash: "2911"`，不套用 GPT-5.6 的整份配置。多代理版本由客户端配置和 feature 决定，不强制 v2。Daybreak Blue 保留 Lite、多代理 v2 和 272K/872K 窗口；Daybreak Red 为 Lite、多代理 v2 和 372K 窗口。Codex Auto Review 保留 Lite、多代理 v1 和 272K/872K 窗口。两个旧 Daybreak key 继续按独立模型路由；新版 Codex 的 `access_programs.cyber` 请求参数也由 Responses adapter 原样转发，不把二者自动互换。模型、Lite 或访问模式是否可用由具体上游和账号决定，错误直接返回。
 
-GPT-6.1 Terra 取自 2026-10-26（America/Los_Angeles）由 Codex 0.164.0 取得的订阅目录缓存，当时公开源码目录尚未收录。按用户选择将默认工作窗口从订阅条目的 `500000` 调整为 `272000`，最大窗口保留 `872000`，记录在 `adjustments` 中；其余字段和专属提示词完整保留，没有从 Sol 模板补齐省略字段或推断额外默认值。默认 effort 为 `low`，支持 `low` 到 `max` 及客户端 `ultra`（原生 `xhigh`）；保留 Responses Lite、Code Mode Only、多代理 v2、`shell_type: "unified_exec"`、`default_reasoning_summary: "none"`、图片 `original` 能力和 `comp_hash: "3000"`。codeks 通过远端 `/models` 读取新条目，已有客户端协议即可处理，不依赖二进制内置同名模型。配置 `catalog: "gpt-6.1-terra"` 并指定实际部署名即可使用；具体端点和账号的可用性由上游决定。
+GPT-6.1 Terra 使用 `rust-v0.165.0` 的同名源码条目。按用户选择将默认工作窗口从 `500000` 调整为 `272000`，最大窗口保留 `872000`，并统一使用 `shell_type: "unified_exec"`；两项修改记录在 `adjustments` 中，其余字段和专属提示词完整保留。默认 effort 为 `low`，支持 `low` 到 `max` 及客户端 `ultra`（原生 `xhigh`）；保留 Responses Lite、Code Mode Only、多代理 v2、`default_reasoning_summary: "none"`、图片 `original` 能力和 `comp_hash: "3000"`。`auto_compact_token_limit: null` 由客户端按窗口计算，省略的 `effective_context_window_percent` 使用 Codex 默认值 `95`。配置 `catalog: "gpt-6.1-terra"` 并指定实际部署名即可使用；具体端点和账号的可用性由上游决定。
 
-订阅缓存是客户端解析后的目录表示，缺省字段按当前客户端语义处理。Terra 已使用规范化的 `unified_exec` 名称，与其他 GPT 条目一致。条目只记录模型内容与来源，不包含整个缓存的账号标识、ETag 或本机路径。未来公开 release 收录同名模型时，按下方更新流程对比完整提示词与能力，再将来源切回固定 tag；不能仅因名字相同就用别的 GPT 条目替换。
+`0.165.0` 审阅：Terra 从此前订阅快照转为公开 tag，便于固定版本和复现导入；提示词差异集中在 Apps / Plugins 段落，采用源码中分开的连接器与插件规则，同时保留源码显式默认值和可空字段。其余 11 个源码模型条目与 `0.164.0` 完全一致，GPT-6.1 Sol 模板也没有变化，因此保留这些条目已有的来源记录，以及 Claude / DeepSeek 的现有精调。
 
 GPT-Reserve 是客户端在普通额度用尽、后端授权后切换的回退模型。Codex 源码目录没有 `gpt-reserve` 条目，客户端只在 TUI 中按这个模型名处理额度回退和模型选择器。因此该条目取自 ChatGPT 订阅端点 `/models` 的同名条目，`source` 记录端点、请求时的客户端版本和取得日期，不记录 tag 与 commit。除上述 shell 类型规范化外，字段顺序和取值原样保留，包括 `visibility: "hide"`、`upgrade: null`、`model_messages.auto_review: null`、`base_instructions` 和 `available_access_programs`；提示词、Lite、多代理 v1、272K/872K 窗口、reasoning 和 `comp_hash` 与 GPT-5.6 Luna 一致。只删除公开源码未出现的名称：两个值为 `false` 的布尔字段，以及 `available_in_plans` 中的两个方案名；客户端不读取这些字段。导入脚本不处理订阅端点，更新时需手动取得条目并重新审阅。与其他条目一样，客户端目录中的 slug、展示名、排序和可见性由别名配置决定；要在选择器中隐藏，需在别名上设置 `visibility: "hide"`。
 
@@ -70,7 +70,7 @@ Opus / Sonnet 两个条目从 `low` 开始：Opus 5.5 始终启用 thinking，So
 ```sh
 node scripts/import-catalog.ts \
   --source /path/to/codex/codex-rs/models-manager/models.json \
-  --tag rust-v0.163.0 \
+  --tag rust-v0.165.0 \
   --model gpt-6.1-sol \
   --output /path/to/review/gpt-6.1-sol.candidate.json
 ```
