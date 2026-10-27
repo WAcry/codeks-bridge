@@ -152,7 +152,7 @@ function suggestedFeedback(definitions: unknown[], name: string): { text: string
   return { text, choices: [...text.matchAll(/^- (.+)$/gm)].map(match => match[1]) };
 }
 
-test("unknown names rank close spellings, prefer their namespace on ties, and show at most ten tools", () => {
+test("unknown names rank close spellings, prefer their namespace on ties, and show at most five tools", () => {
   const definitions = [
     { type: "namespace", name: "other", tools: [functionTool("sleep")] },
     { type: "namespace", name: "clock", tools: [functionTool("sleep"), functionTool("stop")] },
@@ -163,8 +163,8 @@ test("unknown names rank close spellings, prefer their namespace on ties, and sh
   for (const name of ["clock__slep", "clock.slep"]) {
     const { text, choices } = suggestedFeedback(definitions, name);
     assert.deepEqual(choices.slice(0, 3), ["clock__sleep", "other__sleep", "clock__stop"]);
-    assert.equal(choices.length, 10);
-    assert.match(text, /Closest available tools \(showing 10 of 11\)/);
+    assert.equal(choices.length, 5);
+    assert.match(text, /Closest available tools \(showing 5 of 11\)/);
     assert.match(text, /Use an exact tool name from the available tool definitions/);
   }
   const bare = suggestedFeedback(definitions, "slep");
@@ -184,17 +184,17 @@ test("unknown-name ranking considers full names and never prefers namespace over
   assert.match(suggestedFeedback([], "missing").text, /No tools are available/);
 });
 
-test("ambiguous names show at most ten exact candidates without approximate alternatives", () => {
-  for (const count of [7, 10, 12]) {
+test("ambiguous names show at most five exact candidates without approximate alternatives", () => {
+  for (const count of [3, 5, 7]) {
     const definitions = [
       ...Array.from({ length: count }, (_, i) => ({ type: "namespace", name: `source${i}`, tools: [functionTool("read")] })),
       { type: "namespace", name: "other", tools: [functionTool("read_file"), functionTool("reader")] },
     ];
     const { text, choices } = suggestedFeedback(definitions, "read");
     assert.match(text, /"read" is ambiguous/);
-    assert.deepEqual(choices, Array.from({ length: Math.min(count, 10) }, (_, i) => `source${i}__read`));
+    assert.deepEqual(choices, Array.from({ length: Math.min(count, 5) }, (_, i) => `source${i}__read`));
     assert.doesNotMatch(text, /Closest|other__/);
-    if (count > 10) assert.match(text, /Matching tools \(showing 10 of 12\)/);
+    if (count > 5) assert.match(text, /Matching tools \(showing 5 of 7\)/);
     else assert.doesNotMatch(text, /showing/);
   }
 });

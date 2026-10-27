@@ -71,7 +71,7 @@ export function prepareToolCall(tools: ToolSet, id: string, name: string, args: 
   const tool = candidates.length === 1 ? candidates[0] : undefined;
   let error: string | undefined;
   if (!tool) {
-    const choices = (candidates.length ? candidates.map(tool => tool.flatName) : suggestedNames(tools, name)).slice(0, 10);
+    const choices = (candidates.length ? candidates.map(tool => tool.flatName) : suggestedNames(tools, name)).slice(0, 5);
     const total = candidates.length || tools.entries.length;
     error = `Tool name ${JSON.stringify(name)} is ${candidates.length ? "ambiguous" : "unknown"}. No tool was executed.`;
     if (choices.length) {
