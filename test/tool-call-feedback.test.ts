@@ -152,17 +152,19 @@ function suggestedFeedback(definitions: unknown[], name: string): { text: string
   return { text, choices: [...text.matchAll(/^- (.+)$/gm)].map(match => match[1]) };
 }
 
-test("unknown names rank close spellings, prefer their namespace on ties, and show at most five tools", () => {
+test("unknown names rank close spellings, prefer their namespace on ties, and show at most ten tools", () => {
   const definitions = [
     { type: "namespace", name: "other", tools: [functionTool("sleep")] },
     { type: "namespace", name: "clock", tools: [functionTool("sleep"), functionTool("stop")] },
-    { type: "namespace", name: "functions", tools: ["wait", "exec", "spawn_agent", "write"].map(functionTool) },
+    { type: "namespace", name: "functions", tools: [
+      "wait", "exec", "spawn_agent", "write", "request_user_input", "wait_agent", "followup_task", "list_agents",
+    ].map(functionTool) },
   ];
   for (const name of ["clock__slep", "clock.slep"]) {
     const { text, choices } = suggestedFeedback(definitions, name);
     assert.deepEqual(choices.slice(0, 3), ["clock__sleep", "other__sleep", "clock__stop"]);
-    assert.equal(choices.length, 5);
-    assert.match(text, /Closest available tools \(showing 5 of 7\)/);
+    assert.equal(choices.length, 10);
+    assert.match(text, /Closest available tools \(showing 10 of 11\)/);
     assert.match(text, /Use an exact tool name from the available tool definitions/);
   }
   const bare = suggestedFeedback(definitions, "slep");
@@ -182,15 +184,19 @@ test("unknown-name ranking considers full names and never prefers namespace over
   assert.match(suggestedFeedback([], "missing").text, /No tools are available/);
 });
 
-test("ambiguous names list every exact candidate without a cap or approximate alternatives", () => {
-  const definitions = [
-    ...Array.from({ length: 7 }, (_, i) => ({ type: "namespace", name: `source${i}`, tools: [functionTool("read")] })),
-    { type: "namespace", name: "other", tools: [functionTool("read_file"), functionTool("reader")] },
-  ];
-  const { text, choices } = suggestedFeedback(definitions, "read");
-  assert.match(text, /"read" is ambiguous/);
-  assert.deepEqual(choices, Array.from({ length: 7 }, (_, i) => `source${i}__read`));
-  assert.doesNotMatch(text, /Closest|showing|other__/);
+test("ambiguous names show at most ten exact candidates without approximate alternatives", () => {
+  for (const count of [7, 10, 12]) {
+    const definitions = [
+      ...Array.from({ length: count }, (_, i) => ({ type: "namespace", name: `source${i}`, tools: [functionTool("read")] })),
+      { type: "namespace", name: "other", tools: [functionTool("read_file"), functionTool("reader")] },
+    ];
+    const { text, choices } = suggestedFeedback(definitions, "read");
+    assert.match(text, /"read" is ambiguous/);
+    assert.deepEqual(choices, Array.from({ length: Math.min(count, 10) }, (_, i) => `source${i}__read`));
+    assert.doesNotMatch(text, /Closest|other__/);
+    if (count > 10) assert.match(text, /Matching tools \(showing 10 of 12\)/);
+    else assert.doesNotMatch(text, /showing/);
+  }
 });
 
 test("canonical call ids and ordinary tool results stay unchanged", () => {

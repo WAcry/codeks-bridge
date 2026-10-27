@@ -59,7 +59,7 @@ function suggestedNames(tools: ToolSet, name: string): string[] {
     distance: Math.min(editDistance(fullName, tool.flatName), editDistance(shortName, tool.name)),
     sameNamespace: namespace === (tool.namespace || "functions"),
   })).sort((a, b) => a.distance - b.distance || Number(b.sameNamespace) - Number(a.sameNamespace))
-    .slice(0, 5).map(tool => tool.name);
+    .map(tool => tool.name);
 }
 
 /** Resolve a model's name without changing the declared tool table. */
@@ -71,12 +71,12 @@ export function prepareToolCall(tools: ToolSet, id: string, name: string, args: 
   const tool = candidates.length === 1 ? candidates[0] : undefined;
   let error: string | undefined;
   if (!tool) {
-    const choices = candidates.length ? candidates.map(tool => tool.flatName) : suggestedNames(tools, name);
-    const partial = !candidates.length && choices.length < tools.entries.length;
+    const choices = (candidates.length ? candidates.map(tool => tool.flatName) : suggestedNames(tools, name)).slice(0, 10);
+    const total = candidates.length || tools.entries.length;
     error = `Tool name ${JSON.stringify(name)} is ${candidates.length ? "ambiguous" : "unknown"}. No tool was executed.`;
     if (choices.length) {
       const heading = candidates.length ? "Matching tools" : "Closest available tools";
-      const count = partial ? ` (showing ${choices.length} of ${tools.entries.length})` : "";
+      const count = choices.length < total ? ` (showing ${choices.length} of ${total})` : "";
       error += `\n${heading}${count}:\n${choices.map(choice => `- ${choice}`).join("\n")}` +
         "\nUse an exact tool name from the available tool definitions.";
     } else {
