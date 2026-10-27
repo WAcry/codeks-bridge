@@ -42,9 +42,12 @@ test("an interrupted stream retains completed items in output order and its erro
     { type: "response.created", response: { id: "resp_synthetic", status: "in_progress" } },
     done(1, message), done(0, reasoning), done(1, message), error,
   ]);
+  const before = structuredClone(resp);
   assert.deepEqual(finalObject(resp).value, {
     id: "resp_synthetic", status: "in_progress", output: [reasoning, message], errors: [error],
   });
+  assert.match(finalObject(resp).note, /未完成响应快照：没有收到终止事件/);
+  assert.deepEqual(resp, before);
 });
 
 test("failed and incomplete terminals retain their diagnostics alongside completed items", () => {

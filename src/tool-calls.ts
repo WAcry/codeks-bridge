@@ -27,6 +27,13 @@ function decode(id: unknown): WireCall | undefined {
   } catch { /* Unrecognized ids remain opaque. */ }
 }
 
+/** Read only diagnostics explicitly recorded by the bridge, not tool-result text. */
+export function toolCallDiagnostic(item: Record<string, any>): { name: string; message: string } | undefined {
+  if (!["function_call", "custom_tool_call", "function_call_output", "custom_tool_call_output"].includes(item.type)) return;
+  const wire = decode(item.call_id);
+  if (wire?.error !== undefined) return { name: wire.name, message: wire.error };
+}
+
 /** Resolve a model's name without changing the declared tool table. */
 export function prepareToolCall(tools: ToolSet, id: string, name: string, args: Record<string, unknown>, argumentsText = JSON.stringify(args)): ClientToolCall {
   if (typeof id !== "string" || !id || typeof name !== "string" || !name) {

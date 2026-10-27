@@ -11,8 +11,8 @@ export const INPUT_TRANSFORMATION_LABEL = {
 };
 
 export const KIND_LABEL = { turn: '轮次', compaction: '压缩', search: '独立搜索', image_generation: '图片生成', invalid: '无效' };
-export const OUTCOME_LABEL = { active: '进行中', completed: '完成', incomplete: '未完成', failed: '失败', error: '错误', aborted: '中止' };
-export const END_LABEL = { active: '传输中', complete: '完整', cancelled: '已取消', error: '出错', unread: '终止事件后停止读取' };
+export const OUTCOME_LABEL = { active: '进行中', completed: '响应完成', incomplete: '未完成', failed: '失败', error: '错误', aborted: '客户端断开' };
+export const END_LABEL = { active: '传输中', complete: '完整', cancelled: '连接提前结束', error: '出错', unread: '终止事件后停止读取' };
 
 const DECISION = { replay: '回放', passthrough: '原样透传', drop: '丢弃', native: '恢复原生', summary: '文字摘要', handoff: '按需文字交接', reject: '拒绝', output: '输出' };
 const DECISION_CLASS = { replay: 'ok', passthrough: 'info', native: 'ok', drop: 'warn', summary: 'warn', handoff: 'warn', reject: 'bad', output: 'info' };
@@ -57,6 +57,11 @@ export function sourceText(src) {
 }
 
 export function annChip(a, onClick) {
+  if (a.kind === 'tool_error') return h('span', {
+    class: `chip ann ${a.target === 'client.request' ? 'warn' : 'bad'}${onClick ? ' click' : ''}`,
+    title: a.message,
+    onclick: onClick ? (e) => { e.stopPropagation(); onClick(a, e); } : null,
+  }, `${a.target === 'client.request' ? '历史工具诊断' : '无效工具调用'} · ${a.name}`);
   const source = a.source ? sourceText(a.source)
     : (a.decision === 'output' || (a.kind === 'compaction' && a.reason === 'no_native') ? null : '来源未知');
   const parts = [KIND_TEXT[a.kind] ?? a.kind, source, reasonText(a)].filter(Boolean);
@@ -69,6 +74,12 @@ export function annChip(a, onClick) {
 
 /** Full annotation card: fields, compaction summary text and decoded carrier tree. */
 export function annDetail(a) {
+  if (a.kind === 'tool_error') return h('div', { class: 'ann-detail' },
+    kvTable([
+      ['范围', a.target === 'client.request' ? '历史输入，不计入本次输出的无效工具调用' : '本次输出；响应完成不代表工具调用有效'],
+      ['位置', `${a.target}${a.event != null ? ` · 事件 #${a.event}` : ''} · ${a.pointer}`],
+      ['原始工具名', a.name], ['调用 ID', a.call_id],
+    ]), strBlock(a.message, { name: 'tool diagnostic' }));
   const src = a.source;
   const rows = [
     ['位置', `${a.target}${a.event != null ? ` · 事件 #${a.event}` : ''} · ${a.pointer ?? '–'}`],

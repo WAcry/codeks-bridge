@@ -308,7 +308,7 @@ function fromResponses(data) {
   }
   const created = data.find((e) => e.json.type === 'response.created')?.json.response ?? {};
   const errors = data.filter((e) => e.json.type === 'error').map((e) => e.json);
-  return { value: { ...created, output, ...(errors.length ? { errors } : {}) }, note: '流没有终止事件：由 response.created 与 output_item.done 合成' };
+  return { value: { ...created, output, ...(errors.length ? { errors } : {}) }, note: '未完成响应快照：没有收到终止事件，由 response.created 与 output_item.done 合成；status 保留上游原值，不表示仍在生成。' };
 }
 
 function fromMessages(data) {

@@ -6,7 +6,8 @@ import { structureView, newStructState, focusPointer } from './structure.js';
 import { eventsView, newEventsState, finalObject, inputTransformationReports, parseEvents, usageText } from './events.js';
 import { diffView } from './diff.js';
 import { annChip, annDetail, annIndex, callLabel, decisionClass, decisionText, END_LABEL, INPUT_TRANSFORMATION_LABEL, KIND_LABEL, KIND_TEXT, OUTCOME_LABEL, reasonText, sourceText } from './labels.js';
-import { OUTCOME_CLASS, threadKey, byNewest } from './list.js';
+import { threadKey, byNewest } from './list.js';
+import { exchangeClass, responseClass as respClass, responseFailure } from './status.js';
 import { exportDoc } from './api.js';
 import { responseLatency } from './latency.js';
 
@@ -38,7 +39,7 @@ export function stagesOf(d) {
     out.push({ key: `upres:${keys[i]}`, type: 'response', num: '③', title: '上游 → bridge', sub: label, call, resp: call.response ?? null });
   });
   out.push({ key: 'res', type: 'response', num: '④', title: 'bridge → codeks', sub: '客户端响应', target: 'client.response', resp: d.client?.response ?? null });
-  out.push({ key: 'ann', type: 'ann', title: `标注 ${d.annotations?.length ?? 0}` });
+  out.push({ key: 'ann', type: 'ann', title: '标注与工具诊断' });
   out.push({ key: 'diff', type: 'diff', title: '对比' });
   return out;
 }
@@ -52,25 +53,20 @@ export function parseBody(body) {
   return r;
 }
 
-const respSig = (r) => (r ? `${r.status}|${r.end}|${r.ended_ms}|${r.body?.bytes}|${r.events?.length}|${r.error}` : 'none');
+const respSig = (r) => (r ? `${r.status}|${r.end}|${r.ended_ms}|${r.body?.bytes}|${r.events?.length}|${r.error}|${JSON.stringify(r.failure)}` : 'none');
 
 function paneSig(stage, d) {
   if (!stage) return 'missing';
   switch (stage.type) {
-    case 'request': return `${stage.msg?.body?.bytes}|${stage.call?.error ?? ''}|${stage.call?.response ? 1 : 0}`;
-    case 'response': return `${respSig(stage.resp)}|${stage.call?.error ?? ''}|${d.annotations?.length}`;
+    case 'request': return `${stage.msg?.body?.bytes}|${stage.call?.error ?? ''}|${stage.call?.response ? 1 : 0}|${d.tool_diagnostics?.length}`;
+    case 'response': return `${respSig(stage.resp)}|${stage.call?.error ?? ''}|${d.annotations?.length}|${d.tool_diagnostics?.length}`;
     case 'diff': return 'diff';
     default: return `${d.rev}|${respSig(d.client?.response)}|${(d.upstream ?? []).map((c) => respSig(c.response)).join(',')}|${d.annotations?.length}`;
   }
 }
 
-const respClass = (r, err) => {
-  if (err || r?.error || (r?.status ?? 0) >= 400 || r?.end === 'error') return 'bad';
-  if (!r) return 'dim';
-  if (r.end === 'active') return 'info';
-  if (r.end === 'cancelled') return 'warn';
-  return 'ok';
-};
+// Reuse item/event annotation placement without merging tool errors into replay decisions.
+const rowAnnotations = (d) => [...(d.annotations ?? []), ...(d.tool_diagnostics ?? []).map(a => ({ ...a, kind: 'tool_error' }))];
 
 // ---------- small renderers ----------
 
@@ -125,6 +121,7 @@ const SUMMARY_HINTS = {
   id: 'ID', seq: '序号', rev: '版本', started_at: '开始', duration_ms: '耗时', active: '进行中', model: '模型别名', adapter: '适配器', api: 'API',
   upstream: '上游配置', upstream_model: '上游模型', kind: '类型', stream: '流式', status: '状态码', outcome: '结果', error: '错误', usage: '用量',
   thread: '线程', input_items: 'input 项数', preview: '预览', upstream_calls: '上游调用', bytes: '大小',
+  tool_error_count: '本次无效工具调用数',
 };
 
 function headersTable(headers, first) {
@@ -162,7 +159,7 @@ function rawView(text, name, isJson, ext) {
 /** Annotation pointers usable in the structure view of the client response. */
 function responsePointers(d) {
   const resp = d.client?.response;
-  const { byPointer, byEvent } = annIndex(d.annotations, 'client.response');
+  const { byPointer, byEvent } = annIndex(rowAnnotations(d), 'client.response');
   if (!byEvent.size) return byPointer;
   const events = parseEvents(resp) ?? [];
   const out = new Map(byPointer);
@@ -302,12 +299,16 @@ export class DetailView {
         h('span', { class: 'mono' }, fmtDateTime(d.started_at)),
         h('span', { class: `chip kind k-${d.kind}` }, KIND_LABEL[d.kind] ?? d.kind),
         h('span', { class: 'd-model' }, d.model ?? '（无模型）', d.adapter ? ` → ${d.adapter}` : '', d.upstream_model ? h('span', { class: 'dim' }, ` (${d.upstream_model})`) : null),
-        h('span', { class: `chip ${OUTCOME_CLASS[d.outcome] ?? 'dim'}` }, `${OUTCOME_LABEL[d.outcome] ?? d.outcome}${d.status != null ? ` · ${d.status}` : ''}`),
+        h('span', { class: `chip ${exchangeClass(d)}` }, OUTCOME_LABEL[d.outcome] ?? d.outcome),
+        d.status != null ? h('span', { class: 'chip dim', title: 'HTTP 状态码不代表流式响应已完成' }, `HTTP ${d.status}`) : null,
+        d.tool_error_count > 0 ? h('button', { class: 'chip bad click', onclick: () => this.open('ann') }, `无效工具调用 ${d.tool_error_count}`) : null,
         h('span', { class: 'mono' }, d.active ? '进行中…' : fmtDur(d.duration_ms)),
         usage ? h('span', { class: 'mono dim', title: JSON.stringify(d.usage, null, 1) }, usage) : null,
         this.gone ? h('span', { class: 'chip warn', title: '已从 bridge 清空或淘汰；这里显示的是浏览器缓存' }, '已从 bridge 移除') : null,
         h('span', { class: 'grow' }), actions),
-      threadChips.some(Boolean) || d.error ? h('div', { class: 'd-line' }, threadChips, d.error ? h('span', { class: 'err' }, d.error) : null) : null);
+      threadChips.some(Boolean) || d.error ? h('div', { class: 'd-line' }, threadChips,
+        d.error ? h('span', { class: exchangeClass(d) === 'warn' ? 'warning-text' : 'err', title: d.error },
+          d.outcome === 'aborted' && exchangeClass(d) === 'warn' ? '客户端连接已断开，原因未确定。' : d.error) : null) : null);
   }
 
   renderNav(stages) {
@@ -326,7 +327,7 @@ export class DetailView {
     const req = get('req');
     const res = get('res');
     const reqSub = [fmtBytes(req.msg?.body?.bytes), d.input_items != null ? `${d.input_items} 项` : null].filter(Boolean).join(' · ');
-    const respSub = (r, err) => (err ? '传输错误' : r ? [r.status ?? '–', END_LABEL[r.end] ?? r.end, r.events ? `${fmtInt(r.events.length)} 事件` : fmtBytes(r.body?.bytes)].join(' · ') : '无响应');
+    const respSub = (r, err) => (err && !r ? '传输错误' : r ? [r.status != null ? `HTTP ${r.status}` : '–', responseFailure(r, err) ? '失败' : END_LABEL[r.end] ?? r.end, r.events ? `${fmtInt(r.events.length)} 事件` : fmtBytes(r.body?.bytes)].join(' · ') : '无响应');
     const calls = stages.filter((s) => s.key.startsWith('up:'));
     const callBox = h('div', { class: 'pipe-calls' }, calls.length ? calls.map((s) => {
       const r = get(`upres:${s.key.slice(3)}`);
@@ -337,6 +338,7 @@ export class DetailView {
         card(r, `③ 上游 → bridge`, respSub(r.resp, s.call.error), respClass(r.resp, s.call.error)));
     }) : h('span', { class: 'dim' }, '（没有上游调用）'));
     const annCount = d.annotations?.length ?? 0;
+    const diagnosticCount = d.tool_diagnostics?.length ?? 0;
     const routeSub = d.route ? `${d.route.alias ?? ''} · ${d.route.compaction_mode ?? ''}` : '无路由';
     fill(this.navEl,
       h('div', { class: 'pipe-side' }, card(get('overview'), '概要', null, 'mini', routeSub), card(get('diff'), '对比', null, 'mini', '与同线程上一轮或任选两条比较')),
@@ -344,7 +346,7 @@ export class DetailView {
       h('span', { class: 'arrow' }, '→'), callBox, h('span', { class: 'arrow' }, '→'),
       card(res, '④ bridge → codeks', respSub(res.resp), respClass(res.resp)),
       h('span', { class: 'grow' }),
-      card(get('ann'), `标注 ${annCount}`, annCount ? annSummary(d.annotations) : '无', `narrow${annCount ? ' info' : ''}`),
+      card(get('ann'), `标注 ${annCount} · 诊断 ${diagnosticCount}`, d.tool_error_count > 0 ? `本次无效工具调用 ${d.tool_error_count}` : diagnosticCount ? '历史工具诊断' : annCount ? annSummary(d.annotations) : '无', `narrow${d.tool_error_count > 0 ? ' bad' : diagnosticCount ? ' warn' : annCount ? ' info' : ''}`),
       this.panes[1] ? btn('✕ 关闭并排', () => this.closeSecond(), 'close2') : null);
   }
 
@@ -401,12 +403,13 @@ export class DetailView {
       const r = stage.resp;
       if (!r) put(out, h('span', { class: 'dim' }, stage.call?.error ? `传输错误：${stage.call.error}` : '尚无响应'));
       else {
-        put(out, h('span', { class: `chip ${respClass(r)}` }, `${r.status ?? '–'} ${r.status_text ?? ''}`.trim()),
-          h('span', { class: `chip ${r.end === 'active' ? 'info' : 'dim'}`, title: `end: ${r.end}` }, END_LABEL[r.end] ?? r.end ?? '–'),
+        const failure = responseFailure(r, stage.call?.error);
+        put(out, h('span', { class: 'chip dim' }, `HTTP ${r.status ?? '–'} ${r.status_text ?? ''}`.trim()),
+          h('span', { class: `chip ${respClass(r, stage.call?.error)}`, title: `end: ${r.end}` }, failure ? '失败' : r.end === 'cancelled' && stage.target === 'client.response' ? '客户端断开' : END_LABEL[r.end] ?? r.end ?? '–'),
           r.headers_ms != null ? h('span', { class: 'dim', title: '自请求开始到响应头的时间' }, `响应头 ${fmtDur(r.headers_ms)}`) : null,
           r.ended_ms != null ? h('span', { class: 'dim', title: '自请求开始到结束的时间' }, `结束 ${fmtDur(r.ended_ms)}`) : null,
           r.events ? h('span', { class: 'dim' }, `${fmtInt(r.events.length)} 事件`) : h('span', { class: 'dim' }, '非 SSE'),
-          r.error ? h('span', { class: 'chip bad', title: r.error }, oneLine(`错误：${r.error}`, 80)) : null);
+          failure ? h('span', { class: 'chip bad', title: failure.message ?? failure.kind }, oneLine(`错误：${failure.message ?? failure.kind}`, 80)) : null);
       }
     }
     if (body) {
@@ -436,11 +439,11 @@ export class DetailView {
       return headersTable(msg?.headers, [['请求', h('span', { class: 'mono' }, `${msg?.method ?? ''} ${msg?.url ?? msg?.path ?? ''}`)]]);
     }
     if (mode === 'raw') return body ? rawView(body.text, this.fileName(stage, 'body'), parseBody(body).ok, resp?.events ? 'sse.txt' : 'json') : h('div', { class: 'dim' }, '没有正文');
-    const ann = stage.target === 'client.request' ? annIndex(d.annotations, 'client.request').byPointer
+    const ann = stage.target === 'client.request' ? annIndex(rowAnnotations(d), 'client.request').byPointer
       : stage.target === 'client.response' ? responsePointers(d) : null;
     const chip = (a, onClick) => annChip(a, onClick);
     if (mode === 'events' && resp?.events) {
-      const { byEvent } = annIndex(d.annotations, stage.target === 'client.response' ? 'client.response' : '-');
+      const { byEvent } = annIndex(rowAnnotations(d), stage.target === 'client.response' ? 'client.response' : '-');
       return eventsView(resp, {
         state: this.viewState(stage.key, 'events', newEventsState), prefs: this.ctx.prefs,
         onPrefs: () => { this.ctx.savePrefs(); for (const p of this.panes) { if (this.modeOf(this.stages.get(p.key) ?? {}) === 'events') this.renderPane(p, true); } },
@@ -494,13 +497,14 @@ export class DetailView {
             h('td', { class: 'mono' }, r?.ended_ms != null ? fmtDur(r.ended_ms) : '–'),
             h('td', { class: 'mono' }, fmtBytes(c.body?.bytes)),
             h('td', { class: 'mono' }, fmtBytes(r?.body?.bytes)),
-            h('td', { class: 'err' }, c.error ?? r?.error ?? ''));
+            h('td', { class: 'err' }, responseFailure(r, c.error)?.message ?? ''));
           return tr;
         }))));
     }
     if (d.annotations?.length) {
       put(box, h('h4', null, '标注'), h('div', null, h('span', { class: 'chip info' }, annSummary(d.annotations)), ' ', btn('查看全部标注', () => this.open('ann'))));
     }
+    if (d.tool_diagnostics?.length) put(box, this.toolDiagnostics());
     for (const [i, call] of (d.upstream ?? []).entries()) {
       const reports = serverTransformations(call.response);
       if (reports) {
@@ -508,7 +512,7 @@ export class DetailView {
           btn('查看上游响应', () => this.open(`upres:${keys[i]}`)), reports);
       }
     }
-    put(box, h('h4', null, '记录字段'), fieldsTable(d, SUMMARY_HINTS, ['route', 'client', 'upstream', 'annotations']));
+    put(box, h('h4', null, '记录字段'), fieldsTable(d, SUMMARY_HINTS, ['route', 'client', 'upstream', 'annotations', 'tool_diagnostics']));
     return box;
   }
 
@@ -555,10 +559,25 @@ export class DetailView {
 
   // ---------- annotations ----------
 
+  toolDiagnostics() {
+    const list = this.detail.tool_diagnostics ?? [];
+    if (!list.length) return null;
+    return h('section', null,
+      h('h4', null, '工具诊断'),
+      h('div', { class: 'note' }, '本次输出的无效调用与响应是否完成分别显示。历史输入中的诊断仅用于回溯，不计入本次无效调用数。'),
+      list.map(item => {
+        const a = { ...item, kind: 'tool_error' };
+        return h('details', { class: 'transformation-entry' },
+          h('summary', null, annChip(a), ' ', h('span', { class: 'mono dim' }, `${a.pointer}${a.event != null ? ` · 事件 #${a.event}` : ''}`), ' ',
+            btn('定位', e => { e.preventDefault(); this.locate(a); })),
+          annDetail(a));
+      }));
+  }
+
   annotations() {
     const d = this.detail;
     const list = d.annotations ?? [];
-    if (!list.length) return h('div', { class: 'empty small' }, '这条记录没有标注（没有 bridge 载荷的 reasoning 或压缩项）');
+    if (!list.length) return this.toolDiagnostics() ?? h('div', { class: 'empty small' }, '这条记录没有回放标注或工具诊断');
     const tbody = h('tbody');
     list.forEach((a, i) => {
       const where = `${a.target === 'client.request' ? '① 请求' : '④ 响应'}${a.event != null ? ` 事件 #${a.event}` : ''} ${a.pointer ?? ''}`;
@@ -580,6 +599,7 @@ export class DetailView {
       put(tbody, tr);
     });
     return h('div', null,
+      this.toolDiagnostics(),
       h('div', { class: 'note' }, `bridge 按真实回放规则计算：${annSummary(list)}。点击行查看解码后的载荷，“定位”跳到对应项。`),
       h('table', { class: 'anns' }, h('thead', null, h('tr', null, ['#', '位置', '类型', '决定', '原因', '来源', '格式', ''].map((x) => h('th', null, x)))), tbody));
   }
