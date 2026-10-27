@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 import test from "node:test";
-import { Call, Exchange, Inspector } from "../src/inspect/capture.ts";
+import { Call, Exchange, Inspector, headerMap } from "../src/inspect/capture.ts";
 import { detail, summary } from "../src/inspect/view.ts";
 import { prepareToolCall, toolCallDiagnostic, writeToolCall } from "../src/tool-calls.ts";
 import { buildToolSet } from "../src/tools.ts";
@@ -40,6 +40,26 @@ function upstream(exchange: Exchange, status = 200, contentType = "text/event-st
   call.received(new Response(null, { status, headers: { "content-type": contentType } }));
   return call;
 }
+
+test("upstream capture redacts Gemini credentials without rewriting safe routing fields or bodies", () => {
+  const { exchange } = capture();
+  const url = "https://example.com/models/synthetic:streamGenerateContent?alt=sse&key=synthetic-secret&key=second-secret&trace=one%20two";
+  const headers = headerMap(new Headers({ "x-goog-api-key": "synthetic-secret", "x-request-id": "synthetic-request" }));
+  const call = new Call(exchange, "main", url, headers, '{"text":"body stays unchanged"}');
+  const captured = new URL(call.url);
+  assert.equal(captured.pathname, "/models/synthetic:streamGenerateContent");
+  assert.equal(captured.searchParams.get("alt"), "sse");
+  assert.equal(captured.searchParams.get("trace"), "one two");
+  assert.equal(captured.searchParams.getAll("key").length, 2);
+  for (const value of captured.searchParams.getAll("key")) assert.match(value, /^\[redacted:/);
+  assert(!call.url.includes("synthetic-secret"));
+  assert(!call.url.includes("second-secret"));
+  assert.match(call.headers["x-goog-api-key"], /^\[redacted:/);
+  assert.equal(call.headers["x-request-id"], "synthetic-request");
+  assert.equal(call.text, '{"text":"body stays unchanged"}');
+  const safe = "https://example.com/models/synthetic:streamGenerateContent?alt=sse&trace=one%20two";
+  assert.equal(new Call(exchange, "main", safe, {}, "{}").url, safe);
+});
 
 const tools = buildToolSet([{ type: "namespace", name: "clock", tools: [
   { type: "function", name: "sleep", parameters: { type: "object", properties: {} } },

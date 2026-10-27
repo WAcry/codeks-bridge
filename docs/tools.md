@@ -1,10 +1,10 @@
 # 工具转换
 
-客户端负责执行工具，bridge 只转换定义、调用和结果。Responses 后端保留原生定义；Messages 与 Chat 后端只向模型提供普通函数。
+客户端负责执行工具，bridge 只转换定义、调用和结果。Responses 后端保留原生定义；Messages、Chat 与 Gemini 后端只向模型提供普通函数。
 
 ## Lite 工具声明
 
-客户端默认把完整工具 schema 放在 `input[].additional_tools`。GPT 保留原始声明项。Claude 与 DeepSeek 在转换消息前提取声明，与顶层 `tools` 按历史顺序合并，最终只向上游发送一张顶层工具表。声明不会变成普通 reminder，客户端保存的历史不变。
+客户端默认把完整工具 schema 放在 `input[].additional_tools`。GPT 保留原始声明项。Claude、DeepSeek 与 Gemini 在转换消息前提取声明，与顶层 `tools` 按历史顺序合并，最终只向上游发送一张顶层工具表。声明不会变成普通 reminder，客户端保存的历史不变。
 
 增量声明只包含新增或变更的成员，按 namespace 与工具名覆盖旧定义，保留未变的其他成员和已分配的上游名字。每个工具身份最终只有一份定义；反复切换模型产生的同名版本也只保留最后一份。工具移除的 developer 通知保留原位置，不从提示词文字推断删工具。codeks 将默认 `functions` namespace、空 namespace 和省略 namespace 视为同一身份，因此历史调用和显式工具选择均按此规则查找；返回调用保留声明中的原 namespace。
 
@@ -22,7 +22,7 @@
 
 普通函数保留原名。namespace 中的工具使用 `namespace__name`；namespace 已以 `_` 结尾时直接拼接名字。名字规范化为字母、数字、`_` 和 `-`。只有两个不同工具的规范化结果实际冲突时，才为后来的名字加 `_2`、`_3` 等后缀。返回调用通过该请求的映射恢复原 name/namespace。
 
-Messages/Chat 返回的调用还接受完整的 `namespace.name` 和唯一的原始短名。例如 `functions__exec`、`functions.exec`、`exec` 都可定位同一个工具；`agents`、`clock` 及其他 namespace 使用相同规则。省略 namespace 的默认工具也接受 `functions.name` 和 `functions__name`。精确声明名优先；其他别名只有唯一对应工具时才成功，不猜后缀或拼写。exec 内的 JavaScript 原样传递，其中 `tools.*` 的解析仍由客户端负责。
+Messages/Chat/Gemini 返回的调用还接受完整的 `namespace.name` 和唯一的原始短名。例如 `functions__exec`、`functions.exec`、`exec` 都可定位同一个工具；`agents`、`clock` 及其他 namespace 使用相同规则。省略 namespace 的默认工具也接受 `functions.name` 和 `functions__name`。精确声明名优先；其他别名只有唯一对应工具时才成功，不猜后缀或拼写。exec 内的 JavaScript 原样传递，其中 `tools.*` 的解析仍由客户端负责。
 
 这一选择来自实际模型会省略声明名前缀，而提示词仍用 `functions.exec` 等原始身份。保留声明、增加确定性别名，可以修复调用而不重写工具表和 Claude 的签名前缀。GPT 返回的调用保留原生工具协议，不做这种别名匹配；切换到 GPT 时，来自其他 adapter 的历史载体仍需转换为 Responses 可接受的表示。
 
@@ -34,11 +34,11 @@ Messages/Chat 返回的调用还接受完整的 `namespace.name` 和唯一的原
 
 Responses 的 `call_id` 最长 64 字符，`cxbt1_` 载体可能超过这个限制。GPT 出站时，对超过 64 字符的工具 ID（包括载体和其他上游的原始 ID），使用完整客户端 ID 的 SHA-256 生成固定 48 字符的 `call_`＋base64url 摘要；function/custom 调用及对应结果使用同一映射。64 字符以内的 ID（包括短载体）保留原值，减少对已被 GPT 接受的历史前缀的改动；无 ID 的主动通知不生成 ID。映射不依赖调用位置、模型别名或内存状态，因此恢复会话、重试及后续 turn 都保持一致。
 
-不直接用载体内的原始 ID，是因为它本身可能超长，两个不同载体也可能包含同一个原始 ID；不直接截断或去除空白，以免合并不同调用。GPT 历史保留客户端已确定的工具类型、name、namespace、参数及正常结果，失败结果使用载体保存的原诊断。转换仅作用于请求副本：旧会话无需迁移，切回 Messages/Chat 仍能恢复原始调用。普通请求、原生压缩、文字压缩和 handoff 共用这条出站路径。
+不直接用载体内的原始 ID，是因为它本身可能超长，两个不同载体也可能包含同一个原始 ID；不直接截断或去除空白，以免合并不同调用。GPT 历史保留客户端已确定的工具类型、name、namespace、参数及正常结果，失败结果使用载体保存的原诊断。转换仅作用于请求副本：旧会话无需迁移，切回 Messages/Chat/Gemini 仍能恢复原始调用。普通请求、原生压缩、文字压缩和 handoff 共用这条出站路径。
 
 这种无状态的目标协议边界处理也见于 [Magpie 的 `BoundCallID`](https://github.com/yetone/magpie/blob/11c3fbb197f17403183bdae424327aa0de7f0558/internal/provider/codex_request.go#L368)。这里额外保留 bridge 的载体诊断和规范化工具身份。回归覆盖真实 codeks 的 DeepSeek／Claude → GPT → 原模型切换；另用合成历史实测 GPT‑6‑Luna / medium，280、73、90 字符 ID 转换后均为 48 字符，未声明的失败工具身份及诊断可正常回放。该实测验证协议接受性，不评估模型质量。
 
-共享转换层将 Messages/Chat 工具名统一限制为 64 字符，沿用 Chat 端点的较小限制，不为不同后端维护两套命名规则；这不表示所有端点的原生上限都是 64。超长名称保留 55 字符可读前缀，加 `_` 与 8 位摘要，以区别同前缀工具。正常长度不加 hash。历史名称根据当前工具集映射，因此同一次工具调用的名称不依赖模型临时起名。
+共享转换层将 Messages/Chat/Gemini 工具名统一限制为 64 字符，沿用 Chat 端点的较小限制，不为不同后端维护两套命名规则；这不表示所有端点的原生上限都是 64。超长名称保留 55 字符可读前缀，加 `_` 与 8 位摘要，以区别同前缀工具。正常长度不加 hash。历史名称根据当前工具集映射，因此同一次工具调用的名称不依赖模型临时起名。
 
 ## 自由文本与语法
 
@@ -48,7 +48,7 @@ Responses custom tool 转成只有一个必填 `input: string` 字段的函数�
 - Regex 定义原样写进 description，要求 `input` 匹配。
 - 不给特定编辑或执行工具追加私有提示词，不修改其原描述。
 
-Messages/Chat 没有 Responses 的服务端语法约束能力，因此这是模型遵循的说明，不是同等的 constrained decoding。函数参数的 JSON 外壳仍会检查；错误、不完整的工具参数不会交给客户端执行。
+Messages/Chat/Gemini 没有 Responses 的服务端语法约束能力，因此这是模型遵循的说明，不是同等的 constrained decoding。函数参数的 JSON 外壳仍会检查；错误、不完整的工具参数不会交给客户端执行。
 
 ## 明文与多代理
 
@@ -58,13 +58,15 @@ Messages 对不符合端点格式的 call ID 采用确定性映射，并添加�
 
 根 schema 的 `$ref`、`$defs`、`allOf`、`anyOf`、`oneOf` 及其他约束均保留；缺少根 `type` 时补为 `object`，已有类型不覆盖，由上游判断是否支持。codeks 可以发送没有根 `type` 的引用或组合 schema，不能因此把参数清空。未提供参数 schema 时使用空对象定义；显式提供非对象 schema 值则报错，不在 bridge 内解析引用或删减约束。
 
-普通函数显式给出的 `strict: true` 或 `strict: false` 原样保留：Messages 放在工具定义顶层，Chat 放在 `function` 内；省略时不添加默认值。Lite 同名更新替换完整定义，因此新定义省略 `strict` 时也不继承旧值。custom 工具的 JSON 外壳不因此自动启用 strict。
+Messages/Chat 的普通函数显式给出的 `strict: true` 或 `strict: false` 原样保留：Messages 放在工具定义顶层，Chat 放在 `function` 内；省略时不添加默认值。Lite 同名更新替换完整定义，因此新定义省略 `strict` 时也不继承旧值。custom 工具的 JSON 外壳不因此自动启用 strict。
 
 [Claude strict tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/strict-tool-use) 与 [DeepSeek strict mode](https://api-docs.deepseek.com/guides/tool_calls/#strict-mode-beta) 各有支持的 schema 范围；DeepSeek 官方文档还要求 beta 端点及所有函数都设为 `strict: true`。bridge 只转换调用方明确提供的字段，不切换端点、不改其他工具或删减 schema 来满足 strict。需要该能力时由用户配置支持的端点，上游不接受则保留错误。
 
-codeks V2 多代理工具的 task/message 是明文，历史中的 `agent_message` 对 Messages/Chat 转成 user 消息，保留 author、recipient 和内容顺序。它不会成为模型 reasoning。不能解密的工具或 agent message 会明确报错。
+codeks V2 多代理工具的 task/message 是明文，历史中的 `agent_message` 对 Messages/Chat/Gemini 转成 user 消息，保留 author、recipient 和内容顺序。它不会成为模型 reasoning。不能解密的工具或 agent message 会明确报错。
 
 ## 结果与范围
+
+Gemini 的签名 part、并行结果顺序和工具结果图片遵循[原生接口规则](backends-gemini.md)，不把签名放入工具 ID。
 
 文本结果按对应 API 的 tool result 形式传递。Messages 可以把图片放进 `tool_result`；Chat 的工具结果只放文本，图片在同组所有工具结果之后组成 user 消息，并标注来源 call ID，避免打断并行调用的结果序列。
 

@@ -1,8 +1,8 @@
 import type { ResponseWriter, Usage } from "./writer.ts";
 import type { ChatgptAuthConfig } from "./chatgpt-auth.ts";
 
-export type Api = "responses" | "anthropic" | "chat";
-export type AdapterId = "gpt-responses" | "claude-messages" | "deepseek-chat";
+export type Api = "responses" | "anthropic" | "chat" | "gemini";
+export type AdapterId = "gpt-responses" | "claude-messages" | "deepseek-chat" | "gemini-native";
 export type UnrecognizedStatePolicy = "passthrough" | "drop" | "error";
 export interface ClaudeMessagesOptions {
   thinking_mismatch: "drop_block" | "error" | "upstream_default";

@@ -4,9 +4,9 @@ bridge 能识别的 reasoning 默认只恢复给产生它的目标，配置可�
 
 ## 显示与推理分开
 
-目录的 `default_reasoning_summary`、客户端的 `model_reasoning_summary` 和请求的 `reasoning.summary` 控制可见摘要，不决定是否进行推理。Claude / DeepSeek 沿用 GPT-6.1 Sol 的摘要默认值 `none`；在 codeks 配置 `model_reasoning_summary = "auto"` 可打开显示，也可使用 `concise` 或 `detailed`。Codex `0.163.0` 在 `codex-rs/core/src/client.rs` 的 `build_reasoning` 中将有效配置 `none` 表达为省略请求的 summary 字段，因此这两个 adapter 对缺省和 `none` 都不输出可见摘要，仍保存完整原生载荷，并按来源策略回放。GPT 直接保留原生参数和上游摘要事件，由上游响应请求中的显示选择，不在桥接层再次改写摘要。
+目录的 `default_reasoning_summary`、客户端的 `model_reasoning_summary` 和请求的 `reasoning.summary` 控制可见摘要，不决定是否进行推理。Claude / DeepSeek / Gemini 沿用 GPT-6.1 Sol 的摘要默认值 `none`；在 codeks 配置 `model_reasoning_summary = "auto"` 可打开显示，也可使用 `concise` 或 `detailed`。Codex `0.163.0` 在 `codex-rs/core/src/client.rs` 的 `build_reasoning` 中将有效配置 `none` 表达为省略请求的 summary 字段，因此这些 adapter 对缺省和 `none` 都不输出可见摘要，仍保存完整原生载荷，并按来源策略回放。GPT 直接保留原生参数和上游摘要事件，由上游响应请求中的显示选择，不在桥接层再次改写摘要。
 
-启用显示时，Claude 请求 summarized thinking，DeepSeek 展示上游 reasoning 文本，不另外调用模型生成摘要。`auto`、`concise` 和 `detailed` 在这两个 adapter 中都表示请求可见内容，不承诺复现 GPT 的摘要长度差异。隐藏摘要也不意味着丢弃签名、密文或明文 reasoning；这些数据仍由 carrier 持久化。
+启用显示时，Claude 请求 summarized thinking，DeepSeek 展示上游 reasoning 文本，Gemini 请求原生 thought 摘要，不另外调用模型生成摘要。`auto`、`concise` 和 `detailed` 在这些 adapter 中都表示请求可见内容，不承诺复现 GPT 的摘要长度差异。隐藏摘要也不意味着丢弃签名、密文或明文 reasoning；这些数据仍由 carrier 持久化。
 
 ## 保存格式
 
@@ -36,6 +36,7 @@ JSON 的结构如下，示例指纹为占位值：
 | `gpt-responses` | `responses.reasoning.v1` | 上游原始 `encrypted_content` 字符串 |
 | `claude-messages` | `anthropic.thinking.v1` | 完整 `thinking` 或 `redacted_thinking` block，包含签名或隐藏数据 |
 | `deepseek-chat` | `reasoning.text.v1` | 明文 reasoning 字符串 |
+| `gemini-native` | `gemini.parts.v1` | 原生 parts 及其可见输出关联，保留每个 `thoughtSignature` 所在 part |
 
 一个 carrier 对应一项 reasoning；格式可以保存字符串或结构化数据，不限于可见文字。外层只是编码，不是加密。GPT 密文本身不变；Claude 可见 thinking 和 DeepSeek 文本仍可解码。
 

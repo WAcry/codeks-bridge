@@ -19,6 +19,7 @@
 | GPT 系列 | [`gpt-responses`](backends-responses.md) | `/responses` |
 | Claude Opus / Sonnet / Haiku | [`claude-messages`](backends-anthropic.md) | `/messages` |
 | DeepSeek Flash | [`deepseek-chat`](backends-deepseek-chat.md) | `/chat/completions` |
+| Gemini 3.8 Flash / 4 Argon | [`gemini-native`](backends-gemini.md) | `/models/{model}:streamGenerateContent?alt=sse` |
 
 同一个兼容网关的连接可供不同条目使用。服务按每条请求的别名独立选路，因此父代理、子代理和并行会话可以同时使用不同上游。别名固定对应一个目标，不做上游模型发现或自动负载均衡。
 
@@ -66,7 +67,7 @@
 | `auth` | `{"type":"chatgpt"}` 使用 codeks 的文件登录凭据；可选 `codex_home` 指定登录目录 |
 | `api_key_env` | API key 环境变量名称 |
 | `api_key_command` | 与 `api_key_env` 二选一；argv 数组，程序 stdout 返回当前凭据 |
-| `auth_header` | 覆盖鉴权 header 名；默认 GPT/DeepSeek 用 `authorization: Bearer …`，Claude 用 `x-api-key` |
+| `auth_header` | 覆盖鉴权 header 名；默认 GPT/DeepSeek 用 `authorization: Bearer …`，Claude 用 `x-api-key`，Gemini 用 `x-goog-api-key`；OAuth Bearer 连接可显式选择 `authorization` |
 | `headers_timeout_ms` | 等待上游响应头的最长时间；省略时沿用 `stream_idle_timeout_ms`，`null` 表示禁用 |
 | `stream_idle_timeout_ms` | 收到上游响应头后，等待下一批字节的最长空闲时间，默认 300000 ms；`null` 表示禁用 |
 | `headers` | 静态 header，覆盖同名客户端 header，例如 API 版本 |
@@ -234,7 +235,7 @@ model_reasoning_summary = "auto"
 
 ## 压缩模式与执行模型
 
-`models.<别名>.compaction.mode` 可选择 `summary` 或 `native`。默认值取自工作模型：GPT 默认 `native`，Claude/DeepSeek 默认 `summary`。`compaction.model` 可引用另一个已配置的模型别名，让它执行压缩；省略时由工作模型自己执行。两项独立，仅设置执行模型不会改变模式。
+`models.<别名>.compaction.mode` 可选择 `summary` 或 `native`。默认值取自工作模型：GPT 默认 `native`，Claude/DeepSeek/Gemini 默认 `summary`。`compaction.model` 可引用另一个已配置的模型别名，让它执行压缩；省略时由工作模型自己执行。两项独立，仅设置执行模型不会改变模式。
 
 GPT 的默认配置等价于：
 
@@ -322,7 +323,7 @@ bridge 能识别的自身状态默认允许恢复；两份列表增加其他允�
 { "replay": { "unrecognized": "error" } }
 ```
 
-GPT 将透传项保留在 Responses `input` 中，包括其 `id`；Claude/DeepSeek 将原项放入 assistant 消息的 content 数组，不把未知密文猜解为 thinking 或文字。这保留了原始数据，但不保证跨协议或跨模型兼容，上游可以拒绝；bridge 不自动重试或改用其他策略。
+GPT 将透传项保留在 Responses `input` 中，包括其 `id`；Claude/DeepSeek 将原项放入 assistant 消息的 content 数组，Gemini 放入 model 的 parts，不把未知密文猜解为 thinking 或文字。这保留了原始数据，但不保证跨协议或跨模型兼容，上游可以拒绝；bridge 不自动重试或改用其他策略。
 
 这些项没有可确认的来源与复述配方，因此不套用来源允许列表、不创建来源身份，也不触发按需复述。能解码的 bridge carrier 仍遵循原有来源、格式和压缩表示规则。三个选项都不改写客户端已保存的历史；`drop` 会减少本次请求的 reasoning 上下文，丢弃压缩检查点还可能失去早期对话的唯一表示。普通请求取工作模型的策略，委托压缩取实际执行模型的策略。
 
@@ -330,7 +331,7 @@ GPT 将透传项保留在 Responses `input` 中，包括其 `id`；Claude/DeepSe
 
 bridge 的 `GET /v1/models` 返回 Codex 专用的 `{"models": [...]}`，每项包含完整提示词、窗口、工具、多代理和 reasoning 元数据。它与经典 OpenAI 的 `{"object":"list","data":[...]}` 格式不同。仅列出配置中的别名，不暴露上游连接、实际部署名或凭据设置。
 
-这些条目来自仓库内已审阅的 [catalog](../catalog/README.md)，运行时只展开别名和显式配置覆盖。GPT 优先使用自己的 Codex 源码条目，源码尚未收录的模型使用已审阅订阅快照；Claude 和 DeepSeek 使用经过精调的 GPT-6.1 Sol 模板。不会启动 codeks 导出模板，也不请求订阅账号的模型目录。目录版本随 bridge 代码更新，升级客户端不会自动改写它。
+这些条目来自仓库内已审阅的 [catalog](../catalog/README.md)，运行时只展开别名和显式配置覆盖。GPT 优先使用自己的 Codex 源码条目，源码尚未收录的模型使用已审阅订阅快照；Claude、DeepSeek 和 Gemini 使用经过精调的 GPT-6.1 Sol 模板。不会启动 codeks 导出模板，也不请求订阅账号的模型目录。目录版本随 bridge 代码更新，升级客户端不会自动改写它。
 
 ### HTTP 发现
 

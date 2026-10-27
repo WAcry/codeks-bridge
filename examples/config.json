@@ -13,6 +13,10 @@
     "deepseek": {
       "base_url": "https://api.deepseek.com",
       "api_key_env": "DEEPSEEK_API_KEY"
+    },
+    "google": {
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "api_key_env": "GEMINI_API_KEY"
     }
   },
   "models": {
@@ -30,6 +34,11 @@
       "upstream": "deepseek",
       "model": "deepseek-flash",
       "catalog": "deepseek-flash"
+    },
+    "gemini": {
+      "upstream": "google",
+      "model": "gemini-3.8-flash",
+      "catalog": "gemini-3.8-flash"
     }
   }
 }

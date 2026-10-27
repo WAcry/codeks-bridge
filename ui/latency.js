@@ -58,6 +58,12 @@ function eventKinds(data, visibleOnly) {
         default: return [];
       }
     default:
+      if (Array.isArray(data?.candidates)) {
+        return data.candidates.flatMap(candidate => array(candidate.content?.parts).flatMap(part => [
+          ...(present(part.text) ? [part.thought === true ? 'reasoning' : 'text'] : []),
+          ...(present(part.functionCall?.name) ? ['tool'] : []),
+        ]));
+      }
       return array(data?.choices).flatMap(choice => {
         const delta = choice?.delta ?? choice?.message;
         if (!delta) return [];

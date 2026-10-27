@@ -23,6 +23,8 @@
 | `claude-sonnet-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
 | `claude-haiku-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
 | `deepseek-flash` | `gpt-6.1-sol`，经精调 | `deepseek-chat` |
+| `gemini-3.8-flash` | `gpt-6.1-sol`，经精调 | `gemini-native` |
+| `gemini-4-argon` | `gpt-6.1-sol`，经精调 | `gemini-native` |
 
 每份 JSON 包含：
 
@@ -47,7 +49,7 @@ GPT-6.1 Terra 使用 `rust-v0.165.0` 的同名源码条目。按用户选择将�
 
 GPT-Reserve 是客户端在普通额度用尽、后端授权后切换的回退模型。Codex 源码目录没有 `gpt-reserve` 条目，客户端只在 TUI 中按这个模型名处理额度回退和模型选择器。因此该条目取自 ChatGPT 订阅端点 `/models` 的同名条目，`source` 记录端点、请求时的客户端版本和取得日期，不记录 tag 与 commit。除上述 shell 类型规范化外，字段顺序和取值原样保留，包括 `visibility: "hide"`、`upgrade: null`、`model_messages.auto_review: null`、`base_instructions` 和 `available_access_programs`；提示词、Lite、多代理 v1、272K/872K 窗口、reasoning 和 `comp_hash` 与 GPT-5.6 Luna 一致。只删除公开源码未出现的名称：两个值为 `false` 的布尔字段，以及 `available_in_plans` 中的两个方案名；客户端不读取这些字段。导入脚本不处理订阅端点，更新时需手动取得条目并重新审阅。与其他条目一样，客户端目录中的 slug、展示名、排序和可见性由别名配置决定；要在选择器中隐藏，需在别名上设置 `visibility: "hide"`。
 
-Claude 和 DeepSeek 从 GPT-6.1 Sol 的完整条目开始，只做各自 JSON 中列出的修改：底层模型与展示信息、工作窗口、reasoning 档位，以及当前 adapter 尚未转换的参数和 GPT 专属的服务展示信息。提示词仅将首句的 `based on GPT-6` 换成 `based on Claude` 或 `based on DeepSeek`；`You are Codex`、`As Codex` 和其余客户端指令保留。`default_reasoning_summary` 保持源条目的 `none`，由用户在 codeks 中选择摘要展示方式。
+Claude、DeepSeek 和 Gemini 从 GPT-6.1 Sol 的完整条目开始，只做各自 JSON 中列出的修改：底层模型与展示信息、工作窗口、reasoning 档位，以及当前 adapter 尚未转换的参数和 GPT 专属的服务展示信息。提示词仅将首句的 `based on GPT-6` 换成对应的模型家族；`You are Codex`、`As Codex` 和其余客户端指令保留。`default_reasoning_summary` 保持源条目的 `none`，由用户在 codeks 中选择摘要展示方式。
 
 预算默认值遵循与 GPT-6.1 Sol 模板对齐的维护原则：仅保留模板已有字段，或为上游必填参数补充默认值；公布的能力上限本身不要求新增默认配置。窗口字段沿用模板结构：按用户选择，三个 Claude 条目的默认 `context_window` 为 `400000`，`max_context_window` 保留 `1000000`；400K 是项目的工作预算，不是官方能力上限。DeepSeek Flash 的两个字段均为 `1000000`。压缩阈值保留模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 要求 `max_tokens`，因此三个 Claude 条目提供 `128000` 默认预算；GPT 和 DeepSeek 的输出预算由请求、用户配置或上游默认值决定。
 
@@ -58,6 +60,8 @@ Claude 的默认 effort 为 `medium`，DeepSeek 为 `high`。DeepSeek 和 Haiku 
 Opus / Sonnet 两个条目从 `low` 开始：Opus 5.5 始终启用 thinking，Sonnet 5.5 的最低模式 `between_tools` 仍保留工具之间的思考，因此不能用 `none` 表示。需要 Sonnet 的这一模式时，使用 [Messages 原生 options](../docs/backends-anthropic.md#历史与-thinking) 显式配置。目录列出的档位应与已审阅模型匹配；未列出的显式请求值仍交给上游裁决。[Claude thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)
 
 `ultra` 保留 Codex 的自动分工提示词和档位说明：Opus 5.5 使用原生 `xhigh`，Sonnet 5.5、Haiku 5.5 与 DeepSeek Flash 使用 `max`；各条目的 `multi_agent_reasoning_effort` 与映射一致。
+
+Gemini 3.8 Flash 与 Gemini 4 Argon 使用原生 `streamGenerateContent`，默认 `medium`，普通档位为 `low`、`medium`、`high`，`ultra` 使用原生 `high`；两模型不支持 `minimal`，不把它或 `none` 列入目录。Argon 的原生接口要求提供 `thinkingLevel`。工作窗口保留 Sol 模板的 `272000`，`max_context_window` 为官方公布的 `1048576`：Flash 是输入上限，Argon 是输入与输出共用的上下文上限。原生接口不要求输出预算，目录不额外设置 `max_output_tokens`；请求和配置可以覆盖。Gemini 保留图片输入、关闭 `original` 声明，并默认使用文字压缩。[Flash 规格](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash)、[Argon 规格](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon)、[原生 thinking 参数](https://ai.google.dev/gemini-api/docs/generate-content/thinking)、[适配说明](../docs/backends-gemini.md)
 
 这些源模型都明确设置 `supports_search_tool: true`，本目录保持原值。Code Mode Only 如何暴露工具由客户端源码决定，不能因为没有独立的外层 `tool_search` 就把此字段改为 false。网页搜索和图片生成有各自的客户端设置，不通过这个字段控制。
 

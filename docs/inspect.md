@@ -55,6 +55,8 @@ codeks-bridge serve --config /absolute/path/bridge.json --capture
 
 大内容只在显示时折叠，记录本身完整。长字符串显示开头和结尾，中间注明省略的字符数，可以展开全部、复制或下载；`cxbr1:` 与 `cxbc1:` 载荷可以直接解码。很长的列表分批显示，可以继续加载。Responses Lite 的终止事件可能省略完整 `output`；结构视图会用之前的 `response.output_item.done` 还原输出，原始事件保持不变。
 
+Gemini 原生流按 candidate 合成结构视图，只拼接相邻的无签名文字，保留 `thoughtSignature` 所在 part、函数调用和上游终止原因。`usageMetadata` 使用最后一次报告，输出 token 为 `candidatesTokenCount + thoughtsTokenCount`，缓存取 `cachedContentTokenCount`；不把多次累计报告相加。thought 文字、正文与函数调用分别计入延迟，空文字和签名不计入。结构合成不会补造成功状态，原始事件仍可逐条查看。
+
 模型请求的列表和详情顶部 token 用量取自写回 codeks 的响应，只代表该次 main、summary 或 native 调用。handoff 的独立 usage 可在它的上游响应中查看：SSE 事件、结构或 JSON 视图保留原始字段，不累加进客户端用量。缓存命中不产生新的 handoff 调用，也不重复展示为本次消耗。搜索与图片请求保留上游原始响应及其 usage；图片用量只属于本次独立调用，不累加到后续推理。检查器没有跨调用的计费总额；上游没有报告的字段不能按零消耗理解。
 
 “概要”给出实际执行模型的路由配置、每个调用的时间线和上游调用表；模型推理请求的客户端模型字段仍保留用户请求的工作别名；图片请求显示客户端指定的图片模型。“标注”列出全部回放决定，点击可定位到对应项。“对比”选择任意两次交换的任意一段做结构比较，常用的是和同一线程上一轮的客户端请求或上游请求比较；数组按类型和角色对齐，新增、删除的项单独标出。
@@ -75,7 +77,7 @@ codeks-bridge serve --config /absolute/path/bridge.json --capture
 
 正文完整保存，不做字段白名单，也不在服务端截断。codeks 或上游新增的字段原样出现，页面只在显示时折叠。
 
-只有凭据类 header 会脱敏。名称按 `-`/`_` 分段后含 `auth`、`authorization`、`token`、`secret`、`password`、`passwd`、`cookie`、`key`、`apikey`、`credential(s)` 或 `signature` 的 header，值替换为 `[redacted: N chars, sha256 xxxxxxxx]`。长度和哈希前缀可以用来判断凭据是否传到了上游、两次请求是否用了同一个凭据。正文不脱敏。
+凭据类 header 与上游 URL 查询值会脱敏。名称按 `-`/`_` 分段后含 `auth`、`authorization`、`token`、`secret`、`password`、`passwd`、`cookie`、`key`、`apikey`、`credential(s)` 或 `signature` 的值替换为 `[redacted: N chars, sha256 xxxxxxxx]`，覆盖 `x-goog-api-key` 和 `?key=`；普通查询参数如 `alt=sse` 保留。长度和哈希前缀可以用来判断两次请求是否用了同一个凭据。脱敏只影响捕获记录，实际请求不变；正文不脱敏。
 
 几处需要注意的边界：
 

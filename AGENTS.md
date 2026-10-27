@@ -1,6 +1,6 @@
 # codeks-bridge
 
-codeks-bridge 是给 codeks（openai/codex 的自用 fork）用的本地模型桥接器。它对 codeks 提供 Responses 接口，通过已审阅的模型目录接入 GPT Responses、Claude Messages 和 DeepSeek Chat 上游。配置选择目录条目、连接、模型参数和状态复用策略，条目指定的 adapter 负责协议转换。
+codeks-bridge 是给 codeks（openai/codex 的自用 fork）用的本地模型桥接器。它对 codeks 提供 Responses 接口，通过已审阅的模型目录接入 GPT Responses、Claude Messages、DeepSeek Chat 和 Gemini 原生上游。配置选择目录条目、连接、模型参数和状态复用策略，条目指定的 adapter 负责协议转换。
 
 动手前先读：
 

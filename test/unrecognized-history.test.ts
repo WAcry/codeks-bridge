@@ -4,6 +4,7 @@ import { createServer, type Server } from "node:http";
 import test from "node:test";
 import { buildAnthropicRequest } from "../src/backends/anthropic.ts";
 import { buildDeepSeekRequest } from "../src/backends/deepseek.ts";
+import { buildGeminiRequest } from "../src/backends/gemini.ts";
 import { responsesBody } from "../src/backends/responses.ts";
 import { encodeCompaction, encodeReasoning } from "../src/carrier.ts";
 import { CompactionHandoffStore } from "../src/compaction-handoff.ts";
@@ -12,7 +13,7 @@ import { prepareHistory } from "../src/history.ts";
 import { createBridgeServer } from "../src/server.ts";
 import type { Backend, BackendContext, ResolvedModel } from "../src/types.ts";
 
-const aliases = ["gpt", "claude", "deepseek"] as const;
+const aliases = ["gpt", "claude", "deepseek", "gemini"] as const;
 const stateTypes = ["reasoning", "compaction", "compaction_summary"];
 const message = (role: string, text: string) => ({ type: "message", role, content: [{ type: "input_text", text }] });
 const opaque = [
@@ -30,7 +31,7 @@ function configuration(policy?: unknown, base = "https://example.com/v1") {
     upstreams: { example: { base_url: base } },
     models: Object.fromEntries(aliases.map((alias) => [alias, {
       upstream: "example", model: `${alias}-deployment`,
-      catalog: { gpt: "gpt-6.1-sol", claude: "claude-sonnet-5-5", deepseek: "deepseek-flash" }[alias],
+      catalog: { gpt: "gpt-6.1-sol", claude: "claude-sonnet-5-5", deepseek: "deepseek-flash", gemini: "gemini-3.8-flash" }[alias],
       ...(policy === undefined ? {} : { replay: { unrecognized: policy } }),
     }])),
   });
@@ -43,11 +44,13 @@ function context(route: ResolvedModel, input: Record<string, any>[]): BackendCon
 function requestBody(ctx: BackendContext): Record<string, any> {
   if (ctx.route.profile.api === "responses") return responsesBody(ctx);
   if (ctx.route.profile.api === "anthropic") return buildAnthropicRequest(ctx).body;
+  if (ctx.route.profile.api === "gemini") return buildGeminiRequest(ctx).body;
   return buildDeepSeekRequest(ctx).body;
 }
 
 function outgoingState(body: Record<string, any>): Record<string, any>[] {
   if (body.input) return body.input.filter((item: any) => stateTypes.includes(item.type));
+  if (body.contents) return body.contents.flatMap((item: any) => item.parts).filter((item: any) => stateTypes.includes(item.type));
   return body.messages.flatMap((item: any) => Array.isArray(item.content) ? item.content : [])
     .filter((item: any) => stateTypes.includes(item.type));
 }
@@ -73,7 +76,11 @@ test("all adapters pass unrecognized state without decoding or losing fields", (
     assert.deepEqual(prepareHistory(input, route), input);
     const body = requestBody(context(route, input));
     assert.deepEqual(outgoingState(body), opaque);
-    if (route.profile.api !== "responses") {
+    if (route.profile.api === "gemini") {
+      for (const item of body.contents) {
+        if (item.parts.some((part: any) => stateTypes.includes(part.type))) assert.equal(item.role, "model");
+      }
+    } else if (route.profile.api !== "responses") {
       for (const item of body.messages) {
         if (Array.isArray(item.content) && item.content.some((part: any) => stateTypes.includes(part.type))) {
           assert.equal(item.role, "assistant");
@@ -124,7 +131,7 @@ test("unrecognized policy does not replace source and format rules for decoded c
 test("opaque checkpoints do not trigger a handoff or need their original source configured", async () => {
   const config = configuration();
   const never: Backend = async () => assert.fail("Opaque checkpoints cannot generate a bridge handoff");
-  const store = new CompactionHandoffStore(config, { "gpt-responses": never, "claude-messages": never, "deepseek-chat": never });
+  const store = new CompactionHandoffStore(config, { "gpt-responses": never, "claude-messages": never, "deepseek-chat": never, "gemini-native": never });
   for (const alias of aliases) {
     const ctx = context(resolveModel(config, alias), opaque);
     assert.equal(await store.materialize(ctx), ctx.request);

@@ -280,6 +280,24 @@ test("credential commands keep diagnostics private and adapters own protocol hea
   assert.equal((await upstreamHeaders(upstream, "responses", signal)).get("content-type"), "application/json;charset=utf-8");
 });
 
+test("Gemini credentials belong to the upstream and can use a Bearer token", async () => {
+  const upstream = {
+    base_url: "https://example.com/v1beta",
+    api_key_command: [process.execPath, "-e", "process.stdout.write('synthetic-credential')"],
+  };
+  const signal = new AbortController().signal;
+  const client = new Headers({ authorization: "Bearer bridge-credential", "x-goog-api-key": "client-key", "session-id": "synthetic-session" });
+  const native = await upstreamHeaders(upstream, "gemini", signal, client);
+  assert.equal(native.get("x-goog-api-key"), "synthetic-credential");
+  assert.equal(native.get("authorization"), null);
+  assert.equal(native.get("session-id"), "synthetic-session");
+  const bearer = await upstreamHeaders({ ...upstream, auth_header: "authorization" }, "gemini", signal, client);
+  assert.equal(bearer.get("authorization"), "Bearer synthetic-credential");
+  assert.equal(bearer.get("x-goog-api-key"), null);
+  const responses = await upstreamHeaders(upstream, "responses", signal, client);
+  assert.equal(responses.get("x-goog-api-key"), null);
+});
+
 
 test("catalog resolves codeks Ultra through the configured map instead of the template", () => {
   const c = config();

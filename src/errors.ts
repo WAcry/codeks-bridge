@@ -98,7 +98,7 @@ export function upstreamError(status: number | undefined, payload: unknown, head
     : status !== undefined ? `Upstream returned HTTP ${status}` : "The upstream response failed";
   const kind = [error?.code, error?.type].filter((value) => typeof value === "string").join(" ");
   let code: string;
-  if (/context_length|too_many_tokens/.test(kind) || /prompt is too long|maximum context length|too many tokens/i.test(message)) code = "context_length_exceeded";
+  if (/context_length|too_many_tokens/.test(kind) || /prompt is too long|maximum context length|too many tokens|input token count[^\n]*exceeds the maximum number of tokens/i.test(message)) code = "context_length_exceeded";
   else if (/quota|billing|credit|balance/.test(kind) || /insufficient (quota|credit|balance)/i.test(message)) code = "insufficient_quota";
   else if (status === 429 || /rate_limit|slow_down/.test(kind)) code = "rate_limit_exceeded";
   else if (status === 503 || status === 529 || /overload/.test(kind)) code = "server_is_overloaded";
