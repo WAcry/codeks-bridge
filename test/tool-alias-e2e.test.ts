@@ -209,11 +209,12 @@ for (const api of ["chat", "messages"] as const) {
       const dotted = replay(body, api, "call_dotted");
       assert.equal(callName(dotted.call, api), "functions.exec");
       assert.match(JSON.stringify(dotted.result), /DOTTED_ALIAS_OK/);
-      if (step === 3) return { name: "missing_tool", id: "call_unknown", input: 'text(await tools.exec_command({cmd: "printf wrong > wrong-tool-executed.txt"}));' };
+      if (step === 3) return { name: "functions.exce", id: "call_unknown", input: 'text(await tools.exec_command({cmd: "printf wrong > wrong-tool-executed.txt"}));' };
       assert.ok(step >= 4 && step <= 6, "Initial completion, persisted resume and switch back each use one request");
       const unknown = replay(body, api, "call_unknown");
-      assert.equal(callName(unknown.call, api), "missing_tool");
+      assert.equal(callName(unknown.call, api), "functions.exce");
       assert.match(JSON.stringify(unknown.result), /unknown.*No tool was executed/);
+      assert.match(JSON.stringify(unknown.result), /Closest available tools/);
       assert.match(JSON.stringify(unknown.result), /functions__exec/);
       if (api === "messages") assert.equal(unknown.result.is_error, true);
       return { text: "ALIAS_DONE" };
