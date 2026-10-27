@@ -139,6 +139,66 @@ test("unknown names use the normal tool-error loop and retain their original arg
   for (const name of ["functions__exec", "agents__spawn_agent", "clock__sleep"]) assert.ok(body.messages[2].content.includes(name));
 });
 
+function suggestedFeedback(definitions: unknown[], name: string): { text: string; choices: string[] } {
+  const tools = buildToolSet(definitions);
+  const order = tools.entries.map(tool => tool.flatName);
+  const item = committed(prepareToolCall(tools, "wire_suggestion", name, {}));
+  assert.equal(tools.get(item.namespace, item.name), undefined, "Suggestions must never dispatch a real tool");
+  const result = toolResultForReplay({ call_id: item.call_id, output: "unsupported call" });
+  assert.equal(result.isError, true);
+  assert.equal(typeof result.output, "string");
+  assert.deepEqual(tools.entries.map(tool => tool.flatName), order, "Ranking must not reorder the tool table");
+  const text = result.output as string;
+  return { text, choices: [...text.matchAll(/^- (.+)$/gm)].map(match => match[1]) };
+}
+
+test("unknown names rank close spellings, prefer their namespace on ties, and show at most five tools", () => {
+  const definitions = [
+    { type: "namespace", name: "other", tools: [functionTool("sleep")] },
+    { type: "namespace", name: "clock", tools: [functionTool("sleep"), functionTool("stop")] },
+    { type: "namespace", name: "functions", tools: [
+      "wait", "exec", "spawn_agent", "write", "request_user_input", "wait_agent", "followup_task", "list_agents",
+    ].map(functionTool) },
+  ];
+  for (const name of ["clock__slep", "clock.slep"]) {
+    const { text, choices } = suggestedFeedback(definitions, name);
+    assert.deepEqual(choices.slice(0, 3), ["clock__sleep", "other__sleep", "clock__stop"]);
+    assert.equal(choices.length, 5);
+    assert.match(text, /Closest available tools \(showing 5 of 11\)/);
+    assert.match(text, /Use an exact tool name from the available tool definitions/);
+  }
+  const bare = suggestedFeedback(definitions, "slep");
+  assert.deepEqual(bare.choices.slice(0, 2), ["other__sleep", "clock__sleep"],
+    "Equal scores without a namespace keep declaration order");
+});
+
+test("unknown-name ranking considers full names and never prefers namespace over a closer spelling", () => {
+  const definitions = [
+    { type: "namespace", name: "clock", tools: [functionTool("pause")] },
+    { type: "namespace", name: "other", tools: [functionTool("sweep")] },
+    functionTool("clock__sleep"),
+  ];
+  const { text, choices } = suggestedFeedback(definitions, "clock__slep");
+  assert.deepEqual(choices, ["clock__sleep", "other__sweep", "clock__pause"]);
+  assert.doesNotMatch(text, /showing/);
+  assert.match(suggestedFeedback([], "missing").text, /No tools are available/);
+});
+
+test("ambiguous names show at most five exact candidates without approximate alternatives", () => {
+  for (const count of [3, 5, 7]) {
+    const definitions = [
+      ...Array.from({ length: count }, (_, i) => ({ type: "namespace", name: `source${i}`, tools: [functionTool("read")] })),
+      { type: "namespace", name: "other", tools: [functionTool("read_file"), functionTool("reader")] },
+    ];
+    const { text, choices } = suggestedFeedback(definitions, "read");
+    assert.match(text, /"read" is ambiguous/);
+    assert.deepEqual(choices, Array.from({ length: Math.min(count, 5) }, (_, i) => `source${i}__read`));
+    assert.doesNotMatch(text, /Closest|other__/);
+    if (count > 5) assert.match(text, /Matching tools \(showing 5 of 7\)/);
+    else assert.doesNotMatch(text, /showing/);
+  }
+});
+
 test("canonical call ids and ordinary tool results stay unchanged", () => {
   const tools = buildToolSet(definitions);
   const item = committed(prepareToolCall(tools, "wire_canonical", "clock__sleep", { duration_ms: 1 }));
