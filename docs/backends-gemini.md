@@ -37,7 +37,7 @@
 
 ## 消息、工具与图片
 
-开头的 instructions、system 和 developer 指令进入 `systemInstruction`；中途 system/developer 指令转换为原位置的 user `<system-reminder>`，不会为每条新指令重写顶部。user 与 assistant 对应原生 `user` / `model`；相邻同角色内容按原协议组成 parts。
+开头的 instructions、system 和 developer 指令进入 `systemInstruction`；中途 system/developer 指令转换为原位置的 user `<system-reminder>`，不会为每条新指令重写顶部。user 与 assistant 对应原生 `user` / `model`；相邻同类内容组成 parts，但工具结果与后续的新用户指令分别保留为独立 Content。连续的并行工具结果仍在同一 Content 中按调用顺序排列。实测 Vertex AI 路由中，将结果和新指令合并会返回“Requests ending with a model turn are not supported”，保留两条相邻 user Content 则成功；不据此声称所有原生端点都禁止混合 parts。
 
 Lite 的 `additional_tools` 按历史顺序合并，声明放入顶层 `tools.functionDeclarations`，同身份保留最新版本。namespace 名称、自由文本工具和 Lark/regex 语法沿用[共同工具转换](tools.md)，不为 Gemini 另造命名约定。工具调用成为 `functionCall`，结果成为 `functionResponse`；跨消息交错的调用与结果先使用现有工具历史配对规则整理。
 

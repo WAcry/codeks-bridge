@@ -83,7 +83,8 @@ export function buildGeminiRequest(context: BackendContext): { body: Record<stri
     if (!parts.length) return;
     flushModel();
     const last = contents.at(-1);
-    if (last?.role === "user") last.parts.push(...parts);
+    // Preserve the boundary between tool results and a new user instruction.
+    if (last?.role === "user" && Boolean(last.parts[0]?.functionResponse) === Boolean(parts[0]?.functionResponse)) last.parts.push(...parts);
     else contents.push({ role: "user", parts });
   };
   for (const item of prepareHistory(request.input, route)) {
