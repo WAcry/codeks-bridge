@@ -80,6 +80,19 @@ test("Gemini keeps tools with NONE and honors native generation options without 
   assert.equal(body.customOption, true);
 });
 
+test("Gemini keeps a new user instruction after the complete parallel tool-response turn", () => {
+  const { body } = buildGeminiRequest(context({ tools: [tool], input: [
+    message("user", "Read both tasks."),
+    ...["a", "b"].map(call_id => ({ type: "function_call", namespace: "files", name: "lookup", call_id, arguments: "{}" })),
+    { type: "function_call_output", call_id: "b", output: "second" },
+    { type: "function_call_output", call_id: "a", output: "first" },
+    message("user", "Summarize the completed work."),
+  ] }));
+  assert.deepEqual(body.contents.map((content: any) => content.role), ["user", "model", "user", "user"]);
+  assert.deepEqual(body.contents[2].parts.map((part: any) => part.functionResponse.id), ["a", "b"]);
+  assert.deepEqual(body.contents[3].parts, [{ text: "Summarize the completed work." }]);
+});
+
 test("Gemini compaction removes response format but preserves tool choice", () => {
   const ctx = context({ tools: [tool], tool_choice: "auto", text: { format: { type: "json_schema", schema: {} } } });
   ctx.compacting = true;

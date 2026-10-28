@@ -1,0 +1,156 @@
+<analysis>
+1. **Chronological Review of User Requests and Assistant Actions**:
+   - **Initial Request**: We are working on Driftship (`/work/driftship` on branch `feature/resumable-upload`), a TypeScript CLI for uploading a directory to a resumable HTTP object store. The user asked to add resumable parallel uploads, read the repository first, keep zero runtime dependencies and Node 22 or later, inspect server constraints before deciding on defaults (initially suggesting 6 concurrent requests, 8 MiB chunks, 4 retries), keep the command `driftship push <directory> --to <url>`, and keep work strictly to local development and tests (do not publish, merge, or push anything to a remote).
+   - **Inspection**: We checked `package.json`, `src/scan.ts`, `src/push.ts`, and `docs/server-protocol.md` (protocol revision 3: `minimum_chunk_bytes: 1048576`, `maximum_chunk_bytes: 16777216`, `preferred_chunk_bytes: 4194304`, `maximum_parallel_parts: 4`, `checksums: ["sha256"]`).
+   - **Worker/Chunk/Retry/Journal Configuration**: User specified 4 workers, 4 MiB chunks, 4 retries (meaning 4 extra attempts after the initial attempt = 5 total attempts), journal at `.driftship/resume-v1.json` inside the source directory with resume enabled by default, durable journal writes for removable drives, and no deletion/abortion of remote sessions when starting fresh locally.
+   - **URL Validation, Credentials, Identity, and Journal Serialization**: User required rejecting query parameters, fragments, and URL userinfo (normalizing only a trailing slash), keeping authentication in `DRIFTSHIP_TOKEN`, never echoing a supplied URL or token in errors, using full SHA-256 + size + nanosecond mtime for resume identity, and serializing journal writes without adding any external database or runtime dependency.
+   - **Lost Responses, Retry Rules, Cancellation, and Dry-Run**:
+     - User asked to exercise lost responses (part persists before socket dies; completion succeeds before response disappears) without duplicate objects or skipped parts, and ensure `--dry-run` makes zero network calls and creates no `.driftship` directory.
+     - User clarified retry rules: only idempotent `PUT` part uploads may retry; `begin` and `complete` must not automatically retry. One `GET` status check after an ambiguous `complete` network failure (`TypeError`) is allowed; if that `GET` fails, return its error and let the next invocation resume. Cancellation (`SIGINT`) must exit 130. Remote cleanup is out of scope.
+   - **CLI Flag Change**: User changed `--no-resume` to `--resume=on|off` (default `on`), rejecting `verify` for now and removing `--no-resume` without keeping it as an alias.
+   - **JSON Events and Metrics**: User requested one UUID `run_id` generated once per invocation on every JSON event, keeping `type` as the discriminator, and reporting `files`, `bytes`, `uploaded_bytes`, and `resumed_bytes` on `complete` (counting confirmed unique bytes, excluding retransmission traffic).
+   - **Session Validation & Scope Boundaries**: User stated snapshots, file locks, copy-on-write, and watchers are out of scope; detected source changes fail. Remote `status.file_size`, `status.file_sha256`, and `status.part_size` must be validated before accepting resumed state; mismatches must fail with `session_mismatch` rather than silently replacing the session. Only missing (`404`) or `expired` sessions restart automatically.
+   - **Exit Codes & Cancellation Settling**: User defined exit codes: `0` success, `1` transport/server or ordinary local I/O failure (including server checksum mismatch), `2` usage/configuration, `3` invalid or mismatched local resume state (`journal_invalid`, `journal_unsupported`, `destination_mismatch`, `session_mismatch`, but not ordinary permission errors), `130` interruption. Cancellation must settle already queued journal writes without scheduling new upload work.
+   - **Capability Discovery**: User specified keeping `--concurrency` range 1–16, with effective concurrency `min(user setting, server maximum_parallel_parts)`. Malformed discovery or protocol other than 3 must fail before `begin` with no guessed defaults. Dry-run makes no network calls and can display requested concurrency.
+   - **Stress Test, Production Readiness Constraint, and Final Diff Review**:
+     - User instructed not to claim production readiness (no real storage-service test has been run), run a final local stress case (100 small files + 3 large files), review the patch, and not search for unrelated credentials.
+     - Stress test S1 (`seed 83177`, 103 files) and full unit (103) + integration (84) suites passed.
+     - `node scripts/review-final-diff.ts` identified R1, R2, R3 (must fix), R4, R5 (follow-ups), and R6 (document).
+   - **Most Recent User Instruction**:
+     - Fix R1, R2, R3 and add a short note for R6.
+     - Rerun affected tests and typecheck (no need to repeat the full suite unless fixes reveal broader concerns).
+     - Do not create the local commit yet; the user wants to inspect the final diff after these changes.
+     - Keep useful follow-ups in `docs/development-notes.md`, including Windows durability and missing real-service smoke.
+     - Immediately before compaction, we read `src/retry.ts` to begin implementing R1.
+
+2. **Check for Completeness and Constraints**:
+   - All security constraints (never serialize/log `DRIFTSHIP_TOKEN` or supplied URLs in errors/journals/events, reject redirects, no remote cleanup/DELETE calls, no shell execution of filenames or hooks, do not search for unrelated credentials, do not commit/push/merge/publish) are preserved verbatim.
+   - All code snippets and file paths from recent turns are accurately recorded.
+</analysis>
+
+<summary>
+1. Primary Request and Intent:
+   - Add resumable parallel directory uploads to Driftship (`/work/driftship`, branch `feature/resumable-upload`), a TypeScript CLI (`driftship push <directory> --to <url>`) targeting Node 22 or later with zero runtime dependencies.
+   - **Defaults & Server Constraints**:
+     - 4 concurrent workers (`--concurrency`, allowed range 1–16, effective concurrency is `min(requested, capabilities.maximum_parallel_parts)`).
+     - 4 MiB chunks (`--chunk-mib`, allowed range 1–16 MiB, validated against server `minimum_chunk_bytes` and `maximum_chunk_bytes`).
+     - 4 retries (`--retries`, allowed range 0–12), meaning 4 extra attempts after the initial attempt (5 total attempts).
+     - Capability discovery (`GET capabilities`) must validate `protocol === 3`, chunk bounds, `maximum_parallel_parts`, and `sha256` support before starting uploads, with no guessed defaults.
+   - **Resume & Journal**:
+     - Store journal at `.driftship/resume-v1.json` inside the source directory (`0o700` parent directory, `0o600` file).
+     - Use `--resume=on|off` (default `on`); reject `verify` and do not keep `--no-resume` as an alias.
+     - Durable journal writes: serialize updates through an in-memory promise queue, write to a temporary file, `fsync` the file, atomically `rename`, and `fsync` the parent directory.
+     - Local file identity requires matching `size`, nanosecond `mtimeNs`, full `sha256`, and `chunkBytes`.
+     - Remote session status (`GET uploads/{id}`) must validate `file_size`, `file_sha256`, and `part_size` against the local file record (`session_mismatch` on discrepancy). Only missing (`404`) or `expired` sessions restart automatically.
+     - `--dry-run` must make zero network calls (skipping capability discovery) and create no `.driftship` directory.
+   - **Retry & Reconciliation Rules**:
+     - Only idempotent `PUT` part uploads may retry (on HTTP `408, 429, 500, 502, 503, 504` or network `TypeError`, honoring `Retry-After` delta-seconds or HTTP-date).
+     - Do not automatically retry `begin` or `complete`.
+     - On an ambiguous network failure (`TypeError`) during `POST uploads/{id}/complete`, perform a single `GET uploads/{id}` status read; if the session state is `complete`, validate and return its receipt.
+   - **JSON Events & Exit Codes**:
+     - Every JSON stdout event must include `type` (discriminator) and a per-invocation UUID `run_id`.
+     - The `complete` event reports `files`, `bytes`, `uploaded_bytes`, and `resumed_bytes` (counting confirmed unique bytes, not retransmission wire traffic).
+     - Exit codes: `0` success, `1` transport/server or ordinary local I/O failure (including server `checksum_mismatch`), `2` usage/configuration/protocol mismatch, `3` invalid or mismatched local resume state (`journal_invalid`, `journal_unsupported`, `destination_mismatch`, `session_mismatch`), `130` interruption (`SIGINT`).
+     - On `SIGINT`, stop scheduling new work, abort in-flight requests, and settle already queued journal writes before exiting `130`.
+   - **Security, Scope, and Workflow Constraints (Preserve Verbatim)**:
+     - This round is local development and tests. Do not publish, merge, or push anything to a remote.
+     - Do not create the local commit yet; the user wants to inspect the final diff after fixing R1, R2, R3, R6, and updating `docs/development-notes.md`.
+     - Do not claim production readiness: there has been no real storage-service test. Later remote smoke needs a dedicated test tenant and credentials; do not search for unrelated credentials.
+     - Authentication stays in `DRIFTSHIP_TOKEN`. Never serialize it into journals, progress, error output, or request snapshots. Errors must not echo a supplied URL or token.
+     - Reject query parameters, fragments, and URL userinfo in destination URLs; only a trailing slash may be normalized.
+     - Reject HTTP redirects (`redirect: 'error'`) rather than forwarding authorization to another host.
+     - Keep remote cleanup (`DELETE` / abort endpoints) out of scope; `--resume=off` and cancellation must never delete or abort remote sessions.
+     - Filenames are data (never execute shell commands or hooks from uploaded directories; preserve raw Unicode bytes without NFC/NFD normalization; skip `.git`, `.driftship`, symlinks, FIFOs, and devices).
+     - Snapshots, file locks, copy-on-write, and watchers are out of scope.
+
+2. Key Technical Concepts:
+   - Object Store Protocol v3 (`GET capabilities`, `POST uploads`, `PUT uploads/{id}/parts/{part}`, `GET uploads/{id}`, `POST uploads/{id}/complete`).
+   - Bounded global concurrency pool (`parallel` consuming a lazy generator `pendingParts` across all files).
+   - Crash-safe atomic file replacement with file and directory `fsync` serialized via `JournalStore`.
+   - Lost-response recovery via idempotent part `PUT` replay and single-read completion reconciliation.
+   - Transfer metrics deduplication (`TransferMetrics`) separating confirmed `uploaded_bytes` and `resumed_bytes` from wire retransmission bytes.
+
+3. Files and Code Sections:
+   - `src/retry.ts`:
+     - Implements `retryDelay` and `retry`.
+     - Currently being examined to fix review item **R1** (`Date.parse("-1")` accepting negative numbers as dates and producing a `0` ms delay instead of falling back to exponential backoff).
+     - Current code:
+       ```ts
+       import { setTimeout } from 'node:timers/promises';
+       export interface RetryOptions { retries:number; signal:AbortSignal; now?:()=>number; random?:()=>number; sleep?:(ms:number,signal:AbortSignal)=>Promise<void>; onRetry?:(attempt:number,delayMs:number)=>void; }
+       export function retryDelay(header:string|null,now:number):number|undefined {
+         if(!header)return undefined;
+         const seconds=Number(header);
+         if(Number.isFinite(seconds)&&seconds>=0)return seconds*1000;
+         const date=Date.parse(header);
+         if(!Number.isNaN(date))return Math.max(0,date-now);
+         return undefined;
+       }
+       export async function retry<T>(operation:(attempt:number)=>Promise<T>, classify:(e:unknown)=>{retry:boolean;after?:string},options:RetryOptions):Promise<T> {
+         const now=options.now??Date.now, random=options.random??Math.random;
+         const sleep=options.sleep??((ms,signal)=>setTimeout(ms,undefined,{signal}));
+         for(let attempt=0;;attempt++) {
+           options.signal.throwIfAborted();
+           try {return await operation(attempt);}
+           catch(error) {
+             const decision=classify(error);
+             if(!decision.retry||attempt>=options.retries)throw error;
+             const after=retryDelay(decision.after??null,now());
+             const base=Math.min(30000,500*2**attempt);
+             const delay=after??Math.floor(base*(0.5+random()*0.5));
+             options.onRetry?.(attempt+1,delay);
+             await sleep(delay,options.signal);
+           }
+         }
+       }
+       ```
+   - `src/push.ts` & `src/resume.ts`:
+     - Orchestrates directory scanning, capability discovery, journal loading, session resumption/creation, lazy part scheduling (`pendingParts`), `try / finally { await store.settled(); }`, post-upload fingerprint verification, and file completion.
+     - Needs review item **R2** fixed: `validateSession(status, saved)` must be called before accepting `status.state === 'complete'` as well as `status.state === 'open'`.
+     - Relevant code in `src/resume.ts`:
+       ```ts
+       export function validateSession(status:Record<string,unknown>,file:JournalFile):void {
+         if(status.file_size!==file.size||status.file_sha256!==file.sha256||status.part_size!==file.chunkBytes)throw new CliError('Remote session does not match source','session_mismatch');
+       }
+       ```
+   - `src/journal.ts` & `src/journal-store.ts`:
+     - `writeJournal` writes to `.resume-${randomUUID()}.tmp` with mode `0o600`, syncs the file, renames to `.driftship/resume-v1.json`, and syncs the parent directory (`0o700`).
+     - `JournalStore` chains updates sequentially on `this.pending` and records any write error in `this.failed`.
+   - `src/complete.ts`:
+     - Validates completion receipts (`path`, `bytes`, `sha256`, `etag`) and reconciles lost `complete` responses on `TypeError` via a single `transport.getStatus(file.uploadId)` call.
+   - `src/capabilities.ts`:
+     - `parseCapabilities` validates protocol 3, positive safe integers for chunk bounds and `maximum_parallel_parts`, `min <= preferred <= max`, and `checksums.includes('sha256')`.
+     - `effectiveSettings` caps concurrency at `Math.min(requested.concurrency, caps.maximumParallelParts)` and validates `requested.chunkBytes`.
+   - `src/options.ts` & `src/exit-code.ts`:
+     - `parseOptions` parses `--to`, `--concurrency`, `--chunk-mib`, `--retries`, `--resume` (`on` | `off`), `--json`, and `--dry-run`.
+     - `exitCode` maps interruption to `130`, usage/destination/protocol errors to `2`, journal/destination/session mismatch errors to `3`, and everything else to `1`.
+   - `docs/resume.md`, `docs/json-events.md`, `README.md`, and `docs/development-notes.md`:
+     - Documentation for resume behavior, JSON event schema, CLI usage, and follow-up development notes.
+
+4. Errors and Fixes:
+   - **Concurrent journal update race**: Parallel workers overwrote each other's confirmed parts (`expected parts [1,2], observed [2]`). Fixed by introducing `JournalStore` to serialize all state mutations and disk writes through a single promise queue.
+   - **Destination URL query/fragment/userinfo handling**: `destinationKey` initially stripped query/hash/credentials silently. Fixed in `validateDestination` (`src/path.ts`) to reject URLs containing `username`, `password`, `search`, or `hash` without echoing the URL or token.
+   - **Lost `complete` response & already-complete session**: `completeFile` failed on socket reset after server commit, and `push` re-posted `/complete` when resuming an already completed session. Fixed by short-circuiting `status.state === 'complete'` during resume and reconciling `TypeError` during `complete` with a single `getStatus` check.
+   - **TypeScript strict typecheck errors**: Fixed non-void promise catch return in `src/journal-store.ts`, wrapped `Buffer` in `new Uint8Array(body)` for `fetch` in `src/transport.ts`, and narrowed `CliError` before reading `.code` in `src/cli.ts`.
+   - **Exit code 3 & SIGINT pending journal writes**: Added `src/exit-code.ts` to return `3` for `journal_invalid`, `journal_unsupported`, `destination_mismatch`, and `session_mismatch`, and wrapped `parallel(...)` in `try / finally { await store.settled(); }` so queued journal writes finish on cancellation.
+
+5. Problem Solving:
+   - Built and verified the full resumable parallel upload pipeline against unit tests (103 passing), integration fault-injection suites (`integration/generated/protocol-01..03.test.ts`, 84 passing), and a 103-file local stress test (`integration/stress.ts --seed 83177` with 100 small files and 3 multi-part large files under injected 503, part socket reset, and lost completion response faults).
+   - Ran `node scripts/review-final-diff.ts` to audit the final diff, uncovering three must-fix issues (R1, R2, R3), two follow-up architecture notes (R4, R5), and one documentation item (R6).
+
+6. Pending Tasks:
+   - **Fix R1 (`src/retry.ts` and retry tests)**: Enforce a strict nonnegative integer delta-seconds grammar (e.g., `/^\d+$/`) and strict HTTP-date parsing in `retryDelay` so negative values like `"-1"` are not parsed as dates by `Date.parse("-1")` (which produced a `0` ms delay). Update the negative `Retry-After` test (`retry-negative` / unit tests) to assert that it falls back to positive local backoff delay rather than `0`.
+   - **Fix R2 (`src/push.ts` and resume/status tests)**: Move `validateSession(status, saved)` so it runs before accepting `status.state === 'complete'` as well as `status.state === 'open'`.
+   - **Fix R3 (`README.md`)**: Replace `--no-resume` in the README's first example with `--resume=off`.
+   - **Document R6 (`docs/json-events.md` / docs)**: Add a concise note explaining that initial CLI option parser errors occur before `--json` is established and are emitted as plain text to `stderr`.
+   - **Update `docs/development-notes.md`**: Record useful follow-ups including R4 (file descriptor reuse to narrow source-change races), R5 (lazy session creation for huge file counts so idle sessions aren't opened upfront), Windows directory-fsync/rename durability validation, and the missing real storage-service smoke test.
+   - **Verify without committing**: Rerun affected tests and `npm run typecheck`, then inspect `git diff` / `git status` without creating a commit.
+
+7. Current Work:
+   - Immediately before this summary request, the user asked to:
+     "Fix R1, R2, R3 and add a short note for R6. Rerun affected tests and typecheck; no need to repeat the full suite unless the fixes reveal broader concerns. Do not create the local commit yet. I want to inspect the final diff after these changes. Keep useful follow-ups in docs/development-notes.md, including Windows durability and missing real-service smoke."
+   - We had just read `src/retry.ts` to inspect `retryDelay(header, now)` and begin applying fix R1.
+
+8. Optional Next Step:
+   - Edit `src/retry.ts` to fix R1 (strict delta-seconds and HTTP-date parsing in `retryDelay`), edit `src/push.ts` to fix R2 (call `validateSession` before the `status.state === 'complete'` fast path), update `README.md` for R3 (`--resume=off`), update documentation for R6 and `docs/development-notes.md` (R4, R5, Windows durability, missing real-service smoke test), and rerun the affected unit/integration tests and `npm run typecheck` while leaving all changes uncommitted for user inspection.
+</summary>

@@ -90,12 +90,26 @@ node benchmarks/compaction/run.mjs \
 
 [Opus K2 补充报告](results/2026-10-20-opus/README.md)复用同样材料，只测试详细文字摘要。记录六份成功高密度产物、两次生成拒绝、三个开发重复，以及原生 Messages 下默认 5 分钟缓存的实际命中。内容评分与严格 JSON 格式评分分开；其完整历史对照使用 auto 以复用生成前缀，专用调度与上述通用 Responses runner 有所不同。
 
+[Gemini 4 Argon / high 对照](results/2026-10-28-gemini/README.md)复用八份高密度输入和三个开发重复，比较当前 bridge summary 与用户提供的 Antigravity prompt。两者分别标记 S、A，避免与历史 K2 混淆。该轮只新增文字摘要与问答，历史 GPT 原生压缩、handoff 和 Opus 结果从已保存记录读取。
+
+[compare-prompts.mjs](compare-prompts.mjs) 通过 Responses 接口运行文字 prompt 对照；输入、题目、公共指令和 prompt 的 hash 固定在计划中。每份材料先做完整历史、空历史两个答题对照，再连续生成两种摘要；两种 prompt 的先后次序按案例交替。完整历史对照使用 auto，其余对照与恢复问答使用 none。相同开发历史的重复共享基线，闭卷问答仍只含 K。失败保留，不自动重试。Gemini 原生连接由单独运行的 bridge 配置提供，端点和鉴权不写进计划。
+
+```sh
+node benchmarks/compaction/compare-prompts.mjs \
+  --plan benchmarks/compaction/results/2026-10-28-gemini/plan.json \
+  --out benchmarks/compaction/runs/gemini-high
+```
+
+默认只校验输入和输出离线计划；提供 `BENCHMARK_URL`、`BENCHMARK_HEADERS` 并添加 `--execute` 才调用上游。`--cases normal-r1,normal-r2,normal-r3` 可只运行一组；每次使用新输出目录。Gemini Argon 使用隐式缓存，不添加显式缓存对象或 TTL；实际命中以 usage 为准。
+
 本地假上游检查 runner 的实验隔离和数据处理；公开记录核验器检查文件 hash，并从原始回答和题目重算分数。两者都不调用模型：
 
 ```sh
 node --test benchmarks/compaction/offline-test.mjs
+node --test benchmarks/compaction/compare-prompts-test.mjs
 node benchmarks/compaction/verify-record.mjs benchmarks/compaction/results/2026-10-20
 node benchmarks/compaction/verify-record.mjs benchmarks/compaction/results/2026-10-20-opus
+node benchmarks/compaction/verify-record.mjs benchmarks/compaction/results/2026-10-28-gemini
 ```
 
 生成器改编自公开 MIT 项目 `algal/pi-openai-server-compaction`，完整许可在源文件内；Codex prompt 和文本保留算法的归属见仓库 [NOTICE](../../NOTICE)。

@@ -1,0 +1,75 @@
+<summary>
+1. **Task Overview**
+   - **Goal**: Add resumable parallel uploads to Driftship (`@harbor-lab/driftship`), a TypeScript CLI (`driftship push <directory> --to <url>`) in `/work/driftship` on branch `feature/resumable-upload`.
+   - **Core Requirements**:
+     - Keep zero runtime dependencies (`dependencies: {}`) and require Node >= 22.
+     - Defaults aligned with server protocol revision 3: 4 concurrent requests (`--concurrency`, range 1–16, effective concurrency is `min(user setting, server maximum_parallel_parts)`), 4 MiB chunks (`--chunk-mib`, range 1–16 MiB, validated against server min/max chunk bytes), 4 retries (`--retries`, range 0–12, meaning 4 extra attempts = 5 total attempts).
+     - Durable resume journal at `<directory>/.driftship/resume-v1.json` (temp file `0o600`, `fsync`, atomic `rename`, parent dir `0o700` `fsync`, serialized write queue).
+     - Flag `--resume=on|off` (default `on`). Reject `verify` or other values. Do **not** keep `--no-resume` as an alias.
+     - JSON mode (`--json`) emits one JSON object per stdout line with `type` discriminator and a per-invocation UUID `run_id`. Final `complete` event includes `files`, `bytes`, `uploaded_bytes`, and `resumed_bytes` (confirmed unique bytes, excluding retransmission traffic).
+     - Exit codes: `0` success, `1` server/transport/checksum/ordinary local I/O error, `2` usage/invalid destination/unsupported protocol, `3` invalid or mismatched local resume state (`journal_invalid`, `journal_unsupported`, `destination_mismatch`, `session_mismatch`), `130` interruption (`SIGINT`, settling already-queued journal writes before exiting).
+   - **Scope Boundaries**:
+     - Local development and tests only. Do **not** publish, merge, or push to any remote.
+     - Do **not** create the local git commit yet (user wants to inspect the uncommitted final diff first).
+     - Do **not** claim production readiness (no real storage-service test has been run; do not search for unrelated credentials).
+     - Remote session cleanup/deletion and filesystem snapshots/locks/watchers are out of scope.
+
+2. **Progress**
+   - **Completed & Verified Implementation**:
+     - `src/scan.ts`: Recursively scans regular files, skips `.git`, `.driftship`, symlinks, FIFOs/devices, preserves exact UTF-8/Unicode filenames without normalization, sorts by `relativePath`.
+     - `src/path.ts`: Validates `http:`/`https:`, rejects userinfo, query parameters, and fragments without echoing the URL or token; normalizes only a trailing slash; percent-encodes path segments (`%` -> `%25`).
+     - `src/hash.ts`: Full-file SHA-256 `fingerprint` verifying size and `mtimeNs` before and after hashing (`source_changed`), plus `readPart`.
+     - `src/journal.ts` & `src/journal-store.ts`: Reads/validates v1 journal; writes temp file (`0o600`), `file.sync()`, `rename()`, parent directory `sync()`; serializes updates via `JournalStore`.
+     - `src/capabilities.ts`: Validates `GET capabilities` (`protocol === 3`, safe positive integers, `min <= preferred <= max`, `sha256` checksum support) and computes effective concurrency (`min(requested, maximum_parallel_parts)`). Skipped during `--dry-run`.
+     - `src/transport.ts` & `src/complete.ts`: Sends `Bearer` token from `DRIFTSHIP_TOKEN`, sets `redirect: 'error'`, retries only idempotent `PUT` part requests on `408, 429, 500, 502, 503, 504` or network `TypeError`. Never retries `begin` or `complete`; reconciles an ambiguous `complete` `TypeError` with a single `GET uploads/{id}` status read.
+     - `src/resume.ts`, `src/pool.ts`, `src/metrics.ts`, `src/options.ts`, `src/exit-code.ts`, `src/push.ts`, `src/cli.ts`: Full upload pipeline, lazy `pendingParts` generator, global concurrency pool, dry-run (0 network calls, no `.driftship` dir created), and SIGINT handling (`try/finally` awaiting `store.settled()`).
+   - **Verification Run So Far**:
+     - `node scripts/probe-parallel.ts`: PASS.
+     - `node --test test/capabilities.test.ts integration/capabilities.test.ts`: 12 passed.
+     - `node integration/stress.ts --seed 83177`: Stress S1 PASS (100 small files + 3 large files = 103 files, 4 workers, 4 MiB chunks, injected 503, part socket reset, and lost complete response).
+     - `git diff --check && npm run typecheck && npm test && npm run test:integration`: Clean diff check, strict typecheck passed, 103 unit tests passed, 84 integration tests passed.
+     - `node scripts/review-final-diff.ts`: Identified items R1–R6.
+   - **In Progress**:
+     - Read `src/retry.ts` to prepare for R1. Edits for R1, R2, R3, R6, and `docs/development-notes.md` have **not** been applied or tested yet.
+
+3. **Key Findings**
+   - From `node scripts/review-final-diff.ts` and user instructions:
+     - **R1 (Must Fix in `src/retry.ts` & tests)**: `retryDelay("-1", now)` fails `seconds >= 0` (`Number("-1")` is `-1`), then falls through to `Date.parse("-1")`, which V8 parses as a past date, returning `Math.max(0, date - now) === 0` ms instead of `undefined`! The test `retry-negative` in `integration/generated/protocol-03.test.ts` only checked `Number.isFinite(delay)`, missing the zero-delay bug. `retryDelay` must use a strict nonnegative delta-seconds grammar (`/^\d+$/`) and strict HTTP-date parsing so negative/numeric strings return `undefined` and fall back to local backoff.
+     - **R2 (Must Fix in `src/push.ts` & tests)**: In `src/push.ts`, when resuming a file where `GET uploads/{id}` returns `status.state === 'complete'`, the fast path validates `status.receipt` before calling `validateSession(status, saved)`. `validateSession` (`status.file_size`, `status.file_sha256`, `status.part_size`) only runs on the `status.state === 'open'` branch. Moving `validateSession(status, saved)` before both `complete` and `open` branches ensures a mismatched completed session raises `session_mismatch` (exit code 3).
+     - **R3 (Must Fix in `README.md`)**: The first example in `README.md` still says `--no-resume`; replace it with `--resume=off`.
+     - **R6 & Follow-ups (`docs/development-notes.md` / `docs/json-events.md`)**: Document that initial CLI argument parse errors occur before `--json` is known and output plain text to `stderr`. Record follow-ups in `docs/development-notes.md` (Windows directory-fsync/rename durability unvalidated, missing real storage-service smoke test requiring dedicated test tenant/credentials, file descriptor reuse for source-change race reduction, and lazy session creation for very large file trees).
+
+4. **Errors & Fixes**
+   - *Concurrent journal lost updates (`expected parts [1,2], observed [2]`)*: Fixed by serializing state mutations and disk writes through `JournalStore` (`src/journal-store.ts`) and syncing the parent directory after `rename`.
+   - *Silent query stripping on destination URL*: Fixed `validateDestination` in `src/path.ts` to reject URL userinfo, query strings, and fragments before normalizing the trailing slash.
+   - *Duplicate `complete` POST on already-completed session & unhandled socket reset on `complete`*: Fixed `src/push.ts` to short-circuit on `status.state === 'complete'` and `src/complete.ts` to perform one `GET uploads/{id}` status check when `POST .../complete` throws a network `TypeError`.
+   - *Typecheck errors in `src/journal-store.ts`, `src/transport.ts`, `src/cli.ts`*: Fixed promise catch return type (`{ this.failed = error; }`), passed `new Uint8Array(body)` to `fetch`, and narrowed `error instanceof CliError` before reading `.code`.
+   - *Exit code 1 instead of 3 on `destination_mismatch` & unsettled journal write on `SIGINT`*: Added `src/exit-code.ts` mapping resume/session mismatches to `3` and `SIGINT` to `130`; wrapped `parallel(...)` in `try/finally { await store.settled(); }` in `src/push.ts`.
+
+5. **Active Context**
+   - Repo `/work/driftship` is on `feature/resumable-upload` with uncommitted changes.
+   - All tests run against the local in-process fake HTTP server (`integration/harness.ts`).
+
+6. **Next Steps**
+   1. **Read files to be modified**:
+      - Inspect `src/push.ts`, `README.md`, `docs/json-events.md`, `docs/development-notes.md` (if present), `test/` retry/resume unit tests, and `integration/generated/protocol-02.test.ts` / `integration/generated/protocol-03.test.ts`.
+   2. **Fix R1 (`src/retry.ts` and tests)**:
+      - Update `retryDelay` in `src/retry.ts` so delta-seconds requires `/^\d+$/` (nonnegative integer seconds) and negative or numeric strings never fall through to `Date.parse`; require a valid HTTP-date string before accepting `Date.parse`.
+      - Update unit tests and `retry-negative` in `integration/generated/protocol-03.test.ts` to assert that `Retry-After: -1` falls back to positive exponential backoff delay (e.g., `delay >= 250`).
+   3. **Fix R2 (`src/push.ts` and tests)**:
+      - In `src/push.ts`, call `validateSession(status, saved)` before handling `status.state === 'complete'` as well as `status.state === 'open'`.
+      - Add/update a test case verifying that `status.state === 'complete'` with mismatched session metadata (`file_size`, `file_sha256`, or `part_size`) fails with `session_mismatch` (exit code 3).
+   4. **Fix R3 (`README.md`)**:
+      - Replace `--no-resume` with `--resume=off` in `README.md` and run `rg -- '--no-resume'` to ensure no references remain.
+   5. **Document R6 and follow-ups (`docs/development-notes.md` & `docs/json-events.md`)**:
+      - Ensure the note on initial CLI argument parse errors (before `--json` is known, emitted as plain text on `stderr`) is present.
+      - Write `docs/development-notes.md` covering: Windows directory-fsync and rename durability being unvalidated, missing real storage-service smoke test (needs dedicated test tenant and credentials), file descriptor reuse to reduce source-change races (atomic snapshots out of scope), lazy session creation for huge file counts, and the `--json` pre-parse error boundary.
+   6. **Run targeted verification**:
+      - Run `npm run typecheck`, the affected unit/integration tests, `node scripts/review-final-diff.ts`, and `git diff --check`.
+      - Leave all changes uncommitted so the user can inspect the final diff.
+
+7. **Commitments & Constraints**
+   - Do **not** run `git commit`, `git push`, `git merge`, or `npm publish`.
+   - Do **not** claim production readiness or access any external network/credentials.
+   - Keep zero runtime dependencies, Node >= 22, and never leak `DRIFTSHIP_TOKEN` or destination URLs into errors, journals, or events.
+</summary>

@@ -43,6 +43,20 @@
       "sha256": "e9b088e794a6bb9082ac053fcc760bd818d7e720ee4bcdc72c6e480de7b7cb0e",
       "utf8_bytes": 399,
       "characters": 399
+    },
+    "bridge-summary": {
+      "file": "bridge-summary.txt",
+      "sha256": "205d11dc8508227da7bfabd19f48981d502c92cb72e1ac2239f855eadb231782",
+      "utf8_bytes": 5985,
+      "characters": 5977,
+      "source": "Exact SUMMARIZATION_PROMPT at codeks-bridge commit 74aea6a2e3b70a18adbcde1f1ff9a677545582b9; no trailing newline."
+    },
+    "antigravity": {
+      "file": "antigravity.txt",
+      "sha256": "adc0b546b4512337f3edc1080cbcdf2d4b9303345664815694024e7304898a1c",
+      "utf8_bytes": 3937,
+      "characters": 3931,
+      "source": "English prompt supplied by the user for this comparison, attributed by user to Antigravity; not independently matched to a released version."
     }
   },
   "notes": [

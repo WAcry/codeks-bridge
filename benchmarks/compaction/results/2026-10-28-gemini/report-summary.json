@@ -1,0 +1,1358 @@
+{
+  "selections": {
+    "all_stress": [
+      "stress-3617031",
+      "stress-3617032",
+      "stress-3617033",
+      "stress-3617034",
+      "stress-3617131",
+      "stress-3617132",
+      "stress-3617133",
+      "stress-3617134"
+    ],
+    "historical_gpt_seven": [
+      "stress-3617031",
+      "stress-3617032",
+      "stress-3617033",
+      "stress-3617034",
+      "stress-3617131",
+      "stress-3617132",
+      "stress-3617133"
+    ],
+    "opus_completed_six": [
+      "stress-3617031",
+      "stress-3617032",
+      "stress-3617034",
+      "stress-3617132",
+      "stress-3617133",
+      "stress-3617134"
+    ],
+    "normal": [
+      "normal-r1",
+      "normal-r2",
+      "normal-r3"
+    ]
+  },
+  "groups": {
+    "all_stress": {
+      "case_ids": [
+        "stress-3617031",
+        "stress-3617032",
+        "stress-3617033",
+        "stress-3617034",
+        "stress-3617131",
+        "stress-3617132",
+        "stress-3617133",
+        "stress-3617134"
+      ],
+      "routes": {
+        "Gemini S": {
+          "planned": 8,
+          "generated": 7,
+          "answered": 7,
+          "known": {
+            "correct": 1050,
+            "total": 1050,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 1050,
+            "total": 1050,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 35,
+            "total": 35,
+            "accuracy": 1
+          },
+          "delivery": {
+            "correct": 1050,
+            "total": 1200,
+            "accuracy": 0.875
+          },
+          "product_tokens": {
+            "n": 7,
+            "mean": 48534.71428571428,
+            "min": 46028,
+            "max": 54354
+          },
+          "common_text_tokens": {
+            "n": 7,
+            "mean": 32625.571428571428,
+            "min": 31044,
+            "max": 36283
+          },
+          "perfect": 7
+        },
+        "Gemini A": {
+          "planned": 8,
+          "generated": 8,
+          "answered": 8,
+          "known": {
+            "correct": 1200,
+            "total": 1200,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 1200,
+            "total": 1200,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 40,
+            "total": 40,
+            "accuracy": 1
+          },
+          "delivery": {
+            "correct": 1200,
+            "total": 1200,
+            "accuracy": 1
+          },
+          "product_tokens": {
+            "n": 8,
+            "mean": 47445.125,
+            "min": 45286,
+            "max": 52789
+          },
+          "common_text_tokens": {
+            "n": 8,
+            "mean": 31973,
+            "min": 30302,
+            "max": 35436
+          },
+          "perfect": 8
+        },
+        "GPT K3": {
+          "planned": 8,
+          "generated": 8,
+          "answered": 8,
+          "known": {
+            "correct": 1065,
+            "total": 1200,
+            "accuracy": 0.8875
+          },
+          "product_tokens": {
+            "n": 8,
+            "mean": 16558.5,
+            "min": 4079,
+            "max": 18939
+          },
+          "common_text_tokens": null
+        },
+        "GPT K4": {
+          "planned": 8,
+          "generated": 8,
+          "answered": 8,
+          "known": {
+            "correct": 1088,
+            "total": 1200,
+            "accuracy": 0.9066666666666666
+          },
+          "product_tokens": {
+            "n": 8,
+            "mean": 17732.5,
+            "min": 8723,
+            "max": 20808
+          },
+          "common_text_tokens": {
+            "n": 8,
+            "mean": 17726.5,
+            "min": 8717,
+            "max": 20802
+          }
+        },
+        "Opus K2": {
+          "planned": 8,
+          "generated": 6,
+          "answered": 6,
+          "known": {
+            "correct": 900,
+            "total": 900,
+            "accuracy": 1
+          },
+          "product_tokens": {
+            "n": 6,
+            "mean": 25664.166666666668,
+            "min": 23981,
+            "max": 27560
+          },
+          "common_text_tokens": {
+            "n": 6,
+            "mean": 21798,
+            "min": 19838,
+            "max": 23686
+          },
+          "delivery": {
+            "correct": 900,
+            "total": 1200,
+            "accuracy": 0.75
+          }
+        }
+      }
+    },
+    "historical_gpt_seven": {
+      "case_ids": [
+        "stress-3617031",
+        "stress-3617032",
+        "stress-3617033",
+        "stress-3617034",
+        "stress-3617131",
+        "stress-3617132",
+        "stress-3617133"
+      ],
+      "routes": {
+        "Gemini S": {
+          "planned": 7,
+          "generated": 7,
+          "answered": 7,
+          "known": {
+            "correct": 1050,
+            "total": 1050,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 1050,
+            "total": 1050,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 35,
+            "total": 35,
+            "accuracy": 1
+          },
+          "delivery": {
+            "correct": 1050,
+            "total": 1050,
+            "accuracy": 1
+          },
+          "product_tokens": {
+            "n": 7,
+            "mean": 48534.71428571428,
+            "min": 46028,
+            "max": 54354
+          },
+          "common_text_tokens": {
+            "n": 7,
+            "mean": 32625.571428571428,
+            "min": 31044,
+            "max": 36283
+          },
+          "perfect": 7
+        },
+        "Gemini A": {
+          "planned": 7,
+          "generated": 7,
+          "answered": 7,
+          "known": {
+            "correct": 1050,
+            "total": 1050,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 1050,
+            "total": 1050,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 35,
+            "total": 35,
+            "accuracy": 1
+          },
+          "delivery": {
+            "correct": 1050,
+            "total": 1050,
+            "accuracy": 1
+          },
+          "product_tokens": {
+            "n": 7,
+            "mean": 46936.142857142855,
+            "min": 45286,
+            "max": 52789
+          },
+          "common_text_tokens": {
+            "n": 7,
+            "mean": 31647,
+            "min": 30302,
+            "max": 35436
+          },
+          "perfect": 7
+        },
+        "GPT K3": {
+          "planned": 7,
+          "generated": 7,
+          "answered": 7,
+          "known": {
+            "correct": 1050,
+            "total": 1050,
+            "accuracy": 1
+          },
+          "product_tokens": {
+            "n": 7,
+            "mean": 18341.285714285714,
+            "min": 17327,
+            "max": 18939
+          },
+          "common_text_tokens": null
+        },
+        "GPT K4": {
+          "planned": 7,
+          "generated": 7,
+          "answered": 7,
+          "known": {
+            "correct": 1049,
+            "total": 1050,
+            "accuracy": 0.9990476190476191
+          },
+          "product_tokens": {
+            "n": 7,
+            "mean": 19019.571428571428,
+            "min": 17633,
+            "max": 20808
+          },
+          "common_text_tokens": {
+            "n": 7,
+            "mean": 19013.571428571428,
+            "min": 17627,
+            "max": 20802
+          }
+        },
+        "Opus K2": {
+          "planned": 7,
+          "generated": 5,
+          "answered": 5,
+          "known": {
+            "correct": 750,
+            "total": 750,
+            "accuracy": 1
+          },
+          "product_tokens": {
+            "n": 5,
+            "mean": 25710.4,
+            "min": 23981,
+            "max": 27560
+          },
+          "common_text_tokens": {
+            "n": 5,
+            "mean": 21835,
+            "min": 19838,
+            "max": 23686
+          },
+          "delivery": {
+            "correct": 750,
+            "total": 1050,
+            "accuracy": 0.7142857142857143
+          }
+        }
+      }
+    },
+    "opus_completed_six": {
+      "case_ids": [
+        "stress-3617031",
+        "stress-3617032",
+        "stress-3617034",
+        "stress-3617132",
+        "stress-3617133",
+        "stress-3617134"
+      ],
+      "routes": {
+        "Gemini S": {
+          "planned": 6,
+          "generated": 5,
+          "answered": 5,
+          "known": {
+            "correct": 750,
+            "total": 750,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 750,
+            "total": 750,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 25,
+            "total": 25,
+            "accuracy": 1
+          },
+          "delivery": {
+            "correct": 750,
+            "total": 900,
+            "accuracy": 0.8333333333333334
+          },
+          "product_tokens": {
+            "n": 5,
+            "mean": 47736.8,
+            "min": 46028,
+            "max": 53680
+          },
+          "common_text_tokens": {
+            "n": 5,
+            "mean": 32113.4,
+            "min": 31044,
+            "max": 35895
+          },
+          "perfect": 5
+        },
+        "Gemini A": {
+          "planned": 6,
+          "generated": 6,
+          "answered": 6,
+          "known": {
+            "correct": 900,
+            "total": 900,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 900,
+            "total": 900,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 30,
+            "total": 30,
+            "accuracy": 1
+          },
+          "delivery": {
+            "correct": 900,
+            "total": 900,
+            "accuracy": 1
+          },
+          "product_tokens": {
+            "n": 6,
+            "mean": 48099.5,
+            "min": 46065,
+            "max": 52789
+          },
+          "common_text_tokens": {
+            "n": 6,
+            "mean": 32487,
+            "min": 31077,
+            "max": 35436
+          },
+          "perfect": 6
+        },
+        "GPT K3": {
+          "planned": 6,
+          "generated": 6,
+          "answered": 6,
+          "known": {
+            "correct": 765,
+            "total": 900,
+            "accuracy": 0.85
+          },
+          "product_tokens": {
+            "n": 6,
+            "mean": 16047.166666666666,
+            "min": 4079,
+            "max": 18939
+          },
+          "common_text_tokens": null
+        },
+        "GPT K4": {
+          "planned": 6,
+          "generated": 6,
+          "answered": 6,
+          "known": {
+            "correct": 789,
+            "total": 900,
+            "accuracy": 0.8766666666666667
+          },
+          "product_tokens": {
+            "n": 6,
+            "mean": 17236.5,
+            "min": 8723,
+            "max": 19226
+          },
+          "common_text_tokens": {
+            "n": 6,
+            "mean": 17230.5,
+            "min": 8717,
+            "max": 19220
+          }
+        },
+        "Opus K2": {
+          "planned": 6,
+          "generated": 6,
+          "answered": 6,
+          "known": {
+            "correct": 900,
+            "total": 900,
+            "accuracy": 1
+          },
+          "product_tokens": {
+            "n": 6,
+            "mean": 25664.166666666668,
+            "min": 23981,
+            "max": 27560
+          },
+          "common_text_tokens": {
+            "n": 6,
+            "mean": 21798,
+            "min": 19838,
+            "max": 23686
+          },
+          "delivery": {
+            "correct": 900,
+            "total": 900,
+            "accuracy": 1
+          }
+        }
+      }
+    },
+    "normal": {
+      "case_ids": [
+        "normal-r1",
+        "normal-r2",
+        "normal-r3"
+      ],
+      "routes": {
+        "Gemini S": {
+          "planned": 3,
+          "generated": 3,
+          "answered": 3,
+          "known": {
+            "correct": 251,
+            "total": 267,
+            "accuracy": 0.9400749063670412
+          },
+          "strict_known": {
+            "correct": 251,
+            "total": 267,
+            "accuracy": 0.9400749063670412
+          },
+          "unknown": {
+            "correct": 12,
+            "total": 12,
+            "accuracy": 1
+          },
+          "delivery": {
+            "correct": 251,
+            "total": 267,
+            "accuracy": 0.9400749063670412
+          },
+          "product_tokens": {
+            "n": 3,
+            "mean": 5668,
+            "min": 4917,
+            "max": 6350
+          },
+          "common_text_tokens": {
+            "n": 3,
+            "mean": 5213.666666666667,
+            "min": 4575,
+            "max": 5829
+          },
+          "perfect": 0
+        },
+        "Gemini A": {
+          "planned": 3,
+          "generated": 3,
+          "answered": 3,
+          "known": {
+            "correct": 244,
+            "total": 267,
+            "accuracy": 0.9138576779026217
+          },
+          "strict_known": {
+            "correct": 244,
+            "total": 267,
+            "accuracy": 0.9138576779026217
+          },
+          "unknown": {
+            "correct": 12,
+            "total": 12,
+            "accuracy": 1
+          },
+          "delivery": {
+            "correct": 244,
+            "total": 267,
+            "accuracy": 0.9138576779026217
+          },
+          "product_tokens": {
+            "n": 3,
+            "mean": 3294.6666666666665,
+            "min": 2867,
+            "max": 3789
+          },
+          "common_text_tokens": {
+            "n": 3,
+            "mean": 3065.3333333333335,
+            "min": 2686,
+            "max": 3486
+          },
+          "perfect": 0
+        },
+        "GPT K3": {
+          "planned": 3,
+          "generated": 3,
+          "answered": 3,
+          "known": {
+            "correct": 232,
+            "total": 267,
+            "accuracy": 0.8689138576779026
+          },
+          "product_tokens": {
+            "n": 3,
+            "mean": 2287.3333333333335,
+            "min": 2086,
+            "max": 2395
+          },
+          "common_text_tokens": null
+        },
+        "GPT K4": {
+          "planned": 3,
+          "generated": 3,
+          "answered": 3,
+          "known": {
+            "correct": 226,
+            "total": 267,
+            "accuracy": 0.846441947565543
+          },
+          "product_tokens": {
+            "n": 3,
+            "mean": 3238.3333333333335,
+            "min": 2995,
+            "max": 3450
+          },
+          "common_text_tokens": {
+            "n": 3,
+            "mean": 3234.3333333333335,
+            "min": 2991,
+            "max": 3446
+          }
+        },
+        "Opus K2": {
+          "planned": 3,
+          "generated": 3,
+          "answered": 3,
+          "known": {
+            "correct": 204,
+            "total": 267,
+            "accuracy": 0.7640449438202247
+          },
+          "product_tokens": {
+            "n": 3,
+            "mean": 5300.666666666667,
+            "min": 4041,
+            "max": 6384
+          },
+          "common_text_tokens": {
+            "n": 3,
+            "mean": 3363.3333333333335,
+            "min": 2538,
+            "max": 4042
+          },
+          "delivery": {
+            "correct": 204,
+            "total": 267,
+            "accuracy": 0.7640449438202247
+          }
+        }
+      }
+    }
+  },
+  "cases": [
+    {
+      "case": "stress-3617031",
+      "group": "stress",
+      "routes": {
+        "S": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 46028,
+          "common_text_tokens": 31044,
+          "cached_input": 0,
+          "input": 270656
+        },
+        "A": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 46136,
+          "common_text_tokens": 31435,
+          "cached_input": 0,
+          "input": 270188
+        }
+      }
+    },
+    {
+      "case": "stress-3617032",
+      "group": "stress",
+      "routes": {
+        "A": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 46211,
+          "common_text_tokens": 31399,
+          "cached_input": 0,
+          "input": 270225
+        },
+        "S": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 46110,
+          "common_text_tokens": 31107,
+          "cached_input": 0,
+          "input": 270693
+        }
+      }
+    },
+    {
+      "case": "stress-3617033",
+      "group": "stress",
+      "routes": {
+        "S": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 54354,
+          "common_text_tokens": 36283,
+          "cached_input": 0,
+          "input": 270775
+        },
+        "A": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 45678,
+          "common_text_tokens": 30560,
+          "cached_input": 0,
+          "input": 270307
+        }
+      }
+    },
+    {
+      "case": "stress-3617034",
+      "group": "stress",
+      "routes": {
+        "A": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 46065,
+          "common_text_tokens": 31320,
+          "cached_input": 0,
+          "input": 270057
+        },
+        "S": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 46823,
+          "common_text_tokens": 31461,
+          "cached_input": 0,
+          "input": 270525
+        }
+      }
+    },
+    {
+      "case": "stress-3617131",
+      "group": "stress",
+      "routes": {
+        "S": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 46705,
+          "common_text_tokens": 31529,
+          "cached_input": 0,
+          "input": 270446
+        },
+        "A": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 45286,
+          "common_text_tokens": 30302,
+          "cached_input": 0,
+          "input": 269978
+        }
+      }
+    },
+    {
+      "case": "stress-3617132",
+      "group": "stress",
+      "routes": {
+        "A": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 52789,
+          "common_text_tokens": 35436,
+          "cached_input": 0,
+          "input": 270003
+        },
+        "S": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 46043,
+          "common_text_tokens": 31060,
+          "cached_input": 0,
+          "input": 270471
+        }
+      }
+    },
+    {
+      "case": "stress-3617133",
+      "group": "stress",
+      "routes": {
+        "S": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 53680,
+          "common_text_tokens": 35895,
+          "cached_input": 0,
+          "input": 270440
+        },
+        "A": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 46388,
+          "common_text_tokens": 31077,
+          "cached_input": 0,
+          "input": 269972
+        }
+      }
+    },
+    {
+      "case": "stress-3617134",
+      "group": "stress",
+      "routes": {
+        "A": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "strict_known": {
+            "correct": 150,
+            "total": 150,
+            "accuracy": 1
+          },
+          "unknown": {
+            "correct": 5,
+            "total": 5,
+            "accuracy": 1
+          },
+          "product_tokens": 51008,
+          "common_text_tokens": 34255,
+          "cached_input": 0,
+          "input": 269900
+        },
+        "S": {
+          "generation": "failed",
+          "quiz": null,
+          "known": null,
+          "strict_known": null,
+          "unknown": null,
+          "product_tokens": null,
+          "common_text_tokens": null,
+          "cached_input": null,
+          "input": null
+        }
+      }
+    },
+    {
+      "case": "normal-r1",
+      "group": "normal",
+      "routes": {
+        "S": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 83,
+            "total": 89,
+            "accuracy": 0.9325842696629213
+          },
+          "strict_known": {
+            "correct": 83,
+            "total": 89,
+            "accuracy": 0.9325842696629213
+          },
+          "unknown": {
+            "correct": 4,
+            "total": 4,
+            "accuracy": 1
+          },
+          "product_tokens": 4917,
+          "common_text_tokens": 4575,
+          "cached_input": 0,
+          "input": 40295
+        },
+        "A": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 79,
+            "total": 89,
+            "accuracy": 0.8876404494382022
+          },
+          "strict_known": {
+            "correct": 79,
+            "total": 89,
+            "accuracy": 0.8876404494382022
+          },
+          "unknown": {
+            "correct": 4,
+            "total": 4,
+            "accuracy": 1
+          },
+          "product_tokens": 3228,
+          "common_text_tokens": 3024,
+          "cached_input": 0,
+          "input": 39827
+        }
+      }
+    },
+    {
+      "case": "normal-r2",
+      "group": "normal",
+      "routes": {
+        "A": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 81,
+            "total": 89,
+            "accuracy": 0.9101123595505618
+          },
+          "strict_known": {
+            "correct": 81,
+            "total": 89,
+            "accuracy": 0.9101123595505618
+          },
+          "unknown": {
+            "correct": 4,
+            "total": 4,
+            "accuracy": 1
+          },
+          "product_tokens": 2867,
+          "common_text_tokens": 2686,
+          "cached_input": 0,
+          "input": 39827
+        },
+        "S": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 84,
+            "total": 89,
+            "accuracy": 0.9438202247191011
+          },
+          "strict_known": {
+            "correct": 84,
+            "total": 89,
+            "accuracy": 0.9438202247191011
+          },
+          "unknown": {
+            "correct": 4,
+            "total": 4,
+            "accuracy": 1
+          },
+          "product_tokens": 6350,
+          "common_text_tokens": 5829,
+          "cached_input": 0,
+          "input": 40295
+        }
+      }
+    },
+    {
+      "case": "normal-r3",
+      "group": "normal",
+      "routes": {
+        "S": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 84,
+            "total": 89,
+            "accuracy": 0.9438202247191011
+          },
+          "strict_known": {
+            "correct": 84,
+            "total": 89,
+            "accuracy": 0.9438202247191011
+          },
+          "unknown": {
+            "correct": 4,
+            "total": 4,
+            "accuracy": 1
+          },
+          "product_tokens": 5737,
+          "common_text_tokens": 5237,
+          "cached_input": 0,
+          "input": 40295
+        },
+        "A": {
+          "generation": "completed",
+          "quiz": "completed",
+          "known": {
+            "correct": 84,
+            "total": 89,
+            "accuracy": 0.9438202247191011
+          },
+          "strict_known": {
+            "correct": 84,
+            "total": 89,
+            "accuracy": 0.9438202247191011
+          },
+          "unknown": {
+            "correct": 4,
+            "total": 4,
+            "accuracy": 1
+          },
+          "product_tokens": 3789,
+          "common_text_tokens": 3486,
+          "cached_input": 0,
+          "input": 39827
+        }
+      }
+    }
+  ],
+  "cache": {
+    "stress/S": {
+      "requests": 7,
+      "input_tokens": 1894006,
+      "cached_tokens": 0,
+      "hit_rate": 0
+    },
+    "stress/A": {
+      "requests": 8,
+      "input_tokens": 2160630,
+      "cached_tokens": 0,
+      "hit_rate": 0
+    },
+    "stress/all": {
+      "requests": 15,
+      "input_tokens": 4054636,
+      "cached_tokens": 0,
+      "hit_rate": 0
+    },
+    "normal/S": {
+      "requests": 3,
+      "input_tokens": 120885,
+      "cached_tokens": 0,
+      "hit_rate": 0
+    },
+    "normal/A": {
+      "requests": 3,
+      "input_tokens": 119481,
+      "cached_tokens": 0,
+      "hit_rate": 0
+    },
+    "normal/all": {
+      "requests": 6,
+      "input_tokens": 240366,
+      "cached_tokens": 0,
+      "hit_rate": 0
+    },
+    "all/S": {
+      "requests": 10,
+      "input_tokens": 2014891,
+      "cached_tokens": 0,
+      "hit_rate": 0
+    },
+    "all/A": {
+      "requests": 11,
+      "input_tokens": 2280111,
+      "cached_tokens": 0,
+      "hit_rate": 0
+    },
+    "all/all": {
+      "requests": 21,
+      "input_tokens": 4295002,
+      "cached_tokens": 0,
+      "hit_rate": 0
+    }
+  },
+  "usage": {
+    "control": {
+      "requests": 12,
+      "input_tokens": 2264381,
+      "cached_tokens": 0,
+      "output_tokens": 122520,
+      "reasoning_tokens": 67805,
+      "product_output_tokens": 54715
+    },
+    "summary": {
+      "requests": 21,
+      "input_tokens": 4295002,
+      "cached_tokens": 0,
+      "output_tokens": 777607,
+      "reasoning_tokens": 31415,
+      "product_output_tokens": 746192
+    },
+    "recovery": {
+      "requests": 21,
+      "input_tokens": 935984,
+      "cached_tokens": 0,
+      "output_tokens": 412837,
+      "reasoning_tokens": 312173,
+      "product_output_tokens": 100664
+    }
+  },
+  "requests": {
+    "completed": 54,
+    "failed": 10
+  },
+  "failures": [
+    {
+      "case": "normal-r1",
+      "stage": "control-empty",
+      "request": "normal-v2-002-normal-r1-control-empty"
+    },
+    {
+      "case": "normal-r3",
+      "stage": "quiz-A",
+      "prompt": "A",
+      "request": "normal-v2-014-normal-r3-quiz-A"
+    },
+    {
+      "case": "stress-3617031",
+      "stage": "control-empty",
+      "request": "stress-005-stress-3617031-control-empty"
+    },
+    {
+      "case": "stress-3617033",
+      "stage": "control-empty",
+      "request": "stress-014-stress-3617033-control-empty"
+    },
+    {
+      "case": "stress-3617032",
+      "stage": "quiz-S",
+      "prompt": "S",
+      "request": "stress-011-stress-3617032-quiz-S"
+    },
+    {
+      "case": "stress-3617034",
+      "stage": "control-empty",
+      "request": "stress-017-stress-3617034-control-empty"
+    },
+    {
+      "case": "stress-3617132",
+      "stage": "control-empty",
+      "request": "stress-029-stress-3617132-control-empty"
+    },
+    {
+      "case": "stress-3617134",
+      "stage": "control-empty",
+      "request": "stress-041-stress-3617134-control-empty"
+    },
+    {
+      "case": "stress-3617134",
+      "stage": "generate-S",
+      "prompt": "S",
+      "request": "stress-045-stress-3617134-generate-S"
+    },
+    {
+      "case": "stress-3617134",
+      "stage": "generate-S",
+      "prompt": "S",
+      "request": "retry-stress-045-stress-3617134-generate-S-retry-1"
+    }
+  ]
+}
