@@ -1,0 +1,305 @@
+{
+  "schema_version": 1,
+  "files": [
+    {
+      "file": "README.md",
+      "sha256": "b33e547d624e11a6a781612df100cacb7a50c4b772527d1d95bbeeda22c9f714",
+      "bytes": 18888
+    },
+    {
+      "file": "cases/normal-r1/A.txt",
+      "sha256": "64020783b948c8579d002b887b8f674c7fe31bdfea837aacfcaaf6e92cb53b4b",
+      "bytes": 11993
+    },
+    {
+      "file": "cases/normal-r1/S.txt",
+      "sha256": "da8301b8fc3fe6f745c6a99056c949bff2904db884a7954e5e62ea3b25f8b8c0",
+      "bytes": 19518
+    },
+    {
+      "file": "cases/normal-r1/control-full.txt",
+      "sha256": "bb7a330c2cab7e6eb7b7218b3be33054acd7375a1779e731b2deaa033764a69a",
+      "bytes": 4529
+    },
+    {
+      "file": "cases/normal-r1/quiz-A.txt",
+      "sha256": "1c2e45c0b6db008be4633ecac22bd96b90b5af672ee5c2772b15de09cb745d58",
+      "bytes": 4361
+    },
+    {
+      "file": "cases/normal-r1/quiz-S.txt",
+      "sha256": "b1cfbadbfa8d0f4d52b61f699d8b4b527f42677544f4c0524bb8d820555e26a1",
+      "bytes": 4433
+    },
+    {
+      "file": "cases/normal-r2/A.txt",
+      "sha256": "403044a822203b053c02c5f6ed34e4d958ca426f3fc48d0938a3bd80a2c72e00",
+      "bytes": 10476
+    },
+    {
+      "file": "cases/normal-r2/S.txt",
+      "sha256": "3c420181c950a82f26750e4a81d358db527400602c6c1eb6b3e9bb7580902765",
+      "bytes": 24646
+    },
+    {
+      "file": "cases/normal-r2/quiz-A.txt",
+      "sha256": "96249c1e10a2008d3740b928b37e371d2cc292ce2747258636dc1bdabf49eab9",
+      "bytes": 4503
+    },
+    {
+      "file": "cases/normal-r2/quiz-S.txt",
+      "sha256": "50da6f6ca039000c79a9bb9c503760288f515da6e2e629af956e2cc7f3031099",
+      "bytes": 4384
+    },
+    {
+      "file": "cases/normal-r3/A.txt",
+      "sha256": "2353df8f2ef819ee1e1ece6ad1e5ee617ea0054713f1a5a2af765ae6ddd30965",
+      "bytes": 13413
+    },
+    {
+      "file": "cases/normal-r3/S.txt",
+      "sha256": "9effa2a10e166e3a1b7099d397a5cd93f5df11432a8a54342e62bb37576da4de",
+      "bytes": 22322
+    },
+    {
+      "file": "cases/normal-r3/quiz-A-retry-1.txt",
+      "sha256": "7e9b7448b07877a7af21872695d885df89778354f7022e64e75e8d20189683e0",
+      "bytes": 4519
+    },
+    {
+      "file": "cases/normal-r3/quiz-S.txt",
+      "sha256": "0f67c55fc3c4b37d77611a75021de85790b8d7a40e7d849cfa64609f5d192f16",
+      "bytes": 4422
+    },
+    {
+      "file": "cases/stress-3617031/A.txt",
+      "sha256": "2fd9d72e2b5a6c969c60fd530c3b5a6094dc2b8e66638e53475c06255582b0ac",
+      "bytes": 72346
+    },
+    {
+      "file": "cases/stress-3617031/S.txt",
+      "sha256": "6de3b3386ff71ff008238546642b3dc059c9bd6f549218097d131722c126ee4d",
+      "bytes": 73205
+    },
+    {
+      "file": "cases/stress-3617031/control-full.txt",
+      "sha256": "07f7f30ac3109efb56569bbe3ed89240e9e4a170d126a11933f746dbcb81f7e8",
+      "bytes": 10535
+    },
+    {
+      "file": "cases/stress-3617031/quiz-A.txt",
+      "sha256": "07f7f30ac3109efb56569bbe3ed89240e9e4a170d126a11933f746dbcb81f7e8",
+      "bytes": 10535
+    },
+    {
+      "file": "cases/stress-3617031/quiz-S.txt",
+      "sha256": "07f7f30ac3109efb56569bbe3ed89240e9e4a170d126a11933f746dbcb81f7e8",
+      "bytes": 10535
+    },
+    {
+      "file": "cases/stress-3617032/A.txt",
+      "sha256": "a29ee7f431dd73f5da389bbad9094872860bf65204a0887b5617fde846da0ea5",
+      "bytes": 72601
+    },
+    {
+      "file": "cases/stress-3617032/S.txt",
+      "sha256": "c4093419eafc8de239d3aa54c68084ac33d162c438ff0c7a006a71bcfe591f29",
+      "bytes": 74296
+    },
+    {
+      "file": "cases/stress-3617032/control-empty.txt",
+      "sha256": "f257c84c076091167016ae4b1260796b34e8965ecaa361fce530abc4e4a26831",
+      "bytes": 4697
+    },
+    {
+      "file": "cases/stress-3617032/control-full.txt",
+      "sha256": "8a7d2ce592d9aaa2f0c4c1abc8110e548499824c55113114cdd7a2540fd9daca",
+      "bytes": 10556
+    },
+    {
+      "file": "cases/stress-3617032/quiz-A.txt",
+      "sha256": "8a7d2ce592d9aaa2f0c4c1abc8110e548499824c55113114cdd7a2540fd9daca",
+      "bytes": 10556
+    },
+    {
+      "file": "cases/stress-3617032/quiz-S-retry-1.txt",
+      "sha256": "8a7d2ce592d9aaa2f0c4c1abc8110e548499824c55113114cdd7a2540fd9daca",
+      "bytes": 10556
+    },
+    {
+      "file": "cases/stress-3617033/A.txt",
+      "sha256": "b554dbd4cebda7e6b07267ab247b12b483f498139496e8ee6b837d98f9bd22d9",
+      "bytes": 72118
+    },
+    {
+      "file": "cases/stress-3617033/S.txt",
+      "sha256": "75439ffc81a653cced6e2c81c45b9004d0153ddb348e1ee681d2b1f04150b263",
+      "bytes": 86724
+    },
+    {
+      "file": "cases/stress-3617033/control-full.txt",
+      "sha256": "cbe9241a2c05d9c6515368e900cbbb0392b962078b0cecfe4b2fb42046886048",
+      "bytes": 9943
+    },
+    {
+      "file": "cases/stress-3617033/quiz-A.txt",
+      "sha256": "dd841522327cd3d6bd0d3ee99f807d4b64368186af349d501c940d61b26bc3a5",
+      "bytes": 10564
+    },
+    {
+      "file": "cases/stress-3617033/quiz-S.txt",
+      "sha256": "dd841522327cd3d6bd0d3ee99f807d4b64368186af349d501c940d61b26bc3a5",
+      "bytes": 10564
+    },
+    {
+      "file": "cases/stress-3617034/A.txt",
+      "sha256": "52bc286a364ccbbfb9f782a2546fe9e90adbb7c205eb089ab116904476056ffe",
+      "bytes": 72348
+    },
+    {
+      "file": "cases/stress-3617034/S.txt",
+      "sha256": "ede9ab921da3dd8fcd734a1d8b6a5ae3c3af3079d95aa674736c588a17ac91f0",
+      "bytes": 74609
+    },
+    {
+      "file": "cases/stress-3617034/control-full.txt",
+      "sha256": "5f3acb0218143a242f80f6d66d88722f21947c7da8c3b2c8f66bee137b028470",
+      "bytes": 9959
+    },
+    {
+      "file": "cases/stress-3617034/quiz-A.txt",
+      "sha256": "e401584d1fbf4e41004be1601a8c21903a024feba3834e99ae8ed706aab39ec6",
+      "bytes": 10580
+    },
+    {
+      "file": "cases/stress-3617034/quiz-S.txt",
+      "sha256": "e401584d1fbf4e41004be1601a8c21903a024feba3834e99ae8ed706aab39ec6",
+      "bytes": 10580
+    },
+    {
+      "file": "cases/stress-3617131/A.txt",
+      "sha256": "edef72aa8285e47556c4fadeb128385e47585d0cbed5a3342014d6b40d25903c",
+      "bytes": 70886
+    },
+    {
+      "file": "cases/stress-3617131/S.txt",
+      "sha256": "789dce4a95f4b56a3b0f589be03f7e9f8d5807ed432b3858087f721acfd92a81",
+      "bytes": 74740
+    },
+    {
+      "file": "cases/stress-3617131/control-empty.txt",
+      "sha256": "f257c84c076091167016ae4b1260796b34e8965ecaa361fce530abc4e4a26831",
+      "bytes": 4697
+    },
+    {
+      "file": "cases/stress-3617131/control-full.txt",
+      "sha256": "912014137a207cdc5208c6e050c1ce65b725b029125d654468c6cce8b9a594b6",
+      "bytes": 10549
+    },
+    {
+      "file": "cases/stress-3617131/quiz-A.txt",
+      "sha256": "912014137a207cdc5208c6e050c1ce65b725b029125d654468c6cce8b9a594b6",
+      "bytes": 10549
+    },
+    {
+      "file": "cases/stress-3617131/quiz-S.txt",
+      "sha256": "912014137a207cdc5208c6e050c1ce65b725b029125d654468c6cce8b9a594b6",
+      "bytes": 10549
+    },
+    {
+      "file": "cases/stress-3617132/A.txt",
+      "sha256": "4b8cfdcf6b383b4255354107823af5fbae63027e6d2041027fe246b2d82f669d",
+      "bytes": 82756
+    },
+    {
+      "file": "cases/stress-3617132/S.txt",
+      "sha256": "6c50ad35f8a8369dd8df53841034f5cfd344725d0f354745d76bf395faa93d08",
+      "bytes": 74160
+    },
+    {
+      "file": "cases/stress-3617132/control-full.txt",
+      "sha256": "6e143897531021e12a911fc1a971623028d7903eae8419498f39f9353a712604",
+      "bytes": 10568
+    },
+    {
+      "file": "cases/stress-3617132/quiz-A.txt",
+      "sha256": "6e143897531021e12a911fc1a971623028d7903eae8419498f39f9353a712604",
+      "bytes": 10568
+    },
+    {
+      "file": "cases/stress-3617132/quiz-S.txt",
+      "sha256": "6e143897531021e12a911fc1a971623028d7903eae8419498f39f9353a712604",
+      "bytes": 10568
+    },
+    {
+      "file": "cases/stress-3617133/A.txt",
+      "sha256": "0f54728d2348f6337679ae8d8128e84f4374ae6f6d1c4a461d45c5eb922f70ec",
+      "bytes": 73490
+    },
+    {
+      "file": "cases/stress-3617133/S.txt",
+      "sha256": "fcba9ca83fe7b26b8ff0575c5171ea9435fec21c87543b1f318abdd9c141122c",
+      "bytes": 86582
+    },
+    {
+      "file": "cases/stress-3617133/control-empty.txt",
+      "sha256": "f257c84c076091167016ae4b1260796b34e8965ecaa361fce530abc4e4a26831",
+      "bytes": 4697
+    },
+    {
+      "file": "cases/stress-3617133/control-full.txt",
+      "sha256": "576f026af06491be18f7e1fb602dbb4bab54014f76999ec300d48790ad58ba4e",
+      "bytes": 10567
+    },
+    {
+      "file": "cases/stress-3617133/quiz-A.txt",
+      "sha256": "576f026af06491be18f7e1fb602dbb4bab54014f76999ec300d48790ad58ba4e",
+      "bytes": 10567
+    },
+    {
+      "file": "cases/stress-3617133/quiz-S.txt",
+      "sha256": "576f026af06491be18f7e1fb602dbb4bab54014f76999ec300d48790ad58ba4e",
+      "bytes": 10567
+    },
+    {
+      "file": "cases/stress-3617134/A.txt",
+      "sha256": "bdc536bbc235c13025856b8cdbf3cc7927d4dcbb31bef51c66a237e29ed60a72",
+      "bytes": 78570
+    },
+    {
+      "file": "cases/stress-3617134/control-full.txt",
+      "sha256": "c9e8e62055ccdcb711bc0ba7bf1635f585e1768defb9954b50d24fdf3101c9e4",
+      "bytes": 10554
+    },
+    {
+      "file": "cases/stress-3617134/quiz-A.txt",
+      "sha256": "c9e8e62055ccdcb711bc0ba7bf1635f585e1768defb9954b50d24fdf3101c9e4",
+      "bytes": 10554
+    },
+    {
+      "file": "lengths.json",
+      "sha256": "3cc56667f3147a3f62476ca8ea57cecc06cfec65d4c638c5ef91db49b0cd106b",
+      "bytes": 2440
+    },
+    {
+      "file": "plan.json",
+      "sha256": "5bbc94eb6ba1e86313ddcfac2c46b1c2a422c351c1bb849742dddd10500a54f0",
+      "bytes": 8619
+    },
+    {
+      "file": "prompts/base-instructions.txt",
+      "sha256": "c7234f244f8e812e0acb3db532328a869a4a56031e1646d5cd3a6dd328f90bb8",
+      "bytes": 21780
+    },
+    {
+      "file": "report-summary.json",
+      "sha256": "493aef7aa0fb3a60d7676e308e78067bc80ef497c7e350ba334d03522a340a13",
+      "bytes": 32088
+    },
+    {
+      "file": "results.json",
+      "sha256": "2a3474cf1faca6e2ffc001d9357656662e99323838040246cc7444e8afb3de98",
+      "bytes": 6527873
+    }
+  ]
+}

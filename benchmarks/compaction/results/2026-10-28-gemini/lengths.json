@@ -1,0 +1,146 @@
+{
+  "tokenizer": "o200k_base",
+  "tiktoken_version": "0.14.0",
+  "note": "Same offline tokenizer for visible text; not provider billing or context usage. GPT native encrypted K3 is not locally countable.",
+  "cases": [
+    {
+      "case": "stress-3617031",
+      "S": 31044,
+      "A": 31435
+    },
+    {
+      "case": "stress-3617032",
+      "S": 31107,
+      "A": 31399
+    },
+    {
+      "case": "stress-3617033",
+      "S": 36283,
+      "A": 30560
+    },
+    {
+      "case": "stress-3617034",
+      "S": 31461,
+      "A": 31320
+    },
+    {
+      "case": "stress-3617131",
+      "S": 31529,
+      "A": 30302
+    },
+    {
+      "case": "stress-3617132",
+      "S": 31060,
+      "A": 35436
+    },
+    {
+      "case": "stress-3617133",
+      "S": 35895,
+      "A": 31077
+    },
+    {
+      "case": "stress-3617134",
+      "S": null,
+      "A": 34255
+    },
+    {
+      "case": "normal-r1",
+      "S": 4575,
+      "A": 3024
+    },
+    {
+      "case": "normal-r2",
+      "S": 5829,
+      "A": 2686
+    },
+    {
+      "case": "normal-r3",
+      "S": 5237,
+      "A": 3486
+    }
+  ],
+  "history_gpt_handoff": [
+    {
+      "case": "stress-3617031",
+      "tokens": 18709
+    },
+    {
+      "case": "stress-3617032",
+      "tokens": 18450
+    },
+    {
+      "case": "stress-3617033",
+      "tokens": 17627
+    },
+    {
+      "case": "stress-3617034",
+      "tokens": 19166
+    },
+    {
+      "case": "stress-3617131",
+      "tokens": 20802
+    },
+    {
+      "case": "stress-3617132",
+      "tokens": 19220
+    },
+    {
+      "case": "stress-3617133",
+      "tokens": 19121
+    },
+    {
+      "case": "stress-3617134",
+      "tokens": 8717
+    },
+    {
+      "case": "normal-r1",
+      "tokens": 3266
+    },
+    {
+      "case": "normal-r2",
+      "tokens": 3446
+    },
+    {
+      "case": "normal-r3",
+      "tokens": 2991
+    }
+  ],
+  "history_opus": [
+    {
+      "case": "stress-3617031",
+      "tokens": 19838
+    },
+    {
+      "case": "stress-3617032",
+      "tokens": 23686
+    },
+    {
+      "case": "stress-3617034",
+      "tokens": 23312
+    },
+    {
+      "case": "stress-3617132",
+      "tokens": 21281
+    },
+    {
+      "case": "stress-3617133",
+      "tokens": 21058
+    },
+    {
+      "case": "stress-3617134",
+      "tokens": 21613
+    },
+    {
+      "case": "normal-r1",
+      "tokens": 4042
+    },
+    {
+      "case": "normal-r2",
+      "tokens": 3510
+    },
+    {
+      "case": "normal-r3",
+      "tokens": 2538
+    }
+  ]
+}

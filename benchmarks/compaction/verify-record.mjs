@@ -38,6 +38,11 @@ async function files(path = root) {
 assert.deepEqual((await files()).filter(name => name !== 'artifacts.json').sort(), [...listed].sort(), 'Artifact coverage');
 
 const record = await json('results.json');
+if (record.protocol === 'responses-prompt-comparison') {
+  const { verifyComparisonRecord } = await import('./verify-comparison-record.mjs');
+  console.log(JSON.stringify({ verified_files: listed.size, ...await verifyComparisonRecord({ record, json, pathFor }) }, null, 2));
+  process.exit(0);
+}
 if (record.protocol === 'anthropic-messages') {
   const { verifyMessagesRecord } = await import('./verify-messages-record.mjs');
   console.log(JSON.stringify({ verified_files: listed.size, ...await verifyMessagesRecord({ record, json, pathFor }) }, null, 2));
