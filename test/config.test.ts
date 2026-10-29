@@ -467,14 +467,14 @@ test("Claude 5.5 catalogs offer thinking efforts and permit an explicit Sonnet n
   assert.deepEqual(body.output_config, { effort: "low" });
 });
 
-test("Haiku 5.5 uses adaptive thinking by default and can disable it without an effort parameter", () => {
+test("Haiku 5.5 uses adaptive thinking and the shared Claude effort choices", () => {
   const c = validateConfig({
     upstreams: { anthropic: { base_url: "https://example.com/v1" } },
     models: { haiku: { upstream: "anthropic", catalog: "claude-haiku-5-5", model: "haiku-deployment" } },
   });
   const info = buildCatalog(c).models[0];
   assert.deepEqual(info.supported_reasoning_levels.map((level: any) => level.effort),
-    ["none", "low", "medium", "high", "xhigh", "max", "ultra"]);
+    ["low", "medium", "high", "xhigh", "max", "ultra"]);
   assert.equal(info.default_reasoning_level, "medium");
   assert.equal(info.multi_agent_version, "v2");
   assert.deepEqual(info.input_modalities, ["text", "image"]);
@@ -491,9 +491,28 @@ test("Haiku 5.5 uses adaptive thinking by default and can disable it without an 
   assert.deepEqual(body.output_config, { effort: "medium" });
   assert.equal(buildAnthropicRequest({ ...ctx, request: { ...ctx.request, reasoning: { summary: "auto" } } })
     .body.thinking.display, "summarized");
-  const disabled = buildAnthropicRequest({
-    ...ctx, request: { ...ctx.request, reasoning: { effort: "none", summary: "auto" } },
-  }).body;
-  assert.deepEqual(disabled.thinking, { type: "disabled" });
-  assert.equal(disabled.output_config, undefined);
+});
+
+test("DeepSeek offers native effort choices while keeping request aliases compatible", () => {
+  const c = config();
+  const info = buildCatalog(c).models[0];
+  assert.deepEqual(info.supported_reasoning_levels.map((level: any) => level.effort),
+    ["none", "low", "high", "max", "ultra"]);
+  assert.equal(info.default_reasoning_level, "high");
+  assert.equal(info.multi_agent_reasoning_effort, "max");
+  const ctx = {
+    route: resolveModel(c, "first"), request: { model: "first", input: "Hello" },
+    signal: new AbortController().signal,
+  };
+  for (const [effort, native] of [
+    ["minimal", "low"], ["low", "low"], ["medium", "high"], ["high", "high"],
+    ["xhigh", "high"], ["max", "max"], ["ultra", "max"],
+  ]) {
+    const { body } = buildDeepSeekRequest({ ...ctx, request: { ...ctx.request, reasoning: { effort } } });
+    assert.deepEqual(body.thinking, { type: "enabled" });
+    assert.equal(body.reasoning_effort, native);
+  }
+  const { body } = buildDeepSeekRequest({ ...ctx, request: { ...ctx.request, reasoning: { effort: "none" } } });
+  assert.deepEqual(body.thinking, { type: "disabled" });
+  assert.equal(body.reasoning_effort, undefined);
 });

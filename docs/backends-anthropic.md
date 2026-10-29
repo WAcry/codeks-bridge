@@ -12,8 +12,6 @@
 
 Opus 5.5 始终启用 thinking；Sonnet 5.5 的最低模式是 `between_tools`，关闭回复前的思考，但仍在工具之间返回带签名的进度说明。两者都拒绝 `thinking.type: "disabled"`，因此目录不把 `none` 作为可选档位，也不把关闭思考的请求静默改成 `low`。Sonnet 的 `between_tools` 只接受 `high` 或以下 effort，且 `thinking` 对象中不能附带 `display`、`budget_tokens` 等字段。[官方 thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)、[Sonnet 5.5 变更说明](https://platform.claude.com/docs/en/models/sonnet-5-5/whats-new-sonnet-5-5)
 
-Haiku 5.5 还提供 `none`：使用 `thinking.type: "disabled"`，省略 `output_config.effort`，采用上游默认 `medium`。该模型仅在 `high` 或以下 effort 支持 disabled；模式为 disabled 时不附加 display 或 block binding。其余档位沿用共同的 adaptive 转换，不需要按模型名增加 adapter 分支。[Haiku 5.5 变更说明](https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5)
-
 `reasoning.summary` 缺省或为 `none` 时选择 `display: "omitted"`；`auto`、`concise`、`detailed` 选择 `summarized`，不保证上游区分摘要长度。目录默认值与 GPT-6.1 Sol 一样为 `none`；要显示摘要，在 codeks 配置中设置 `model_reasoning_summary = "auto"`。显示开关不关闭 thinking 或载荷回放。
 
 `reasoning.effort_map` 可以替换映射，`options.thinking` 和 `options.output_config` 可以覆盖完整原生对象。例如以下 Sonnet 模型条目固定使用 `between_tools` 与 `low` effort；options 优先于客户端请求中推导的模式、effort 和 display，无需新增转换接口：
