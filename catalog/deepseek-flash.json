@@ -10,19 +10,15 @@
     "以 GPT-6.1 Sol 的完整条目为起点；保留 Code Mode Only、Responses Lite、多代理和工具元数据。",
     "将模型标识和展示信息改为 DeepSeek Flash；instructions_template 仅将 based on GPT-6 改为 based on DeepSeek，保留 Codex 代理身份和其余客户端提示词。",
     "context_window 和 max_context_window 设为 1000000，部署配置可明确覆盖。",
-    "默认 effort 为 high；目录提供 none、low、high、max 及客户端 ultra。minimal、medium、xhigh 仅保留兼容映射，不作为独立菜单选项，避免重复原生档位；none 关闭 thinking，未列出的显式请求值继续由上游裁决。",
+    "默认 effort 为 high；目录提供原生 low、high、max 及客户端 ultra，thinking 使用 enabled。未列出的显式请求值继续由上游裁决。",
     "关闭尚未转换的 verbosity 和 original image detail 声明；保留普通图片输入。",
     "清空 GPT 专属的服务优先级、速度档位、推广和升级提示。",
     "ultra 是客户端自动分工档位，映射到原生 max；multi_agent_reasoning_effort 同样设为 max，保留源条目的 Ultra 描述。"
   ],
   "adapter": "deepseek-chat",
   "effort_map": {
-    "none": "none",
-    "minimal": "low",
     "low": "low",
-    "medium": "high",
     "high": "high",
-    "xhigh": "high",
     "max": "max",
     "ultra": "max"
   },
@@ -65,10 +61,6 @@
     "description": "DeepSeek Flash with the Codex coding-agent instructions and tools.",
     "default_reasoning_level": "high",
     "supported_reasoning_levels": [
-      {
-        "effort": "none",
-        "description": "Disable thinking"
-      },
       {
         "effort": "low",
         "description": "Upstream reasoning effort: low"

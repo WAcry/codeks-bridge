@@ -164,7 +164,7 @@ test("Chat preserves system updates and places tool images after all parallel re
 
 test("DeepSeek maps efforts for any deployment name, forced tools and JSON output", () => {
   const ctx = context();
-  for (const [incoming, outgoing] of [["minimal", "low"], ["medium", "high"], ["xhigh", "high"], ["ultra", "max"]]) {
+  for (const [incoming, outgoing] of [["low", "low"], ["high", "high"], ["max", "max"], ["ultra", "max"]]) {
     ctx.request.reasoning = { effort: incoming };
     assert.equal(buildDeepSeekRequest(ctx).body.reasoning_effort, outgoing);
   }
@@ -172,9 +172,8 @@ test("DeepSeek maps efforts for any deployment name, forced tools and JSON outpu
   assert.deepEqual(buildDeepSeekRequest(ctx).body.tool_choice, { type: "function", function: { name: "agents__spawn_agent" } });
   ctx.request.text = { format: { type: "json_schema", name: "answer", schema: { type: "object" }, strict: true } };
   assert.deepEqual(buildDeepSeekRequest(ctx).body.response_format, { type: "json_object" });
-  ctx.request.reasoning = { effort: "none" };
   const { body } = buildDeepSeekRequest(ctx);
-  assert.deepEqual(body.thinking, { type: "disabled" });
+  assert.deepEqual(body.thinking, { type: "enabled" });
   assert.deepEqual(body.tool_choice, { type: "function", function: { name: "agents__spawn_agent" } });
   ctx.compacting = true;
   assert.deepEqual(buildDeepSeekRequest(ctx).body.tool_choice, { type: "function", function: { name: "agents__spawn_agent" } });
@@ -267,7 +266,6 @@ test("Chat capacity interruption remains retryable", async () => {
 
 test("Chat forced tool selection preserves the original identity and kind", () => {
   const ctx = context();
-  ctx.request.reasoning = { effort: "none" };
   ctx.request.tools = [{ type: "function", name: "look_up", parameters: { type: "object" } }];
   for (const selected of [
     { type: "function", name: "look.up" },

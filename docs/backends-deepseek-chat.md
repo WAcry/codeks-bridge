@@ -32,12 +32,9 @@
 
 | 客户端 effort | 原生参数 |
 | --- | --- |
-| `none` | `thinking.type: "disabled"` |
 | `low` | `thinking.type: "enabled"`，`reasoning_effort: "low"` |
 | `high` | `thinking.type: "enabled"`，`reasoning_effort: "high"` |
 | `max`、`ultra` | `thinking.type: "enabled"`，`reasoning_effort: "max"` |
-
-`minimal` 映射到 `low`，`medium`、`xhigh` 映射到 `high`，继续兼容已有配置和显式请求；这些名称是兼容别名，因此不作为重复档位展示。[官方 effort 映射](https://api-docs.deepseek.com/guides/thinking_mode/)
 
 codeks 的 `ultra` 由客户端注入多代理提示词，并使用原生 `max` effort。映射可由 `reasoning.effort_map` 整体替换，显式覆盖时其键同时决定目录中可选档位。未映射的显式 effort 原样发送。上游和模型 `options` 随后覆盖推导参数，允许直接设置端点专有选项；桥接器最终固定 model、messages、工具定义、流模式和 usage 开关。
 

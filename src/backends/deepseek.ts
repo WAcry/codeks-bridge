@@ -7,10 +7,10 @@ import type { ChatDialect } from "./chat.ts";
 const deepseek: ChatDialect = {
   reasoningField: "reasoning_content",
   requestParameters({ request, route }) {
-    const effort = reasoningEffort(route, request.reasoning?.effort);
-    return effort === "none"
-      ? { thinking: { type: "disabled" } }
-      : { thinking: { type: "enabled" }, reasoning_effort: effort };
+    return {
+      thinking: { type: "enabled" },
+      reasoning_effort: reasoningEffort(route, request.reasoning?.effort),
+    };
   },
   configureStructuredOutput({ request, route }, body) {
     const format = request.text?.format;

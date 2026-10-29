@@ -55,7 +55,7 @@ Claude、DeepSeek 和 Gemini 从 GPT-6.1 Sol 的完整条目开始，只做各�
 
 依据：[Sonnet 模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[Haiku 模型规格](https://platform.claude.com/docs/en/models/haiku-5-5/overview)、[Messages 必填参数](https://platform.claude.com/docs/en/api/messages/create)、[DeepSeek 模型规格](https://api-docs.deepseek.com/quick_start/pricing/)。这些是第三方精调的依据，`source` 仍记录 Codex 模板来源。
 
-Claude 的默认 effort 为 `medium`，目录提供 `low`、`medium`、`high`、`xhigh`、`max` 和客户端 `ultra`。DeepSeek 默认 `high`，目录提供 `none`、`low`、`high`、`max` 和 `ultra`；`none` 关闭 thinking。DeepSeek 的 `minimal`、`medium`、`xhigh` 仍作为请求兼容别名映射到原生值，但不作为重复档位展示。[DeepSeek effort 映射](https://api-docs.deepseek.com/guides/thinking_mode/)
+Claude 的默认 effort 为 `medium`，目录提供 `low`、`medium`、`high`、`xhigh`、`max` 和客户端 `ultra`。DeepSeek 默认 `high`，目录提供原生 `low`、`high`、`max` 和客户端 `ultra`。[DeepSeek thinking 参数](https://api-docs.deepseek.com/guides/thinking_mode/)
 
 Opus / Sonnet 两个条目从 `low` 开始：Opus 5.5 始终启用 thinking，Sonnet 5.5 的最低模式 `between_tools` 仍保留工具之间的思考，因此不能用 `none` 表示。需要 Sonnet 的这一模式时，使用 [Messages 原生 options](../docs/backends-anthropic.md#历史与-thinking) 显式配置。目录列出的档位应与已审阅模型匹配；未列出的显式请求值仍交给上游裁决。[Claude thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)
 
