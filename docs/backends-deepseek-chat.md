@@ -28,16 +28,18 @@
 
 没有可恢复 reasoning 的 assistant 历史使用 `reasoning_content: ""`，不编造思考。它使带有其他目标历史的工具循环仍具备 DeepSeek 要求的字段。
 
-默认 effort 为 `high`，默认映射如下：
+默认 effort 为 `high`，目录只展示原生选择和客户端多代理模式：
 
 | 客户端 effort | 原生参数 |
 | --- | --- |
 | `none` | `thinking.type: "disabled"` |
-| `minimal`、`low` | `thinking.type: "enabled"`，`reasoning_effort: "low"` |
-| `medium`、`high`、`xhigh` | `thinking.type: "enabled"`，`reasoning_effort: "high"` |
+| `low` | `thinking.type: "enabled"`，`reasoning_effort: "low"` |
+| `high` | `thinking.type: "enabled"`，`reasoning_effort: "high"` |
 | `max`、`ultra` | `thinking.type: "enabled"`，`reasoning_effort: "max"` |
 
-codeks 的 `ultra` 由客户端注入多代理提示词，并使用原生 `max` effort。映射可由 `reasoning.effort_map` 整体替换，目录中可选档位来自同一配置。未映射的显式 effort 原样发送。上游和模型 `options` 随后覆盖推导参数，允许直接设置端点专有选项；桥接器最终固定 model、messages、工具定义、流模式和 usage 开关。
+`minimal` 映射到 `low`，`medium`、`xhigh` 映射到 `high`，继续兼容已有配置和显式请求；这些名称是兼容别名，因此不作为重复档位展示。[官方 effort 映射](https://api-docs.deepseek.com/guides/thinking_mode/)
+
+codeks 的 `ultra` 由客户端注入多代理提示词，并使用原生 `max` effort。映射可由 `reasoning.effort_map` 整体替换，显式覆盖时其键同时决定目录中可选档位。未映射的显式 effort 原样发送。上游和模型 `options` 随后覆盖推导参数，允许直接设置端点专有选项；桥接器最终固定 model、messages、工具定义、流模式和 usage 开关。
 
 强制工具选择、输出格式与 thinking 能否组合由上游判断。bridge 转换可表达的请求后直接发送，上游不支持时保留错误，不自动关闭 thinking 或改成普通文本输出。
 
