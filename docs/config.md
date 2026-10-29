@@ -217,7 +217,7 @@ token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次�
 }
 ```
 
-`effort_map` 的键是 codeks 可选档位，值是发给上游的原生值。提供映射时完整替换目录条目的默认映射；`default_effort` 必须出现在映射中。未指定默认档位时，保留映射中仍存在的条目默认值，否则选映射第一项。映射为原生 `none` 时，Messages/DeepSeek adapter 发送 `thinking.type: "disabled"`，是否接受由上游决定。Claude 5.5 目录不提供这个档位；Sonnet 的 `between_tools` 模式可通过显式 options 选择，含义和配置见 [Messages](backends-anthropic.md)。
+`effort_map` 的键是 codeks 可选档位，值是发给上游的原生值。提供映射时完整替换目录条目的默认映射；`default_effort` 必须出现在映射中。未指定默认档位时，保留映射中仍存在的条目默认值，否则选映射第一项。Sonnet 的 `between_tools` 模式可通过显式 options 选择，含义和配置见 [Messages](backends-anthropic.md)。
 
 请求没有 effort 时使用配置默认值；有映射则转换，未列出的显式 effort 直接透传，交给上游判断。catalog 与实际请求使用同一份配置；通过原生 `options` 再覆盖 thinking/effort 时，应同时调整这里的展示设置。
 

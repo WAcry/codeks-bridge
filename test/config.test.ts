@@ -493,11 +493,11 @@ test("Haiku 5.5 uses adaptive thinking and the shared Claude effort choices", ()
     .body.thinking.display, "summarized");
 });
 
-test("DeepSeek offers native effort choices while keeping request aliases compatible", () => {
+test("DeepSeek offers native effort choices and client Ultra", () => {
   const c = config();
   const info = buildCatalog(c).models[0];
   assert.deepEqual(info.supported_reasoning_levels.map((level: any) => level.effort),
-    ["none", "low", "high", "max", "ultra"]);
+    ["low", "high", "max", "ultra"]);
   assert.equal(info.default_reasoning_level, "high");
   assert.equal(info.multi_agent_reasoning_effort, "max");
   const ctx = {
@@ -505,14 +505,10 @@ test("DeepSeek offers native effort choices while keeping request aliases compat
     signal: new AbortController().signal,
   };
   for (const [effort, native] of [
-    ["minimal", "low"], ["low", "low"], ["medium", "high"], ["high", "high"],
-    ["xhigh", "high"], ["max", "max"], ["ultra", "max"],
+    ["low", "low"], ["high", "high"], ["max", "max"], ["ultra", "max"],
   ]) {
     const { body } = buildDeepSeekRequest({ ...ctx, request: { ...ctx.request, reasoning: { effort } } });
     assert.deepEqual(body.thinking, { type: "enabled" });
     assert.equal(body.reasoning_effort, native);
   }
-  const { body } = buildDeepSeekRequest({ ...ctx, request: { ...ctx.request, reasoning: { effort: "none" } } });
-  assert.deepEqual(body.thinking, { type: "disabled" });
-  assert.equal(body.reasoning_effort, undefined);
 });
