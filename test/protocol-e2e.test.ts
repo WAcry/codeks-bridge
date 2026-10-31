@@ -141,7 +141,7 @@ test("real codeks: GPT-6.1 Terra is discovered and runs with its own window and 
   const { models } = await discover();
   assert.equal(models.length, 1);
   assert.equal(models[0].slug, "protocol-probe");
-  assert.equal(models[0].context_window, 272000);
+  assert.equal(models[0].context_window, 500000);
   assert.equal(models[0].max_context_window, 872000);
   assert.equal(models[0].multi_agent_reasoning_effort, "xhigh");
   for (const options of [[], ["-c", 'model_reasoning_effort="ultra"']]) {

@@ -7,23 +7,30 @@ import { catalogKeys, getCatalogEntry } from "../src/model-catalog.ts";
 import { reasoningEffort } from "../src/profiles.ts";
 
 for (const key of ["gemini-3.8-flash", "gemini-4-argon"]) {
-  test(`${key} keeps the Codex working budget and exposes native thinking levels`, () => {
+  test(`${key} keeps the reviewed working budget and exposes native thinking levels`, () => {
+    const template = getCatalogEntry("gpt-6.1-sol").model;
     const config = validateConfig({
       upstreams: { test: { base_url: "https://generativelanguage.googleapis.com/v1beta" } },
       models: { gemini: { catalog: key, upstream: "test", model: "gemini-deployment" } },
     });
     const [entry] = buildCatalog(config).models;
-    assert.equal(entry.context_window, 272000);
+    assert.equal(entry.context_window, 400000);
     assert.equal(entry.max_context_window, 1048576);
     assert.equal(entry.tool_mode, "code_mode_only");
     assert.equal(entry.multi_agent_version, "v2");
     assert.equal(entry.use_responses_lite, true);
-    assert.equal(entry.shell_type, "unified_exec");
+    assert.equal(entry.shell_type, "shell_command");
     assert.equal(entry.default_reasoning_summary, "none");
     assert.equal(entry.supports_image_detail_original, false);
     assert.deepEqual(entry.input_modalities, ["text", "image"]);
     assert.deepEqual(entry.supported_reasoning_levels.map((level: { effort: string }) => level.effort), ["low", "medium", "high", "ultra"]);
-    assert.match(entry.model_messages.instructions_template, /You are Codex, an agent based on Gemini/);
+    const expectedMessages = structuredClone(template.model_messages);
+    expectedMessages.instructions_template = expectedMessages.instructions_template.replace("based on GPT-6", "based on Gemini model");
+    assert.deepEqual(entry.model_messages, expectedMessages);
+    assert.match(entry.model_messages.instructions_template, /^You are Codex, an agent based on Gemini model\./);
+    for (const level of entry.supported_reasoning_levels) {
+      assert.deepEqual(level, template.supported_reasoning_levels.find((source: { effort: string }) => source.effort === level.effort));
+    }
     const route = resolveModel(config, "gemini");
     assert.equal(route.profile.id, "gemini-native");
     assert.equal(route.profile.api, "gemini");
@@ -42,9 +49,9 @@ test("GPT-6.1 Terra keeps its reviewed window and resolves Ultra through xhigh",
     models: { terra: { catalog: "gpt-6.1-terra", upstream: "test", model: "terra-deployment" } },
   });
   const [entry] = buildCatalog(config).models;
-  assert.equal(entry.context_window, 272000);
+  assert.equal(entry.context_window, 500000);
   assert.equal(entry.max_context_window, 872000);
-  assert.equal(entry.shell_type, "unified_exec");
+  assert.equal(entry.shell_type, "shell_command");
   assert.equal(entry.tool_mode, "code_mode_only");
   assert.equal(entry.multi_agent_version, "v2");
   assert.equal(entry.use_responses_lite, true);
@@ -74,8 +81,7 @@ test("legacy GPT catalogs retain their protocol, window, and reasoning differenc
     const original = getCatalogEntry(key);
     assert.equal("tag" in original.source && original.source.tag, "rust-v0.164.0");
     if (key === "gpt-5.5") assert.match(original.adjustments[0], /Responses Lite/);
-    assert.ok(original.adjustments.some(note => note.includes("shell_type")));
-    assert.equal(entry.shell_type, "unified_exec");
+    assert.equal(entry.shell_type, key === "codex-auto-review" ? "unified_exec" : "shell_command");
     assert.deepEqual(entry.model_messages, original.model.model_messages);
     assert.equal(entry.use_responses_lite, lite);
     assert.equal(entry.tool_mode, key === "gpt-5.5" ? null : "code_mode_only");

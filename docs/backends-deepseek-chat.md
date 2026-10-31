@@ -20,7 +20,7 @@
 }
 ```
 
-目录的默认及最大上下文窗口为 `1000000`。输出预算使用上游默认值；请求中的 `max_output_tokens` 或模型配置可指定预算，请求值优先，并转为 `max_tokens`；原生 options 仍可覆盖。上游的输出预算包含 thinking 与可见输出；达到上限返回失败，不执行不完整工具调用。`base_url` 可包含 `/v1` 等前缀。[官方参数范围](https://api-docs.deepseek.com/api/create-chat-completion/)
+目录的默认上下文窗口为 `400000`，作为与其他第三方条目一致的工作预算；最大上下文窗口为 `1000000`。输出预算使用上游默认值；请求中的 `max_output_tokens` 或模型配置可指定预算，请求值优先，并转为 `max_tokens`；原生 options 仍可覆盖。上游的输出预算包含 thinking 与可见输出；达到上限返回失败，不执行不完整工具调用。`base_url` 可包含 `/v1` 等前缀。[官方参数范围](https://api-docs.deepseek.com/api/create-chat-completion/)
 
 ## Reasoning 与参数
 
