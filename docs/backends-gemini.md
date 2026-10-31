@@ -33,7 +33,7 @@
 
 `reasoning.summary` 为 `auto`、`concise` 或 `detailed` 时请求 `includeThoughts: true`，将上游标记 `thought: true` 的文本作为可见摘要。缺省或 `none` 不展示摘要；这不等于关闭 thinking，也不应丢失签名。目录沿用 Sol 的摘要默认值 `none`，可在 codeks 中设置 `model_reasoning_summary = "auto"`。
 
-默认工作窗口为 `272000`；两个条目的最大窗口为 `1048576`。Flash 的官方限制是输入 token 上限，Argon 则是输入与输出共用的窗口，不能把后者理解成可以在 1M 输入之后再输出 1M。官方标准输出上限为 `65536` token；Argon 的更长输出需要另一种后台 long decode 路径。本 adapter 不设置额外默认输出预算或压缩阈值。显式预算从请求或模型配置取得，再接受原生 options 覆盖。[Flash 规格](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash)、[Argon 规格](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon)
+默认工作窗口为 `400000`，作为与其他第三方条目一致的工作预算；两个条目的最大窗口为 `1048576`。Flash 的官方限制是输入 token 上限，Argon 则是输入与输出共用的窗口，不能把后者理解成可以在 1M 输入之后再输出 1M。官方标准输出上限为 `65536` token；Argon 的更长输出需要另一种后台 long decode 路径。本 adapter 不设置额外默认输出预算或压缩阈值。显式预算从请求或模型配置取得，再接受原生 options 覆盖。[Flash 规格](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash)、[Argon 规格](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon)
 
 ## 消息、工具与图片
 

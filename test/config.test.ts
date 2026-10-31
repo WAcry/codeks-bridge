@@ -326,7 +326,7 @@ test("curated GPT entries preserve each model's instructions and reasoning choic
     assert.equal(entry.multi_agent_reasoning_effort, curated.multi_agent_reasoning_effort);
     assert.equal(entry.context_window, curated.context_window);
     assert.equal(entry.max_context_window, curated.max_context_window);
-    assert.equal(entry.shell_type, "unified_exec");
+    assert.equal(entry.shell_type, "shell_command");
     assert.equal(entry.tool_mode, "code_mode_only");
     assert.equal(entry.use_responses_lite, true);
     const route = resolveModel(c, entry.slug);
@@ -412,21 +412,26 @@ test("client snippets use the HTTP catalog by default and permit a static catalo
 
 test("third-party defaults retain the Codex role and provide model-specific Ultra and budgets", () => {
   const template = getCatalogEntry("gpt-6.1-sol").model;
-  for (const [key, vendor, ultra, output, contextWindow] of [
-    ["claude-opus-5-5", "Claude", "xhigh", 128000, 400000],
-    ["claude-sonnet-5-5", "Claude", "max", 128000, 400000],
-    ["claude-haiku-5-5", "Claude", "max", 128000, 400000],
-    ["deepseek-flash", "DeepSeek", "max", undefined, 1000000],
+  for (const [key, vendor, ultra, output] of [
+    ["claude-opus-5-5", "Claude", "xhigh", 128000],
+    ["claude-sonnet-5-5", "Claude", "max", 128000],
+    ["claude-haiku-5-5", "Claude", "max", 128000],
+    ["deepseek-flash", "DeepSeek", "max", undefined],
   ] as const) {
     const c = validateConfig({ upstreams: { a: { base_url: "https://example.com/v1" } }, models: {
       selected: { catalog: key, upstream: "a", model: "deployment" },
     } });
     const info = buildCatalog(c).models[0];
     const expectedMessages = structuredClone(template.model_messages);
-    expectedMessages.instructions_template = expectedMessages.instructions_template.replace("based on GPT-6", `based on ${vendor}`);
+    expectedMessages.instructions_template = expectedMessages.instructions_template.replace("based on GPT-6", `based on ${vendor} model`);
     assert.deepEqual(info.model_messages, expectedMessages);
+    assert.ok(info.model_messages.instructions_template.startsWith(`You are Codex, an agent based on ${vendor} model.`));
+    for (const level of info.supported_reasoning_levels) {
+      assert.deepEqual(level, template.supported_reasoning_levels.find((source: { effort: string }) => source.effort === level.effort));
+    }
     assert.equal(info.default_reasoning_summary, template.default_reasoning_summary);
-    assert.equal(info.context_window, contextWindow);
+    assert.equal(info.shell_type, "shell_command");
+    assert.equal(info.context_window, 400000);
     assert.equal(info.max_context_window, 1000000);
     assert.equal(info.multi_agent_reasoning_effort, ultra);
     assert(info.supported_reasoning_levels.some((level: any) => level.effort === "ultra"));

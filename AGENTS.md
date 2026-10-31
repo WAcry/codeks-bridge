@@ -14,7 +14,7 @@ codeks-bridge 是给 codeks（openai/codex 的自用 fork）用的本地模型�
 - 私有名称清单在本机的 `~/.config/codeks/private-terms`，和 codeks 共用，不进仓库：每行一个正则，不区分大小写，`#` 开头是注释。提交、推送和开 PR 前运行 `npm run check`，它会用这份清单扫描仓库文件、提交说明和分支名。遇到清单里没有的私有名称，追加进去。
 - 真实上游的地址、密钥和测试配置只放在仓库外（例如 `~/.config/codeks-bridge/`）。测试数据里的 id、签名和密文要换成合成值。
 - 运行时零依赖，只用 Node 内置模块。开发依赖只有 TypeScript 和 Node 类型定义。
-- GPT 目录保留对应版本 Codex 源码中该模型的完整原始条目和提示词；所有 GPT 的 `shell_type` 统一使用 `unified_exec`，GPT-5.5 显式启用 Responses Lite；窗口等用户指定的调整记在各条目的 `adjustments` 中。源码尚未收录的模型可取自已审阅的 ChatGPT 订阅目录同名条目，完整保留模型差异，并检查是否含不适合公开的名称。第三方模型基于明确的现代模板精调，只调整身份和必要能力差异；每项调整记在目录条目的 `adjustments` 中。预算、窗口和压缩阈值等默认设置以 GPT-6.1 的字段为基准，额外默认值仅用于满足上游必填参数。
+- GPT 目录优先保留对应版本 Codex 源码中该模型的完整原始条目和提示词，包括各自的 `shell_type` 和窗口；GPT-5.5 显式启用 Responses Lite，其他明确例外记在各条目的 `adjustments` 中。源码尚未收录的模型可取自已审阅的 ChatGPT 订阅目录同名条目，完整保留模型差异，并检查是否含不适合公开的名称。第三方模型基于 GPT-6.1 Sol 精调，默认工作窗口统一为 `400000`、最大窗口保留各自能力上限，`shell_type` 沿用模板的 `shell_command`；首句身份使用对应家族加 `model`，其余 Codex 人格保留。reasoning 档位说明参考模板同名档位的含义，与原生 effort 映射分开维护。每项调整记在条目的 `adjustments` 中；输出预算和压缩阈值保留模板字段，额外默认值仅用于满足上游必填参数。
 - 只支持 `src/model-catalog.ts` 列出的有限模型。`models.catalog` 选择已审阅条目，显示别名和实际部署名独立；未知 key 明确报错。配置优先表达参数和复用策略，模型名不承担协议检测。共享协议代码只处理共同结构，方言差异归对应 adapter。
 - 目录来源固定到 Codex 源码的 tag 和 commit，运行时不请求订阅目录；订阅快照记录端点、取得日期和客户端版本，不包含账号或设备标识。导入脚本只生成待审阅候选文件，运行时直接使用仓库内条目。更新时复核提示词、窗口、reasoning、工具与多代理字段，不能自动覆盖精调结果。
 - 客户端协议优先跟随最新 Codex 的 GPT 默认行为，以 OpenAI 订阅、AWS 和 Azure 的使用场景为基准。当前目录保留 Responses Lite、Code Mode Only 和多代理元数据；GPT 保留其工具声明、reasoning 语义和协议 header，其他 adapter 在转换边界适配。上游版本差异应核对源码并记录，不能为了桥接便利静默关闭客户端默认能力。

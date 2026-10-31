@@ -6,9 +6,7 @@
     "path": "codex-rs/models-manager/models.json",
     "model": "gpt-6.1-sol"
   },
-  "adjustments": [
-    "按用户选择将 shell_type 从 shell_command 统一为 unified_exec；当前 codeks 将旧名称解析为相同类型，不改变工具行为。"
-  ],
+  "adjustments": [],
   "adapter": "gpt-responses",
   "model": {
     "slug": "gpt-6.1-sol",
@@ -74,7 +72,7 @@
         "description": "Maximum reasoning with automatic task delegation"
       }
     ],
-    "shell_type": "unified_exec",
+    "shell_type": "shell_command",
     "visibility": "list",
     "minimal_client_version": "0.153.0",
     "supported_in_api": true,
