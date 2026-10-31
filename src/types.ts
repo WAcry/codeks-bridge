@@ -37,6 +37,8 @@ export interface ModelConfig {
   context_window?: number;
   max_output_tokens?: number;
   input_modalities?: ("text" | "image")[];
+  /** Replace advertised service tiers; an empty list removes tier choices. */
+  service_tiers?: { id: string; name: string; description: string; [key: string]: unknown }[];
   reasoning?: { default_effort?: string; effort_map?: Record<string, string> };
   replay?: { reasoning_from?: string[]; native_compaction_from?: string[]; unrecognized?: UnrecognizedStatePolicy };
   compaction?: { mode?: "summary" | "native"; model?: string; native_replay?: boolean };
