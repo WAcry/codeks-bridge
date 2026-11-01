@@ -151,6 +151,7 @@ token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次�
 | `context_window` | 可选窗口预算；设置时同时覆盖客户端的 `context_window` 和 `max_context_window` |
 | `max_output_tokens` | 覆盖目录的默认回答输出预算；请求中的显式值优先于模型配置 |
 | `input_modalities` | 可选，覆盖条目中的 `text`/`image` 能力声明 |
+| `service_tiers` | 可选，完整替换客户端可选服务档位；每项为 `{id, name, description}`，`[]` 清空额外档位 |
 | `reasoning` | 默认 effort 及其到原生值的映射 |
 | `replay` | reasoning、原生压缩的允许来源，以及未识别历史状态的处理方式 |
 | `compaction` | 压缩方式、执行模型，以及本目标是否接收原生压缩 |
@@ -173,6 +174,27 @@ token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次�
 请求先由 adapter 转换，再浅层合并 `upstream.options`、`model.options`；后者优先，嵌套对象整体替换。例如模型 `options.output_config` 会替换推导值和上游同名对象。由此可以显式调整 thinking budget、原生 effort 或端点专有字段。
 
 最终由 bridge 固定模型路由、转换后的历史、工具定义、流模式和必要协议字段。摘要请求保留普通工具选择并移除结构化输出约束；原生压缩移除普通回答的输出上限。必须重建的字段承载桥接契约，不由 options 改写。详见上表链接的后端文档，以及[摘要的工具选择](compaction.md#工具选择与缓存)。
+
+## 服务档位
+
+同一 GPT 模型在不同端点上可能支持不同档位。`models.<别名>.service_tiers` 使用 Codex 当前的原生目录格式：`id` 是实际请求中的 `service_tier` 值，`name` 是客户端展示和档位命令名称，`description` 是说明文字。省略时保留原目录；设置后完整替换，可以给相同目录条目的不同别名配置不同能力。
+
+```json
+"gpt-fast": {
+  "catalog": "gpt-6.1-sol", "upstream": "primary", "model": "gpt-6.1-sol",
+  "service_tiers": [
+    { "id": "priority", "name": "Fast", "description": "Faster responses with priority processing" }
+  ]
+},
+"gpt-standard": {
+  "catalog": "gpt-6.1-sol", "upstream": "secondary", "model": "sol-deployment",
+  "service_tiers": []
+}
+```
+
+`service_tiers` 是当前字段；`additional_speed_tiers` 已被 Codex 标记弃用，不作为独立配置项。显式覆盖时，bridge 同时清空派生目录中的旧字段，避免它继续声明 Fast 能力。原目录的 `default_service_tier` 仍在新列表时保留，否则清空；配置不会改写仓库中的原始模型条目。
+
+这是客户端能力声明，不是请求默认值或服务端权限。实际选择由 codeks 的 `service_tier` 设置及界面决定；bridge 保留 GPT 请求中的 `service_tier`，不会根据这份列表再次过滤或替换。档位 ID 不限定为 `priority`、`ultrafast` 或 `flex`，额外元数据原样保留，真实支持情况由上游决定。当前 codeks 即使未在目录中列出 `flex`，仍允许显式请求它，因此 `[]` 不代表禁止所有服务档位请求。
 
 ## Adapter 专用行为
 

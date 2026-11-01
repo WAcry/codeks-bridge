@@ -40,7 +40,7 @@ Claude、DeepSeek 与 Gemini 从 GPT-6.1 Sol 模板开始，`shell_type` 沿用 
 
 ## 配置表达策略，adapter 负责协议
 
-`models.catalog` 选择条目；`upstreams` 包含连接、鉴权及共用的 adapter 设置；别名和真实部署名独立。目录条目决定 adapter，实际模型名不参与方言推断。模型窗口、输入模态、effort 映射、状态复用范围、压缩模式及执行模型可由配置覆盖。
+`models.catalog` 选择条目；`upstreams` 包含连接、鉴权及共用的 adapter 设置；别名和真实部署名独立。目录条目决定 adapter，实际模型名不参与方言推断。模型窗口、输入模态、服务档位、effort 映射、状态复用范围、压缩模式及执行模型可由配置覆盖。
 
 协议专用桥接行为放在 `adapters.<adapter ID>`，模型逐字段覆盖连接，再取对应 adapter 默认值；原生请求参数仍通过开放的 `options` 浅层合并。这样的边界让未来 GPT、Messages 或 Chat 方言可以添加各自确有需求的设置，而不用在连接顶层堆积特例，也不提前维护空的配置对象或通用插件框架。配置行为不改变来源身份和模型目录。Claude 的 thinking 失配策略通过这里配置，适用于工具定义变化、故障续接等引起的前缀差异；见 [Adapter 专用行为](config.md#adapter-专用行为)。
 

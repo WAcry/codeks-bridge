@@ -47,6 +47,12 @@ export function modelProfile(model: ModelConfig): ModelProfile {
   if (model.reasoning?.default_effort !== undefined) info.default_reasoning_level = model.reasoning.default_effort;
   if (model.context_window !== undefined) info.context_window = info.max_context_window = model.context_window;
   if (model.input_modalities !== undefined) info.input_modalities = [...model.input_modalities];
+  if (model.service_tiers !== undefined) {
+    info.service_tiers = structuredClone(model.service_tiers);
+    // Keep legacy Fast discovery consistent with the explicit tier list.
+    info.additional_speed_tiers = [];
+    if (!model.service_tiers.some(tier => tier.id === info.default_service_tier)) info.default_service_tier = null;
+  }
   return {
     ...FORMATS[entry.adapter], model_info: info, effort_map, multi_agent_effort,
     max_output_tokens: model.max_output_tokens ?? entry.max_output_tokens,

@@ -7,6 +7,7 @@ import { reasoningEffort } from "../src/profiles.ts";
 import { getCatalogEntry } from "../src/model-catalog.ts";
 import { buildAnthropicRequest } from "../src/backends/anthropic.ts";
 import { buildDeepSeekRequest } from "../src/backends/deepseek.ts";
+import { responsesBody } from "../src/backends/responses.ts";
 import { resolveClaudeOptions } from "../src/adapter-options.ts";
 
 const config = () => validateConfig({
@@ -144,6 +145,53 @@ test("catalog and adapter share configured efforts while unknown request values 
   assert.deepEqual(entry.supported_reasoning_levels.map((p: any) => p.effort), ["low", "high"]);
   assert.deepEqual(entry.input_modalities, ["text"]);
   assert.match(configSnippet(c, "/tmp/catalog.json"), /remote_compaction = "v2"/);
+});
+
+test("service tier overrides keep aliases independent and reconcile legacy choices and defaults", () => {
+  const model = { upstream: "a", catalog: "gpt-6-sol", model: "deployment" };
+  const tiers = [
+    { id: "priority", name: "Fast", description: "Priority processing" },
+    { id: "future-tier", name: "Future", description: "", metadata: { label: "preserved" } },
+  ];
+  const c = validateConfig({
+    upstreams: { a: { base_url: "https://example.com/v1" } },
+    models: { original: model, standard: { ...model, service_tiers: [] }, custom: { ...model, service_tiers: tiers } },
+  });
+  const source = getCatalogEntry(model.catalog).model;
+  const [original, standard, custom] = buildCatalog(c).models;
+  assert.deepEqual(original.service_tiers, source.service_tiers);
+  assert.deepEqual(original.additional_speed_tiers, source.additional_speed_tiers);
+  assert.equal(original.default_service_tier, "priority");
+  assert.deepEqual(standard.service_tiers, []);
+  assert.deepEqual(standard.additional_speed_tiers, []);
+  assert.equal(standard.default_service_tier, null);
+  assert.deepEqual(custom.service_tiers, tiers);
+  assert.deepEqual(custom.additional_speed_tiers, []);
+  assert.equal(custom.default_service_tier, "priority");
+  assert.deepEqual(resolveModel(c, "standard").origin, resolveModel(c, "original").origin);
+  custom.service_tiers[1].metadata!.label = "modified output";
+  assert.equal(tiers[1].metadata!.label, "preserved");
+  assert.deepEqual(getCatalogEntry(model.catalog).model, source);
+
+  const body = responsesBody({
+    route: resolveModel(c, "standard"), signal: new AbortController().signal,
+    request: { model: "standard", input: "Hello", service_tier: "unadvertised-native-tier" },
+  });
+  assert.equal(body.service_tier, "unadvertised-native-tier");
+  assert.equal(body.service_tiers, undefined);
+  assert.equal(body.additional_speed_tiers, undefined);
+});
+
+test("service tier configuration rejects malformed client metadata without restricting native IDs", () => {
+  const tier = { id: "priority", name: "Fast", description: "Priority processing" };
+  for (const service_tiers of [
+    null, {}, [null], ["priority"], [{}], [{ ...tier, id: " " }], [{ ...tier, name: "" }],
+    [{ ...tier, description: null }], [{ id: "priority", name: "Fast" }], [tier, tier],
+  ]) {
+    const c = config();
+    Object.assign(c.models.first, { service_tiers });
+    assert.throws(() => validateConfig(c), /service_tiers/);
+  }
 });
 
 test("compaction defaults follow the adapter's native representation", () => {

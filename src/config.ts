@@ -81,6 +81,17 @@ export function validateConfig(value: unknown): BridgeConfig {
     }
     if (model.options !== undefined && !object(model.options)) fail(`model ${slug}: options must be an object`);
     if (model.input_modalities !== undefined && (!strings(model.input_modalities) || !model.input_modalities.length || model.input_modalities.some((m: string) => !["text", "image"].includes(m)))) fail(`model ${slug}: input_modalities must contain text or image`);
+    if (model.service_tiers !== undefined) {
+      if (!Array.isArray(model.service_tiers)) fail(`model ${slug}: service_tiers must be an array`);
+      const ids = new Set<string>();
+      for (const tier of model.service_tiers) {
+        if (!object(tier) || typeof tier.id !== "string" || !tier.id.trim() || typeof tier.name !== "string" || !tier.name.trim() || typeof tier.description !== "string") {
+          fail(`model ${slug}: service_tiers entries require nonempty id, name, and a string description`);
+        }
+        if (ids.has(tier.id)) fail(`model ${slug}: duplicate service_tiers id ${tier.id}`);
+        ids.add(tier.id);
+      }
+    }
     if (model.reasoning !== undefined) {
       const r = model.reasoning;
       if (!object(r)) fail(`model ${slug}: reasoning must be an object`);
