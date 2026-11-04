@@ -78,9 +78,9 @@ const scenarios: Scenario[] = [
     message: /upgrade to Plus/, errorInfo: "usage_limit_exceeded",
   },
   {
-    name: "SSE flex unavailable uses the capacity message without retrying",
+    name: "SSE flex unavailable retries once and keeps the capacity message",
     error: { code: "flex_unavailable", message: "Synthetic flex restriction" },
-    message: /Flex capacity unavailable\./, errorInfo: "flex_unavailable",
+    message: /Flex capacity unavailable\./, errorInfo: "flex_unavailable", requests: 2,
   },
   {
     name: "HTTP usage limit retains plan and reset information",
