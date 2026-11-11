@@ -6,7 +6,7 @@ import { resolveModel, validateConfig } from "../src/config.ts";
 import { catalogKeys, getCatalogEntry } from "../src/model-catalog.ts";
 import { reasoningEffort } from "../src/profiles.ts";
 
-for (const key of ["gemini-3.8-flash", "gemini-4-argon"]) {
+for (const key of ["gemini-3.8-flash", "gemini-4-argon", "gemini-4-carbon"]) {
   test(`${key} keeps the reviewed working budget and exposes native thinking levels`, () => {
     const template = getCatalogEntry("gpt-6.1-sol").model;
     const config = validateConfig({

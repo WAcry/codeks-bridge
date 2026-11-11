@@ -25,6 +25,7 @@
 | `deepseek-flash` | `gpt-6.1-sol`，经精调 | `deepseek-chat` |
 | `gemini-3.8-flash` | `gpt-6.1-sol`，经精调 | `gemini-native` |
 | `gemini-4-argon` | `gpt-6.1-sol`，经精调 | `gemini-native` |
+| `gemini-4-carbon` | `gpt-6.1-sol`，经精调 | `gemini-native` |
 
 每份 JSON 包含：
 
@@ -63,7 +64,7 @@ Opus / Sonnet 两个条目从 `low` 开始：Opus 5.5 始终启用 thinking，So
 
 `ultra` 保留 Codex 的自动分工提示词和档位说明：Opus 5.5 使用原生 `xhigh`，Sonnet 5.5、Haiku 5.5 与 DeepSeek Flash 使用 `max`；各条目的 `multi_agent_reasoning_effort` 与映射一致。
 
-Gemini 3.8 Flash 与 Gemini 4 Argon 使用原生 `streamGenerateContent`，默认 `medium`，普通档位为 `low`、`medium`、`high`，`ultra` 使用原生 `high`；两模型不支持 `minimal`，不把它或 `none` 列入目录。Argon 的原生接口要求提供 `thinkingLevel`。默认工作窗口为 `400000`，`max_context_window` 为官方公布的 `1048576`：Flash 是输入上限，Argon 是输入与输出共用的上下文上限。原生接口不要求输出预算，目录不额外设置 `max_output_tokens`；请求和配置可以覆盖。Gemini 保留图片输入、关闭 `original` 声明，并默认使用文字压缩。[Flash 规格](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash)、[Argon 规格](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon)、[原生 thinking 参数](https://ai.google.dev/gemini-api/docs/generate-content/thinking)、[适配说明](../docs/backends-gemini.md)
+Gemini 3.8 Flash、Gemini 4 Argon 与 Gemini 4 Carbon 使用原生 `streamGenerateContent`，默认 `medium`，普通档位为 `low`、`medium`、`high`，`ultra` 使用原生 `high`；不把 `minimal` 或 `none` 列入目录。Argon 与 Carbon 的请求均发送 `thinkingLevel`。默认工作窗口为 `400000`，`max_context_window` 为官方公布的 `1048576`：Flash 是输入上限，Argon 与 Carbon 是输入与输出共用的上下文上限。原生接口不要求输出预算，目录不额外设置 `max_output_tokens`；请求和配置可以覆盖。Gemini 保留图片输入、关闭 `original` 声明，并默认使用文字压缩。Carbon 与 Argon 使用同一原生协议，通过独立目录条目维护能力，不按模型名新增 adapter 分支。[Flash 规格](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash)、[Argon 规格](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon)、[Carbon 规格](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-carbon)、[原生 thinking 参数](https://ai.google.dev/gemini-api/docs/generate-content/thinking)、[适配说明](../docs/backends-gemini.md)
 
 这些源模型都明确设置 `supports_search_tool: true`，本目录保持原值。Code Mode Only 如何暴露工具由客户端源码决定，不能因为没有独立的外层 `tool_search` 就把此字段改为 false。网页搜索和图片生成有各自的客户端设置，不通过这个字段控制。
 
