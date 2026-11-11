@@ -9,7 +9,7 @@
   "adjustments": [
     "以 GPT-6.1 Sol 的完整条目为起点；保留 Codex 代理身份、Code Mode Only、Responses Lite、多代理和工具元数据。",
     "将模型标识和展示信息改为 Gemini 3.8 Flash；instructions_template 仅将 based on GPT-6 改为 based on Gemini model，保留其余客户端提示词。",
-    "按用户选择将默认 context_window 设为 400000，max_context_window 保留官方公开的 1048576。原生接口不要求默认输出预算，因此不新增 max_output_tokens；配置和请求可明确指定。",
+    "按用户选择将默认 context_window 设为 272000，max_context_window 保留官方公开的 1048576。原生接口不要求默认输出预算，因此不新增 max_output_tokens；配置和请求可明确指定。",
     "默认 effort 为 medium，普通档位 low、medium、high 对应 thinkingLevel；这两个模型不支持 minimal，不宣传 none；未映射的显式请求值仍交给上游裁决。",
     "ultra 保留客户端自动分工提示词，映射到原生 high；multi_agent_reasoning_effort 同样设为 high。",
     "关闭尚未转换的 verbosity 和 original image detail 声明；保留普通图片输入与模板的 none 摘要默认值。",
@@ -46,7 +46,7 @@
     "requires_sandboxed_review": false,
     "auto_review_model_override": null,
     "model_specialty": null,
-    "context_window": 400000,
+    "context_window": 272000,
     "max_context_window": 1048576,
     "auto_compact_token_limit": null,
     "comp_hash": "3000",
