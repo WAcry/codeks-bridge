@@ -169,7 +169,7 @@ token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次�
 }
 ```
 
-不设置窗口时，原条目的两个窗口字段各自保留。多数 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；GPT-6.1 Terra 为 `500000` / `872000`，GPT-5.5 的两个字段均为 `272000`，Daybreak Red 均为 `372000`。Claude、DeepSeek 和 Gemini 默认 `context_window: 400000`，作为统一工作预算；`max_context_window` 保留各自能力上限，Claude 和 DeepSeek 为 `1000000`，Gemini 为 `1048576`。压缩阈值沿用模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 必须提供 `max_tokens`，对应目录外层默认预算为 `128000`；GPT、DeepSeek 和 Gemini 使用请求、模型配置或上游提供的默认值。原生 options 也可调整预算，实际限制由部署端点裁决。
+不设置窗口时，原条目的两个窗口字段各自保留。多数 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；GPT-6.1 Terra 为 `500000` / `872000`，GPT-5.5 的两个字段均为 `272000`，Daybreak Red 均为 `372000`。Claude 和 DeepSeek 默认 `context_window: 400000`，Gemini 默认 `context_window: 272000`，作为各自的工作预算；`max_context_window` 保留各自能力上限，Claude 和 DeepSeek 为 `1000000`，Gemini 为 `1048576`。压缩阈值沿用模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 必须提供 `max_tokens`，对应目录外层默认预算为 `128000`；GPT、DeepSeek 和 Gemini 使用请求、模型配置或上游提供的默认值。原生 options 也可调整预算，实际限制由部署端点裁决。
 
 请求先由 adapter 转换，再浅层合并 `upstream.options`、`model.options`；后者优先，嵌套对象整体替换。例如模型 `options.output_config` 会替换推导值和上游同名对象。由此可以显式调整 thinking budget、原生 effort 或端点专有字段。
 

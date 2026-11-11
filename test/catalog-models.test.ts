@@ -14,7 +14,7 @@ for (const key of ["gemini-3.8-flash", "gemini-4-argon", "gemini-4-carbon"]) {
       models: { gemini: { catalog: key, upstream: "test", model: "gemini-deployment" } },
     });
     const [entry] = buildCatalog(config).models;
-    assert.equal(entry.context_window, 400000);
+    assert.equal(entry.context_window, 272000);
     assert.equal(entry.max_context_window, 1048576);
     assert.equal(entry.tool_mode, "code_mode_only");
     assert.equal(entry.multi_agent_version, "v2");
