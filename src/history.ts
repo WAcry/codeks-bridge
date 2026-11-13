@@ -31,7 +31,8 @@ export function restoresNativeCompaction(carrier: CompactionCarrier, route: Reso
 }
 
 /** Selects model-specific opaque state without changing the stored history. */
-export function prepareHistory(input: ResponsesRequest["input"], route: ResolvedModel): Record<string, any>[] {
+export function prepareHistory(input: ResponsesRequest["input"], route: ResolvedModel,
+  beforeTools?: (items: Record<string, any>[]) => Record<string, any>[]): Record<string, any>[] {
   if (typeof input === "string") {
     return [{ type: "message", role: "user", content: [{ type: "input_text", text: input }] }];
   }
@@ -43,7 +44,8 @@ export function prepareHistory(input: ResponsesRequest["input"], route: Resolved
   let toolSegmentStart = 0;
   const finishToolSegment = () => {
     if (route.profile.api !== "responses") {
-      result.push(...translateToolHistory(result.splice(toolSegmentStart)));
+      const segment = result.splice(toolSegmentStart);
+      result.push(...translateToolHistory(beforeTools ? beforeTools(segment) : segment));
       toolSegmentStart = result.length;
     }
   };

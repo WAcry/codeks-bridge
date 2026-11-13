@@ -54,7 +54,9 @@ Claude、DeepSeek 与 Gemini 从 GPT-6.1 Sol 模板开始，`shell_type` 沿用 
 
 Gemini 使用 `streamGenerateContent`，不走 Chat 兼容层。`thoughtSignature` 绑定原始 part，工具和正文的可见输出仍由 Responses 交付，同源回放时再由 carrier 恢复对应的完整 part。这样签名可以随 codeks 会话、resume 和 fork 一起保存，不依赖运行中的 bridge 进程。
 
-对比参考实现后保留这个选择：[Magpie 的磁盘签名存储](https://github.com/yetone/magpie/blob/e056779a67d2024a09aa25edad8a4373931a5b64/internal/gateway/gemini_sigstore.go)依赖本地文件及 call ID 引用，[CC Switch 的 session shadow](https://github.com/farion1231/cc-switch/blob/ee8ee25ebc63faa877e779f0831e29cf2b369604/src-tauri/src/proxy/providers/gemini_shadow.rs)依赖有限容量的内存会话。bridge 已有自包含的 `cxbr1:` 格式，无需增加另一份恢复状态，也不把签名塞进可能受长度限制的调用 ID。原生 JSON Schema 通道可以保留工具约束；不复制参考实现中的 schema 猜测、签名重排或缺少终止时的成功回退。协议细节和真实验证范围见 [Gemini adapter](backends-gemini.md)。
+2026-11-13 对照最新参考源码后保留这个选择：[Magpie 的原生 Gemini 路线](https://github.com/yetone/magpie/blob/71079b69f53ba2c1f4ce0b5b4c7f1f7f5c287cfc/internal/gateway/gemini_signature.go)通过 call ID 引用磁盘签名库，Responses 路线不保存文本签名；[CC Switch 的 Codex Chat 历史恢复](https://github.com/farion1231/cc-switch/blob/8c76bfe1e2628fe385b2c009020036d85510b01d/src-tauri/src/proxy/providers/codex_chat_history.rs)通过进程内缓存找回 Gemini Chat 工具签名，其 Gemini Native shadow 属于 Claude 客户端路线。值得采用的是按工具身份关联状态、先恢复再转换的原则。bridge 的 `cxbr1:` 可以随历史持久保存完整 Part，无需另建签名库或修改 call ID，也不采用签名失效后自动删除重试的方案。
+
+Gemini 先在压缩检查点内按调用身份关联载荷，再整理工具历史。新载荷记录生成 ID，使 Codex 插入的 `aborted` 和异步通知不会拆散已观察到的原生并行组；旧载荷保留有限的签名结构兼容。载荷先于可执行工具项交付，未交付的投影不成为调用。子代理可以只继承首个调用，不必等待父响应的全部调用，也不改变 Codex 的快照或工具调度。原生 JSON Schema 和完整 Part 继续保留；协议细节和真实验证范围见 [Gemini adapter](backends-gemini.md)。
 
 ## 订阅鉴权复用文件登录
 

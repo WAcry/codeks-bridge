@@ -52,7 +52,11 @@ Lite 的 `additional_tools` 按历史顺序合并，声明放入顶层 `tools.fu
 
 Gemini 的 thought signature 是原生 Part 上的 `thoughtSignature`，不等同于可见思考摘要。它可能附在文本或 `functionCall` 上，也可能单独出现在流末尾的空文本 part；同源续接需要保留它与原始 part 的关系。官方要求工具调用时返回签名，并且不能把带签名与不带签名的 part 随意合并。[Thought signatures](https://ai.google.dev/gemini-api/docs/generate-content/thought-signatures)
 
-原生载荷保存为现有 `cxbr1:` reasoning carrier，格式为 `gemini.parts.v1`，data 保存原始 `parts`。正文或工具调用还记录对应的 Responses 投影标记：客户端仍看到正常文本和可执行调用，下一次同源请求恢复完整原生 parts 并替换紧邻的前一项投影，避免把文字或工具重复发送。签名不编码进 call ID；工具身份继续使用共用的调用转换与目标协议 ID 处理。原生末尾的空文本签名 part 也要保留。
+原生载荷保存为现有 `cxbr1:` reasoning carrier，格式为 `gemini.parts.v1`，data 保存原始 `parts`。正文或工具调用还记录对应的 Responses 投影标记：客户端仍看到正常文本和可执行调用，同源回放时恢复完整原生 parts 并替换对应投影，避免把文字或工具重复发送。工具按 `call_id` 关联，允许调用与载荷之间插入已有工具结果；名称、参数仍须匹配，重复或跨其他模型输出、用户指令、压缩边界的歧义关联会报错。正文投影继续在原位置核对可见文字。签名不编码进 call ID；原生末尾的空文本签名 part 也要保留。
+
+新载荷用可选的 `generation` 记录本次 Responses response ID。同一次生成中，历史实际保留的 parts 先组成 model Content，再发送已有工具结果和通知；不会把并行调用拆成多轮。恢复关联先于公共工具历史整理。没有该字段的旧载荷仍可读取：按旧工具签名规则，将首个带签名调用及后续无签名调用恢复为同一并行步骤，并保留空文本尾 Part；下一个带签名调用开始另一工具步骤。
+
+工具载荷在其可执行投影之前交付，二者都使用现有的成功后提交缓冲。这样客户端开始工具或 fork 时，已经保存对应的原生状态。快照只有载荷而没有工具项时，不凭载荷构造调用；快照只包含并行组的首个调用时，只恢复已继承的部分，不要求后续调用到齐，也不补造结果。此前 `call → aborted → carrier` 的旧顺序继续兼容。字段与封装保持向后读取兼容；回放新交付顺序需要更新后的 bridge，不依赖旧版的相邻项假设。
 
 其他模型转入的工具历史没有 Gemini 签名。适配器使用官方允许的 `skip_thought_signature_validator` 标记这一边界；它不补造 reasoning，也不是服务端返回的真实签名。可以恢复的同源载荷始终原样回放。[跨模型工具历史规则](https://ai.google.dev/gemini-api/docs/generate-content/thought-signatures)
 
@@ -84,4 +88,6 @@ Gemini 4 Argon 与 Carbon 的官方隐式缓存要求共享前缀至少 `4096` t
 
 2026-10-27 的真实原生请求通过 Vertex AI 路由验证两个模型的 `MEDIUM`、thought 摘要、末尾空文本签名、工具签名回放、图片与 JSON Schema；Flash 省略输出预算也能成功。该记录验证实际收到的原生协议，不等同于已直连 Google AI Developer API，也不证明所有区域、缓存条件或跨模型签名兼容。适配器自身另以合成数据测试转换与客户端交付。
 
-2026-11-10 的 Carbon 条目按官方规格复用 Argon 的原生协议、Codex 模板和工作预算，覆盖目录与实际 npm 包的加载测试。Carbon 的真实模型推理尚待可用端点验证；该条目不宣称已经验证模型生成质量、签名或缓存命中率。
+2026-11-10 的 Carbon 条目按官方规格复用 Argon 的原生协议、Codex 模板和工作预算，覆盖目录与实际 npm 包的加载测试；当时真实端点尚未可用。
+
+2026-11-13 的真实原生验证确认 Argon、Carbon 均接受完整并行调用组、仅首个带签名调用及其结果、以及完整调用组的两个 `aborted` 结果；单独保留无签名的第二调用被拒绝。另在保留原始 Part 与签名的条件下，分别修改 system、工具说明/schema、先前消息、当前用户请求或删除较早对话，两模型均成功；删除或损坏当前轮签名则返回 400。这说明当前测试路由没有表现出阻断式前缀绑定，不证明任意历史改写都无损，也不能仅凭成功响应确认内部状态的使用方式。bridge 不增加移除签名后重试的策略。

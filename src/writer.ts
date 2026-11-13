@@ -146,6 +146,12 @@ export class ResponseWriter {
     this.suffixOutputStart = this.output.length;
   }
 
+  /** Hold native tool state together with the calls that depend on it. */
+  beginToolOutput(): void {
+    this.flushPendingMessage("commentary");
+    this.holdSuffix();
+  }
+
   private releaseSuffix(): void {
     const suffix = this.suffix;
     this.suffix = undefined;
