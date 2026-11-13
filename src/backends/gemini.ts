@@ -10,11 +10,10 @@ import { buildToolSet, normalizeToolDeclarations, type ToolSet } from "../tools.
 import type { Backend, BackendContext } from "../types.ts";
 import { upstreamFetch } from "../upstream.ts";
 import type { Usage } from "../writer.ts";
+import { prepareGeminiHistory, type GeminiParts, type GeminiProjection } from "./gemini-history.ts";
 
 type Part = Record<string, any>;
-interface Projection { type: "message" | "function_call"; call_id?: string }
-interface NativeParts { parts: Part[]; projection?: Projection; continuation_before?: string }
-interface Entry { parts: Part[]; projection?: Projection; custom?: boolean }
+interface Entry { parts: Part[]; projection?: GeminiProjection; custom?: boolean }
 interface Content { role: "user" | "model"; parts: Part[] }
 const IMPORTED_SIGNATURE = "skip_thought_signature_validator";
 
@@ -87,11 +86,11 @@ export function buildGeminiRequest(context: BackendContext): { body: Record<stri
     if (last?.role === "user" && Boolean(last.parts[0]?.functionResponse) === Boolean(parts[0]?.functionResponse)) last.parts.push(...parts);
     else contents.push({ role: "user", parts });
   };
-  for (const item of prepareHistory(request.input, route)) {
+  for (const item of prepareHistory(request.input, route, prepareGeminiHistory)) {
     if (isOpaqueStateItem(item)) {
       entries.push({ parts: [item] });
     } else if (item.type === "bridge_reasoning") {
-      const state = item.state.data as NativeParts;
+      const state = item.state.data as GeminiParts;
       if (!object(state) || !Array.isArray(state.parts) || !state.parts.length || !state.parts.every(object)) {
         throw new BridgeError("Invalid Gemini reasoning carrier.");
       }
@@ -248,11 +247,11 @@ export const runGemini: Backend = async (context, writer) => {
   let rawUsage: Record<string, any> | undefined;
   const ids = new Set<string>();
   let pendingContinuation = continuationBefore;
-  const carrier = (parts: Part[], projection?: Projection) => {
+  const carrier = (parts: Part[], projection?: GeminiProjection) => {
     const encoded = encodeReasoning({
       source: context.route.origin, format: context.route.profile.reasoning_format,
-      data: { parts, ...(projection ? { projection } : {}),
-        ...(pendingContinuation ? { continuation_before: pendingContinuation } : {}) } satisfies NativeParts,
+      data: { parts, generation: writer.responseId, ...(projection ? { projection } : {}),
+        ...(pendingContinuation ? { continuation_before: pendingContinuation } : {}) } satisfies GeminiParts,
     });
     pendingContinuation = undefined;
     return encoded;
@@ -290,8 +289,9 @@ export const runGemini: Backend = async (context, writer) => {
             if (typeof id !== "string" || !id || ids.has(id)) throw new BridgeError("Gemini returned an invalid or repeated function call ID.", "upstream_error", 502);
             ids.add(id);
             const call = prepareToolCall(tools, id, value.name, value.args ?? {});
-            writeToolCall(writer, call);
+            writer.beginToolOutput();
             writer.endReasoning(carrier([part], { type: "function_call", call_id: call.call.call_id }));
+            writeToolCall(writer, call);
             calls++;
           } else if (typeof part.text === "string" || typeof part.thoughtSignature === "string") {
             const isThinking = part.thought === true;

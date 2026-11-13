@@ -42,6 +42,8 @@ JSON 的结构如下，示例指纹为占位值：
 
 Claude 的外层还可包含 `continuation_before: "Continue."`，记录生成该块前实际补入的 user 续接边界。它只用于响应首块为 thinking/redacted 的情况，原生 `data` 和签名不变，前缀仍为 `cxbr1:`。字段随载荷保存、筛选和恢复，不改变复用策略；具体时序与覆盖范围见 [Claude 故障续接](backends-anthropic.md#失配策略与故障续接)。
 
+Gemini 的 `data.generation` 可选字段记录一次原生生成对应的 Responses response ID，用来恢复历史已保留的 Part 分组；旧载荷没有该字段仍可读取。工具投影按 `call_id` 关联，载荷在可执行项之前交付。只有载荷、没有投影的未提交工具不会被回放；实际签名、来源策略及 `gemini.parts.v1` 格式不变。[Gemini 历史恢复](backends-gemini.md#保留历史与压缩)
+
 codeks 会再次发送 `encrypted_content`，因此载荷可以跨请求、会话恢复、服务重启和子代理 fork 保留。只放在 reasoning 的可见 `content` 中不足以完成这种回放。
 
 ## 来源身份
