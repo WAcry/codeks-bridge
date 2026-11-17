@@ -1,6 +1,6 @@
 # Claude Messages
 
-模型选择 `catalog: "claude-opus-5-5"`、`"claude-sonnet-5-5"` 或 `"claude-haiku-5-5"`，条目指定 `claude-messages` adapter，请求转换为 `POST <base_url>/messages`。官方端点的 `base_url` 为 `https://api.anthropic.com/v1`；默认使用 `x-api-key` 和 `anthropic-version: 2023-06-01`，可通过连接配置覆盖。
+Claude [目录条目](../catalog/README.md)使用 `claude-messages` adapter，请求转换为 `POST <base_url>/messages`。官方端点的 `base_url` 为 `https://api.anthropic.com/v1`；默认使用 `x-api-key` 和 `anthropic-version: 2023-06-01`，可通过连接配置覆盖。通过该端点接入 Fable 5.2 时，将模型的 `catalog` 和 `model` 都设为 `claude-fable-5-2`。Claude API 要求工作区具备该模型所需的 30 天数据保留权限，Anthropic 明确授权的例外除外。[Fable 5.2 迁移指南](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide)
 
 ## 历史与 thinking
 
@@ -8,9 +8,9 @@
 
 相邻同角色消息合并；reasoning、文本和工具调用成为 assistant 内容块，工具输出成为下一条 user 消息中的 `tool_result`。原历史不变。
 
-默认 effort 为 `medium`，普通映射提供 `low`、`medium`、`high`、`xhigh`、`max` 并保留同名值，使用 adaptive thinking 并写入 `output_config.effort`。codeks 的 `ultra` 注入多代理提示词，并将 Opus 5.5 的原生 effort 设为 `xhigh`、Sonnet 5.5 与 Haiku 5.5 设为 `max`。
+Fable 5.2 默认 effort 为 `high`，其余 Claude 条目为 `medium`。普通映射提供 `low`、`medium`、`high`、`xhigh`、`max` 并保留同名值，使用 adaptive thinking 并写入 `output_config.effort`。codeks 的 `ultra` 注入多代理提示词，并将 Fable 5.2 与 Opus 5.5 的原生 effort 设为 `xhigh`、Sonnet 5.5 与 Haiku 5.5 设为 `max`。
 
-Opus 5.5 始终启用 thinking；Sonnet 5.5 的最低模式是 `between_tools`，关闭回复前的思考，但仍在工具之间返回带签名的进度说明。两者都拒绝 `thinking.type: "disabled"`，因此目录不把 `none` 作为可选档位，也不把关闭思考的请求静默改成 `low`。Sonnet 的 `between_tools` 只接受 `high` 或以下 effort，且 `thinking` 对象中不能附带 `display`、`budget_tokens` 等字段。[官方 thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)、[Sonnet 5.5 变更说明](https://platform.claude.com/docs/en/models/sonnet-5-5/whats-new-sonnet-5-5)
+Fable 5.2 与 Opus 5.5 始终启用 adaptive thinking。Sonnet 5.5 的最低模式是 `between_tools`，关闭回复前的思考，但仍在工具之间返回带签名的进度说明。这些模型都拒绝 `thinking.type: "disabled"`，因此目录不把 `none` 作为可选档位。Sonnet 的 `between_tools` 只接受 `high` 或以下 effort，且 `thinking` 对象中不能附带 `display`、`budget_tokens` 等字段。[官方 thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)、[Sonnet 5.5 变更说明](https://platform.claude.com/docs/en/models/sonnet-5-5/whats-new-sonnet-5-5)
 
 `reasoning.summary` 缺省或为 `none` 时选择 `display: "omitted"`；`auto`、`concise`、`detailed` 选择 `summarized`，不保证上游区分摘要长度。目录默认值与 GPT-6.1 Sol 一样为 `none`；要显示摘要，在 codeks 配置中设置 `model_reasoning_summary = "auto"`。显示开关不关闭 thinking 或载荷回放。
 
@@ -28,11 +28,13 @@ Opus 5.5 始终启用 thinking；Sonnet 5.5 的最低模式是 `between_tools`�
 }
 ```
 
-未映射的显式 effort 仍交给上游判断；对 Opus / Sonnet 显式请求 `none` 时，adapter 仍发送 `thinking.type: "disabled"`，由上游返回错误。目录精调不构成运行时能力预检。
+未映射的显式 effort 仍交给上游判断。显式请求 `none` 时，adapter 发送 `thinking.type: "disabled"`，由上游决定是否接受。目录精调不构成运行时能力预检。
 
-Opus / Sonnet / Haiku 5.5 目录按用户选择设置默认上下文窗口 `400000`，最大上下文窗口为 `1000000`，Messages API 要求提供 `max_tokens`，因此目录设置默认输出预算 `128000`，对应官方标准最大输出。输出预算依次取请求 `max_output_tokens`、模型配置、目录默认值，再接受上游和模型 options 的覆盖；这是允许的上限，不要求每次生成同样长度。[Sonnet 模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[Haiku 模型规格](https://platform.claude.com/docs/en/models/haiku-5-5/overview)、[配置优先级](config.md)
+Claude 目录使用默认工作窗口 `400000` 和最大窗口 `1000000`。Messages API 要求提供 `max_tokens`，因此目录设置默认输出预算 `128000`，对应官方标准最大输出。输出预算依次取请求 `max_output_tokens`、模型配置、目录默认值，再接受上游和模型 options 的覆盖。[Claude 模型规格](https://platform.claude.com/docs/en/models/overview)、[配置优先级](config.md)
 
 完整 `thinking`/`redacted_thinking` block，包括签名或隐藏数据，存入 `anthropic.thinking.v1` carrier。请求按 `replay.reasoning_from` 恢复允许来源，签名完整保留；其他来源只在当前请求过滤。允许配对不意味着上游一定接受其签名。[Reasoning 策略](reasoning.md)
+
+Claude API 上 Fable 5.2 可读取兼容账号下 Opus、Sonnet 和 Haiku 5.5 的 thinking，反向切换时旧模型无法读取 Fable 5.2 的 thinking。需要从这些模型向 Fable 续接时，只在 Fable 的 `replay.reasoning_from` 添加已确认的来源。Fable 5.2 的签名前缀还会检查工具列表，变更可能触发现有的 `drop_block` 策略。[原生签名兼容表](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#which-model-switches-keep-the-reasoning-on-the-claude-api)
 
 ## 失配策略与故障续接
 
@@ -67,6 +69,8 @@ Opus / Sonnet / Haiku 5.5 目录按用户选择设置默认上下文窗口 `4000
 Responses `text.format: {type: "json_schema", schema: ...}` 转为 `output_config.format: {type: "json_schema", schema: ...}`；name/strict 不转发。schema 内容直接交给上游，随后 options 仍可覆盖原生格式。普通 `text` 不添加约束；无法表达为 Messages 的未知格式报错。
 
 namespace 和 custom tool 使用共享映射。自由文本工具转换成 `{input: string}`，Lark/regex 放入描述，返回时恢复原始字符串；不添加工具专属提示词。指定工具必须能在当前工具表中解析，`tool_choice: "required"` 转为原生 `any`，不会改成 `auto`。显式 `temperature`、`top_p` 也继续发送；这些参数与具体模型、thinking 的组合是否受支持由上游判断。静默删除参数或关闭 thinking 会改变用户请求，bridge 不做这类修正。
+
+Fable 5.2 使用 `auto` 或 `none` 工具选择，并省略采样参数。Claude API 支持通过模型的 `options.speed: "fast"` 显式选择 Fast 模式。[Fable 5.2 请求限制](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2)
 
 工具定义由共享转换层按历史顺序合并到顶层 `tools`，同身份的新定义覆盖旧定义，其他成员保留。每个上游工具名只对应一份最终定义；详情与取舍见 [Lite 工具声明](tools.md#lite-工具声明)。
 

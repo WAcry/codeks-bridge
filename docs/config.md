@@ -17,7 +17,7 @@
 | 目录模型 | 条目指定的 adapter | 上游路径 |
 | --- | --- | --- |
 | GPT 系列 | [`gpt-responses`](backends-responses.md) | `/responses` |
-| Claude Opus / Sonnet / Haiku | [`claude-messages`](backends-anthropic.md) | `/messages` |
+| Claude Fable / Opus / Sonnet / Haiku | [`claude-messages`](backends-anthropic.md) | `/messages` |
 | DeepSeek Flash | [`deepseek-chat`](backends-deepseek-chat.md) | `/chat/completions` |
 | Gemini 3.8 Flash / 4 Argon | [`gemini-native`](backends-gemini.md) | `/models/{model}:streamGenerateContent?alt=sse` |
 
