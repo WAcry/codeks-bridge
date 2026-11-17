@@ -6,6 +6,42 @@ import { resolveModel, validateConfig } from "../src/config.ts";
 import { catalogKeys, getCatalogEntry } from "../src/model-catalog.ts";
 import { reasoningEffort } from "../src/profiles.ts";
 
+for (const [key, window, modalities, tiers] of [
+  ["gpt-6.2-sol", 500000, ["text", "image", "audio"], ["priority", "ultrafast"]],
+  ["gpt-6.2-astra", 272000, ["text", "image"], ["priority"]],
+] as const) {
+  test(`${key} preserves its subscription capabilities and routes Ultra to xhigh`, () => {
+    const original = getCatalogEntry(key);
+    const config = validateConfig({
+      upstreams: { test: { base_url: "https://example.com/v1" } },
+      models: { worker: { catalog: key, upstream: "test", model: `deployment/${key}` } },
+    });
+    const [entry] = buildCatalog(config).models;
+    assert.equal(entry.context_window, window);
+    assert.equal(entry.max_context_window, 872000);
+    assert.equal(entry.auto_compact_token_limit, null);
+    assert.equal(entry.supports_reasoning_effort_updates, true);
+    assert.deepEqual(entry.input_modalities, modalities);
+    assert.deepEqual(entry.service_tiers.map((tier: { id: string }) => tier.id), tiers);
+    assert.deepEqual(entry.model_messages, original.model.model_messages);
+    assert.equal(entry.base_instructions, original.model.base_instructions);
+    assert.deepEqual(entry.supported_reasoning_levels.map((level: { effort: string }) => level.effort), ["low", "medium", "high", "xhigh", "max", "ultra"]);
+    const route = resolveModel(config, "worker");
+    assert.equal(route.compaction.mode, "native");
+    const body = responsesBody({
+      route, signal: new AbortController().signal,
+      request: { model: "worker", input: "Hello", reasoning: { effort: "ultra" }, service_tier: tiers.at(-1) },
+    });
+    assert.equal(body.model, `deployment/${key}`);
+    assert.equal(body.reasoning.effort, "xhigh");
+    assert.equal(body.service_tier, tiers.at(-1));
+    if (key === "gpt-6.2-sol") {
+      config.models.worker!.input_modalities = ["text", "audio"];
+      assert.deepEqual(buildCatalog(validateConfig(config)).models[0]!.input_modalities, ["text", "audio"]);
+    }
+  });
+}
+
 for (const key of ["gemini-3.8-flash", "gemini-4-argon", "gemini-4-carbon"]) {
   test(`${key} keeps the reviewed working budget and exposes native thinking levels`, () => {
     const template = getCatalogEntry("gpt-6.1-sol").model;

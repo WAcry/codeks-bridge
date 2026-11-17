@@ -13,10 +13,15 @@
     }
   },
   "models": {
-    "gpt": {
-      "catalog": "gpt-6.1-sol",
+    "gpt-6.2-sol": {
+      "catalog": "gpt-6.2-sol",
       "upstream": "chatgpt",
-      "model": "gpt-6.1-sol"
+      "model": "gpt-6.2-sol"
+    },
+    "gpt-6.2-astra": {
+      "catalog": "gpt-6.2-astra",
+      "upstream": "chatgpt",
+      "model": "gpt-6.2-astra"
     },
     "claude": {
       "catalog": "claude-sonnet-5-5",

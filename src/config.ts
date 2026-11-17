@@ -80,7 +80,7 @@ export function validateConfig(value: unknown): BridgeConfig {
       if (model[field] !== undefined && (!Number.isSafeInteger(model[field]) || model[field] <= 0)) fail(`model ${slug}: ${field} must be a positive integer`);
     }
     if (model.options !== undefined && !object(model.options)) fail(`model ${slug}: options must be an object`);
-    if (model.input_modalities !== undefined && (!strings(model.input_modalities) || !model.input_modalities.length || model.input_modalities.some((m: string) => !["text", "image"].includes(m)))) fail(`model ${slug}: input_modalities must contain text or image`);
+    if (model.input_modalities !== undefined && (!strings(model.input_modalities) || !model.input_modalities.length || model.input_modalities.some((m: string) => !["text", "image", "audio"].includes(m)))) fail(`model ${slug}: input_modalities must contain text, image, or audio`);
     if (model.service_tiers !== undefined) {
       if (!Array.isArray(model.service_tiers)) fail(`model ${slug}: service_tiers must be an array`);
       const ids = new Set<string>();
