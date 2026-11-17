@@ -21,6 +21,7 @@
 | `gpt-daybreak-red-latest` | 同名条目 | `gpt-responses` |
 | `codex-auto-review` | 同名条目 | `gpt-responses` |
 | `gpt-reserve` | 订阅端点同名条目 | `gpt-responses` |
+| `claude-fable-5-2` | `gpt-6.1-sol`，经精调 | `claude-messages` |
 | `claude-opus-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
 | `claude-sonnet-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
 | `claude-haiku-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
@@ -56,17 +57,17 @@ GPT-Reserve 是客户端在普通额度用尽、后端授权后切换的回退�
 
 Claude、DeepSeek 和 Gemini 从 GPT-6.1 Sol 的完整条目开始，只做各自 JSON 中列出的修改：底层模型与展示信息、工作窗口、reasoning 档位，以及当前 adapter 尚未转换的参数和 GPT 专属的服务展示信息。`shell_type` 沿用源码模板的 `shell_command`。提示词仅将首句的 `based on GPT-6` 换成 `based on Claude model`、`based on DeepSeek model` 或 `based on Gemini model`，使底层模型身份明确；`You are Codex`、`As Codex` 和其余客户端指令保留。`default_reasoning_summary` 保持源条目的 `none`，由用户在 codeks 中选择摘要展示方式。
 
-预算默认值遵循与 GPT-6.1 Sol 模板对齐的维护原则：仅保留模板已有字段，或为上游必填参数补充默认值；公布的能力上限本身不要求新增默认配置。窗口字段沿用模板结构：Claude 和 DeepSeek 的默认 `context_window` 为 `400000`，Gemini 为 `272000`；`max_context_window` 保留各自能力上限，Claude 和 DeepSeek 为 `1000000`，Gemini 为 `1048576`。这些默认值是项目的工作预算，不是官方能力上限。压缩阈值保留模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 要求 `max_tokens`，因此三个 Claude 条目提供 `128000` 默认预算；GPT、DeepSeek 和 Gemini 的输出预算由请求、用户配置或上游默认值决定。
+预算默认值遵循与 GPT-6.1 Sol 模板对齐的维护原则：仅保留模板已有字段，或为上游必填参数补充默认值；公布的能力上限本身不要求新增默认配置。窗口字段沿用模板结构：Claude 和 DeepSeek 的默认 `context_window` 为 `400000`，Gemini 为 `272000`；`max_context_window` 保留各自能力上限，Claude 和 DeepSeek 为 `1000000`，Gemini 为 `1048576`。这些默认值是项目的工作预算，不是官方能力上限。压缩阈值保留模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 要求 `max_tokens`，因此 Claude 条目提供 `128000` 默认预算；GPT、DeepSeek 和 Gemini 的输出预算由请求、用户配置或上游默认值决定。
 
 依据：[Sonnet 模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[Haiku 模型规格](https://platform.claude.com/docs/en/models/haiku-5-5/overview)、[Messages 必填参数](https://platform.claude.com/docs/en/api/messages/create)、[DeepSeek 模型规格](https://api-docs.deepseek.com/quick_start/pricing/)。这些是第三方精调的依据，`source` 仍记录 Codex 模板来源。
 
-Claude 的默认 effort 为 `medium`，目录提供 `low`、`medium`、`high`、`xhigh`、`max` 和客户端 `ultra`。DeepSeek 默认 `high`，目录提供原生 `low`、`high`、`max` 和客户端 `ultra`。[DeepSeek thinking 参数](https://api-docs.deepseek.com/guides/thinking_mode/)
+Fable 5.2 按 Claude API 默认使用 `high`，其余 Claude 条目默认使用 `medium`。Claude 目录提供 `low`、`medium`、`high`、`xhigh`、`max` 和客户端 `ultra`。DeepSeek 默认 `high`，目录提供原生 `low`、`high`、`max` 和客户端 `ultra`。[Fable 5.2 规格](https://platform.claude.com/docs/en/models/fable-5-2/overview)、[DeepSeek thinking 参数](https://api-docs.deepseek.com/guides/thinking_mode/)
 
 第三方条目的档位说明沿用 GPT-6.1 Sol 同名档位对速度、推理深度和自动分工的描述，帮助用户选择。说明文字与 `effort_map` 分开维护；相同说明不表示不同上游的原生 effort、推理预算或效果相同。
 
-Opus / Sonnet 两个条目从 `low` 开始：Opus 5.5 始终启用 thinking，Sonnet 5.5 的最低模式 `between_tools` 仍保留工具之间的思考，因此不能用 `none` 表示。需要 Sonnet 的这一模式时，使用 [Messages 原生 options](../docs/backends-anthropic.md#历史与-thinking) 显式配置。目录列出的档位应与已审阅模型匹配；未列出的显式请求值仍交给上游裁决。[Claude thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)
+Fable 5.2 与 Opus 5.5 始终启用 adaptive thinking。Sonnet 5.5 的最低模式 `between_tools` 仍保留工具之间的思考，因此这些目录从 `low` 开始。需要 Sonnet 的这一模式时，使用 [Messages 原生 options](../docs/backends-anthropic.md#历史与-thinking) 显式配置。目录列出的档位应与已审阅模型匹配；未列出的显式请求值仍交给上游裁决。[Claude thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)
 
-`ultra` 保留 Codex 的自动分工提示词和档位说明：Opus 5.5 使用原生 `xhigh`，Sonnet 5.5、Haiku 5.5 与 DeepSeek Flash 使用 `max`；各条目的 `multi_agent_reasoning_effort` 与映射一致。
+`ultra` 保留 Codex 的自动分工提示词和档位说明：Fable 5.2 与 Opus 5.5 使用原生 `xhigh`，Sonnet 5.5、Haiku 5.5 与 DeepSeek Flash 使用 `max`；各条目的 `multi_agent_reasoning_effort` 与映射一致。
 
 Gemini 3.8 Flash、Gemini 4 Argon 与 Gemini 4 Carbon 使用原生 `streamGenerateContent`，默认 `medium`，普通档位为 `low`、`medium`、`high`，`ultra` 使用原生 `high`；不把 `minimal` 或 `none` 列入目录。Argon 与 Carbon 的请求均发送 `thinkingLevel`。默认工作窗口为 `272000`，`max_context_window` 为官方公布的 `1048576`：Flash 是输入上限，Argon 与 Carbon 是输入与输出共用的上下文上限。原生接口不要求输出预算，目录不额外设置 `max_output_tokens`；请求和配置可以覆盖。Gemini 保留图片输入、关闭 `original` 声明，并默认使用文字压缩。Carbon 与 Argon 使用同一原生协议，通过独立目录条目维护能力，不按模型名新增 adapter 分支。[Flash 规格](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash)、[Argon 规格](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon)、[Carbon 规格](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-carbon)、[原生 thinking 参数](https://ai.google.dev/gemini-api/docs/generate-content/thinking)、[适配说明](../docs/backends-gemini.md)
 

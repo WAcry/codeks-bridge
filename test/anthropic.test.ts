@@ -32,11 +32,11 @@ const finish = (stop = "end_turn") => [
   { type: "message_delta", delta: { stop_reason: stop }, usage: { output_tokens: 30, output_tokens_details: { thinking_tokens: 20 } } },
   { type: "message_stop" },
 ];
-function textEvents(text: string): unknown[] {
+function textEvents(text: string, index = 0): unknown[] {
   return [
-    { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
-    { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
-    { type: "content_block_stop", index: 0 },
+    { type: "content_block_start", index, content_block: { type: "text", text: "" } },
+    { type: "content_block_delta", index, delta: { type: "text_delta", text } },
+    { type: "content_block_stop", index },
   ];
 }
 
@@ -63,6 +63,36 @@ function writerCapture(): { writer: ResponseWriter; output: () => any[] } {
   writer.start();
   return { writer, output: () => raw.split("\n\n").filter(Boolean).map((frame) => JSON.parse(frame.slice(6))) };
 }
+
+test("Fable 5.2 streams through Messages with its reviewed defaults", async () => {
+  const signedBlock = { type: "thinking", thinking: "", signature: "synthetic_fable_signature" };
+  const stream = events(start,
+    { type: "content_block_start", index: 0, content_block: signedBlock },
+    { type: "content_block_stop", index: 0 },
+    ...textEvents("Fable response", 1),
+    ...finish());
+  await withUpstream(stream, async (base, requests) => {
+    const fable = resolveModel(validateConfig({
+      upstreams: { api: { base_url: base } },
+      models: { fable: { upstream: "api", catalog: "claude-fable-5-2", model: "claude-fable-5-2" } },
+    }), "fable");
+    const ctx = { ...context(), route: fable, request: { model: "fable", input: "Hello" } };
+    const { writer } = writerCapture();
+    const result = await runAnthropic(ctx, writer);
+    writer.complete(result.usage, result.endTurn);
+    const [request] = requests;
+    assert.equal(request.path, "/v1/messages");
+    assert.equal(request.body.model, "claude-fable-5-2");
+    assert.equal(request.body.max_tokens, 128000);
+    assert.equal(request.body.output_config.effort, "high");
+    assert.equal(request.body.thinking.type, "adaptive");
+    assert.equal(request.body.thinking.block_binding.prefix_mismatch_behavior, "drop_block");
+    assert.match(request.headers["anthropic-beta"], /thinking-binding-controls-2026-08-01/);
+    const preserved = writer.outputItems.find(item => item.type === "reasoning");
+    assert.deepEqual(decodeReasoning(preserved?.encrypted_content)?.data, signedBlock);
+    assert.equal(buildAnthropicRequest({ ...ctx, request: { ...ctx.request, reasoning: { effort: "ultra" } } }).body.output_config.effort, "xhigh");
+  });
+});
 
 test("Messages preserves signed reasoning, chronological instructions, and grouped tools", () => {
   const foreign = { type: "reasoning", encrypted_content: encodeReasoning({ source: resolveModel(config, "other").origin, format: route.profile.reasoning_format, data: thinking }) };
