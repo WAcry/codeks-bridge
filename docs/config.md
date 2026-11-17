@@ -150,7 +150,7 @@ token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次�
 | `visibility` | 默认 `"list"`；`"hide"` 在客户端选择器中隐藏，仍保留完整目录条目；`expose: false` 时不输出条目 |
 | `context_window` | 可选窗口预算；设置时同时覆盖客户端的 `context_window` 和 `max_context_window` |
 | `max_output_tokens` | 覆盖目录的默认回答输出预算；请求中的显式值优先于模型配置 |
-| `input_modalities` | 可选，覆盖条目中的 `text`/`image` 能力声明 |
+| `input_modalities` | 可选，覆盖条目中的 `text`/`image`/`audio` 能力声明 |
 | `service_tiers` | 可选，完整替换客户端可选服务档位；每项为 `{id, name, description}`，`[]` 清空额外档位 |
 | `reasoning` | 默认 effort 及其到原生值的映射 |
 | `replay` | reasoning、原生压缩的允许来源，以及未识别历史状态的处理方式 |

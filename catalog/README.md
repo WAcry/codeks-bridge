@@ -2,10 +2,12 @@
 
 这里保存运行时使用的完整模型条目。每个文件对应一个受支持的 catalog key；显示别名、连接和实际发给上游的模型名由用户配置。未知 key 直接报错，不使用通用模板猜测模型能力。
 
-来源是 OpenAI Codex 的 `codex-rs/models-manager/models.json`，每份 JSON 独立记录版本。原有条目来自 [`rust-v0.163.0`](https://github.com/openai/codex/tree/rust-v0.163.0)，commit `83086188ae0614bd882818ff1aa23f3194962012`；GPT-5.5、两个 Daybreak 条目及 Codex Auto Review 来自 [`rust-v0.164.0`](https://github.com/openai/codex/tree/rust-v0.164.0)，commit `6aaac694803004a63c6f393d153c96d22521a6b9`。GPT-6.1 Terra 来自 [`rust-v0.165.0`](https://github.com/openai/codex/tree/rust-v0.165.0)，commit `360319d8dee62d87e2d59fc0c21805d79519cfed`。源码尚未收录的 GPT-Reserve 使用订阅快照，见下文。运行时不从订阅账号请求远端目录，也不在用户启动时读取本机 codeks 的最新模板。
+来源是 OpenAI Codex 的 `codex-rs/models-manager/models.json`，每份 JSON 独立记录版本。原有条目来自 [`rust-v0.163.0`](https://github.com/openai/codex/tree/rust-v0.163.0)，commit `83086188ae0614bd882818ff1aa23f3194962012`；GPT-5.5、两个 Daybreak 条目及 Codex Auto Review 来自 [`rust-v0.164.0`](https://github.com/openai/codex/tree/rust-v0.164.0)，commit `6aaac694803004a63c6f393d153c96d22521a6b9`。GPT-6.1 Terra 来自 [`rust-v0.165.0`](https://github.com/openai/codex/tree/rust-v0.165.0)，commit `360319d8dee62d87e2d59fc0c21805d79519cfed`。源码尚未收录的 GPT-6.2 Sol、GPT-6.2 Astra 和 GPT-Reserve 使用订阅快照，见下文。运行时不从订阅账号请求远端目录，也不在用户启动时读取本机 codeks 的最新模板。
 
 | Catalog key | 来源条目 | Adapter |
 | --- | --- | --- |
+| `gpt-6.2-sol` | 订阅端点同名条目 | `gpt-responses` |
+| `gpt-6.2-astra` | 订阅端点同名条目 | `gpt-responses` |
 | `gpt-6-astra` | 同名条目 | `gpt-responses` |
 | `gpt-6.1-sol` | 同名条目 | `gpt-responses` |
 | `gpt-6.1-terra` | 同名条目 | `gpt-responses` |
@@ -39,6 +41,8 @@
 `model` 是运行时的唯一模板来源。运行时只展开别名与用户的明确覆盖，不重新生成这些精调内容，也不维护第二套完整上游副本。
 
 ## 当前精调
+
+GPT-6.2 Sol 和 Astra 取自 2026-11-17 的 ChatGPT 订阅 `/models` 目录，请求客户端版本为 `0.167.0`；已核对的公开 `rust-v0.169.0` 源码目录尚未收录二者。完整保留各自的 `model_messages` 和 `base_instructions`，以及 `shell_type: "shell_command"`、Responses Lite、Code Mode Only、多代理 v2、`comp_hash: "3000"` 和 reasoning effort 更新能力。两者默认 effort 为 `low`，支持 `low`、`medium`、`high`、`xhigh`、`max` 和客户端 `ultra`（原生 `xhigh`）。Sol 默认工作窗口为 `500000`，Astra 为 `272000`，最大窗口均为 `872000`；压缩阈值保留 `null`。Sol 保留 `text`、`image`、`audio` 输入声明及 Fast、Ultrafast 服务档位，Astra 保留 `text`、`image` 和 Fast。只删除两个公开源码未定义的 `false` 布尔字段、一个 `null` 字段及一个公开源码目录未出现的方案名，处理方式记在各自的 `adjustments`。使用现有 Responses adapter，配置示例见 [ChatGPT＋Claude](../examples/chatgpt-claude.json)。
 
 GPT 的 `model` 对象以对应源码或订阅目录的完整条目为基础，包括各自的提示词、默认 effort、摘要设置、服务档位和多代理设置。11 个源码中的 GPT 模型保留各自的 `shell_type: "shell_command"` 和窗口值，优先保持源码表达，减少独立精调。GPT-5.5 另有下述 Lite 调整；审查专用及订阅条目的明确调整单独记录。GPT-5.6 Terra 保留原生多代理 v2；GPT-5.6 Luna 按用户选择跟随上游保留 v1，不额外添加 `ultra` 档位。运行时从各自的 `supported_reasoning_levels` 推导普通档位；`ultra` 是客户端模式，按 `multi_agent_reasoning_effort` 解析，源条目未指定时使用 `max`，不会把 `ultra` 直接作为 GPT 原生 effort。不能用 GPT-6.1 Sol 的默认值覆盖 Luna 或其他 GPT 的差异。
 

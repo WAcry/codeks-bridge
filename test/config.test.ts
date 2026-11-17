@@ -360,7 +360,7 @@ test("catalog resolves codeks Ultra through the configured map instead of the te
 });
 
 test("curated GPT entries preserve each model's instructions and reasoning choices", () => {
-  const keys = ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"];
+  const keys = ["gpt-6.2-sol", "gpt-6.2-astra", "gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"];
   const c = validateConfig({
     upstreams: { a: { base_url: "https://example.com/v1" } },
     models: Object.fromEntries(keys.map(key => [key, { catalog: key, upstream: "a", model: `deployment/${key}` }])),

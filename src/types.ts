@@ -36,7 +36,7 @@ export interface ModelConfig {
   visibility?: "list" | "hide";
   context_window?: number;
   max_output_tokens?: number;
-  input_modalities?: ("text" | "image")[];
+  input_modalities?: ("text" | "image" | "audio")[];
   /** Replace advertised service tiers; an empty list removes tier choices. */
   service_tiers?: { id: string; name: string; description: string; [key: string]: unknown }[];
   reasoning?: { default_effort?: string; effort_map?: Record<string, string> };
@@ -70,7 +70,7 @@ export interface ModelProfile {
   default_effort: string;
   multi_agent_effort?: string;
   effort_map: Record<string, string>;
-  input_modalities: ("text" | "image")[];
+  input_modalities: ("text" | "image" | "audio")[];
 }
 export interface StateOrigin {
   /** Stable source fingerprint, independent of aliases and replay policy. */
