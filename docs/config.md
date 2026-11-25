@@ -19,7 +19,7 @@
 | GPT 系列 | [`gpt-responses`](backends-responses.md) | `/responses` |
 | Claude Fable / Opus / Sonnet / Haiku | [`claude-messages`](backends-anthropic.md) | `/messages` |
 | DeepSeek Flash | [`deepseek-chat`](backends-deepseek-chat.md) | `/chat/completions` |
-| Gemini 3.8 Flash / 4 Argon | [`gemini-native`](backends-gemini.md) | `/models/{model}:streamGenerateContent?alt=sse` |
+| Gemini 3.8 Flash 与 4 系列 | [`gemini-native`](backends-gemini.md) | `/models/{model}:streamGenerateContent?alt=sse` |
 
 同一个兼容网关的连接可供不同条目使用。服务按每条请求的别名独立选路，因此父代理、子代理和并行会话可以同时使用不同上游。别名固定对应一个目标，不做上游模型发现或自动负载均衡。
 
@@ -169,7 +169,7 @@ token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次�
 }
 ```
 
-不设置窗口时，原条目的两个窗口字段各自保留。多数 GPT 条目为 `context_window: 272000`、`max_context_window: 872000`；GPT-6.1 Terra 为 `500000` / `872000`，GPT-5.5 的两个字段均为 `272000`，Daybreak Red 均为 `372000`。Claude 和 DeepSeek 默认 `context_window: 400000`，Gemini 默认 `context_window: 272000`，作为各自的工作预算；`max_context_window` 保留各自能力上限，Claude 和 DeepSeek 为 `1000000`，Gemini 为 `1048576`。压缩阈值沿用模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 必须提供 `max_tokens`，对应目录外层默认预算为 `128000`；GPT、DeepSeek 和 Gemini 使用请求、模型配置或上游提供的默认值。原生 options 也可调整预算，实际限制由部署端点裁决。
+省略窗口覆盖时，目录条目各自保留 `context_window` 和 `max_context_window`。GPT-6.2 Sol、GPT-6.1 Sol 和 GPT-6.1 Terra 的默认工作窗口为 `500000`，最大窗口为 `872000`。其余 GPT 窗口见对应[目录条目](../catalog/README.md)。Claude 和 DeepSeek 默认工作窗口为 `400000`，最大窗口为 `1000000`。Gemini 默认工作窗口为 `272000`，最大窗口为 `1048576`。第三方条目沿用模板省略 `auto_compact_token_limit`，由客户端按窗口计算。Claude Messages 必须提供 `max_tokens`，因此目录外层提供 `128000` 的默认输出预算。GPT、DeepSeek 和 Gemini 使用请求、模型配置或上游提供的默认输出预算。原生 options 也可调整预算，实际限制由部署端点裁决。
 
 请求先由 adapter 转换，再浅层合并 `upstream.options`、`model.options`；后者优先，嵌套对象整体替换。例如模型 `options.output_config` 会替换推导值和上游同名对象。由此可以显式调整 thinking budget、原生 effort 或端点专有字段。
 
@@ -239,7 +239,7 @@ token 临近过期时自动续期并写回原文件；HTTP 401 可触发一次�
 }
 ```
 
-`effort_map` 的键是 codeks 可选档位，值是发给上游的原生值。第三方目录的档位说明参考 GPT-6.1 Sol 同名档位对速度、推理深度和自动分工的描述，与原生参数映射分别维护。提供映射时完整替换目录条目的默认映射；`default_effort` 必须出现在映射中。未指定默认档位时，保留映射中仍存在的条目默认值，否则选映射第一项。Sonnet 的 `between_tools` 模式可通过显式 options 选择，含义和配置见 [Messages](backends-anthropic.md)。
+`effort_map` 的键是 codeks 可选档位，值是发给上游的原生值。第三方目录的档位说明参考 GPT-6.2 Sol 同名档位对速度、推理深度和自动分工的描述，与原生参数映射分别维护。提供映射时完整替换目录条目的默认映射；`default_effort` 必须出现在映射中。未指定默认档位时，保留映射中仍存在的条目默认值，否则选映射第一项。Sonnet 的 `between_tools` 模式可通过显式 options 选择，含义和配置见 [Messages](backends-anthropic.md)。
 
 请求没有 effort 时使用配置默认值；有映射则转换，未列出的显式 effort 直接透传，交给上游判断。catalog 与实际请求使用同一份配置；通过原生 `options` 再覆盖 thinking/effort 时，应同时调整这里的展示设置。
 
@@ -251,7 +251,7 @@ codeks 的 `ultra` 是客户端特殊档位：注入多代理提示词，并优�
 model_reasoning_summary = "auto"
 ```
 
-也可选择 `concise`、`detailed` 或 `none`。Claude 和 DeepSeek 目录沿用 GPT-6.1 Sol 的 `default_reasoning_summary: "none"`；客户端配置为 `none` 时省略请求的 summary 字段。bridge 对缺省或 `none` 不展示可见摘要，对其他上述值请求或展示可用内容；Claude 使用原生 summarized 显示，DeepSeek 展示原生 reasoning 文本。它不承诺所有模型区分摘要长度，也不因此关闭实际推理或历史载荷回放。
+也可选择 `concise`、`detailed` 或 `none`。Claude、DeepSeek 和 Gemini 目录沿用 GPT-6.2 Sol 的 `default_reasoning_summary: "none"`。客户端配置为 `none` 时省略请求的 summary 字段。bridge 对缺省或 `none` 不展示可见摘要，其他上述值请求或展示可用内容。Claude 使用原生 summarized 显示，DeepSeek 展示原生 reasoning 文本，Gemini 请求原生 thought 摘要。实际推理和历史载荷回放独立于显示选择，摘要长度由上游决定。
 
 `input_modalities` 用于客户端能力声明，不是 bridge 的模型能力预检。bridge 负责转换能表达的输入，具体模型能否处理由上游裁决。
 
@@ -353,7 +353,7 @@ GPT 将透传项保留在 Responses `input` 中，包括其 `id`；Claude/DeepSe
 
 bridge 的 `GET /v1/models` 返回 Codex 专用的 `{"models": [...]}`，每项包含完整提示词、窗口、工具、多代理和 reasoning 元数据。它与经典 OpenAI 的 `{"object":"list","data":[...]}` 格式不同。仅列出配置中的别名，不暴露上游连接、实际部署名或凭据设置。
 
-这些条目来自仓库内已审阅的 [catalog](../catalog/README.md)，运行时只展开别名和显式配置覆盖。GPT 优先使用自己的 Codex 源码条目，源码尚未收录的模型使用已审阅订阅快照；Claude、DeepSeek 和 Gemini 使用经过精调的 GPT-6.1 Sol 模板。不会启动 codeks 导出模板，也不请求订阅账号的模型目录。目录版本随 bridge 代码更新，升级客户端不会自动改写它。
+这些条目来自仓库内已审阅的 [catalog](../catalog/README.md)，运行时只展开别名和显式配置覆盖。GPT 优先采用同名订阅快照条目，快照缺项时采用指定 Codex 源码版本。Claude、DeepSeek 和 Gemini 使用经过精调的 GPT-6.2 Sol 订阅模板。目录版本随 bridge 代码更新，运行时直接使用随版本发布的条目。
 
 ### HTTP 发现
 

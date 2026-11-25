@@ -2,33 +2,35 @@
 
 这里保存运行时使用的完整模型条目。每个文件对应一个受支持的 catalog key；显示别名、连接和实际发给上游的模型名由用户配置。未知 key 直接报错，不使用通用模板猜测模型能力。
 
-来源是 OpenAI Codex 的 `codex-rs/models-manager/models.json`，每份 JSON 独立记录版本。原有条目来自 [`rust-v0.163.0`](https://github.com/openai/codex/tree/rust-v0.163.0)，commit `83086188ae0614bd882818ff1aa23f3194962012`；GPT-5.5、两个 Daybreak 条目及 Codex Auto Review 来自 [`rust-v0.164.0`](https://github.com/openai/codex/tree/rust-v0.164.0)，commit `6aaac694803004a63c6f393d153c96d22521a6b9`。GPT-6.1 Terra 来自 [`rust-v0.165.0`](https://github.com/openai/codex/tree/rust-v0.165.0)，commit `360319d8dee62d87e2d59fc0c21805d79519cfed`。源码尚未收录的 GPT-6.2 Sol、GPT-6.2 Astra 和 GPT-Reserve 使用订阅快照，见下文。运行时不从订阅账号请求远端目录，也不在用户启动时读取本机 codeks 的最新模板。
+GPT 优先使用已审阅的 ChatGPT 订阅 `/models` 快照。当前快照日期为 2026-11-25（UTC），客户端版本为 `0.172.0`。快照缺少 GPT-5.5 和 Daybreak Red，因此这两项使用 Codex [rust-v0.172.0 的公开目录](https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/models-manager/models.json)，commit 为 `3d86e43b075adeba2193ec5c22ac92f55afd82e6`。每份 JSON 的 `source` 记录实际来源。运行时使用随 bridge 发布的目录文件。
 
 | Catalog key | 来源条目 | Adapter |
 | --- | --- | --- |
 | `gpt-6.2-sol` | 订阅端点同名条目 | `gpt-responses` |
 | `gpt-6.2-astra` | 订阅端点同名条目 | `gpt-responses` |
-| `gpt-6-astra` | 同名条目 | `gpt-responses` |
-| `gpt-6.1-sol` | 同名条目 | `gpt-responses` |
-| `gpt-6.1-terra` | 同名条目 | `gpt-responses` |
-| `gpt-6-sol` | 同名条目 | `gpt-responses` |
-| `gpt-6-luna` | 同名条目 | `gpt-responses` |
-| `gpt-5.6-sol` | 同名条目 | `gpt-responses` |
-| `gpt-5.6-terra` | 同名条目 | `gpt-responses` |
-| `gpt-5.6-luna` | 同名条目 | `gpt-responses` |
-| `gpt-5.5` | 同名条目 | `gpt-responses` |
-| `gpt-daybreak-blue-latest` | 同名条目 | `gpt-responses` |
-| `gpt-daybreak-red-latest` | 同名条目 | `gpt-responses` |
-| `codex-auto-review` | 同名条目 | `gpt-responses` |
+| `gpt-6-astra` | 订阅端点同名条目 | `gpt-responses` |
+| `gpt-6.1-sol` | 订阅端点同名条目 | `gpt-responses` |
+| `gpt-6.1-terra` | 订阅端点同名条目 | `gpt-responses` |
+| `gpt-6-sol` | 订阅端点同名条目 | `gpt-responses` |
+| `gpt-6-luna` | 订阅端点同名条目 | `gpt-responses` |
+| `gpt-5.6-sol` | 订阅端点同名条目 | `gpt-responses` |
+| `gpt-5.6-terra` | 订阅端点同名条目 | `gpt-responses` |
+| `gpt-5.6-luna` | 订阅端点同名条目 | `gpt-responses` |
+| `gpt-5.5` | Codex 公开源码同名条目 | `gpt-responses` |
+| `gpt-daybreak-blue-latest` | 订阅端点同名条目 | `gpt-responses` |
+| `gpt-daybreak-red-latest` | Codex 公开源码同名条目 | `gpt-responses` |
+| `codex-auto-review` | 订阅端点同名条目 | `gpt-responses` |
 | `gpt-reserve` | 订阅端点同名条目 | `gpt-responses` |
-| `claude-fable-5-2` | `gpt-6.1-sol`，经精调 | `claude-messages` |
-| `claude-opus-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
-| `claude-sonnet-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
-| `claude-haiku-5-5` | `gpt-6.1-sol`，经精调 | `claude-messages` |
-| `deepseek-flash` | `gpt-6.1-sol`，经精调 | `deepseek-chat` |
-| `gemini-3.8-flash` | `gpt-6.1-sol`，经精调 | `gemini-native` |
-| `gemini-4-argon` | `gpt-6.1-sol`，经精调 | `gemini-native` |
-| `gemini-4-carbon` | `gpt-6.1-sol`，经精调 | `gemini-native` |
+| `claude-fable-5-2` | `gpt-6.2-sol` 订阅条目，经精调 | `claude-messages` |
+| `claude-opus-5-5` | `gpt-6.2-sol` 订阅条目，经精调 | `claude-messages` |
+| `claude-sonnet-5-5` | `gpt-6.2-sol` 订阅条目，经精调 | `claude-messages` |
+| `claude-haiku-5-5` | `gpt-6.2-sol` 订阅条目，经精调 | `claude-messages` |
+| `deepseek-flash` | `gpt-6.2-sol` 订阅条目，经精调 | `deepseek-chat` |
+| `gemini-3.8-flash` | `gpt-6.2-sol` 订阅条目，经精调 | `gemini-native` |
+| `gemini-4-argon` | `gpt-6.2-sol` 订阅条目，经精调 | `gemini-native` |
+| `gemini-4-carbon` | `gpt-6.2-sol` 订阅条目，经精调 | `gemini-native` |
+| `gemini-4-hydrogen` | `gpt-6.2-sol` 订阅条目，经精调 | `gemini-native` |
+| `gemini-4-neon` | `gpt-6.2-sol` 订阅条目，经精调 | `gemini-native` |
 
 每份 JSON 包含：
 
@@ -41,35 +43,37 @@
 
 `model` 是运行时的唯一模板来源。运行时只展开别名与用户的明确覆盖，不重新生成这些精调内容，也不维护第二套完整上游副本。
 
-## 当前精调
+## GPT 条目
 
-GPT-6.2 Sol 和 Astra 取自 2026-11-17 的 ChatGPT 订阅 `/models` 目录，请求客户端版本为 `0.167.0`；已核对的公开 `rust-v0.169.0` 源码目录尚未收录二者。完整保留各自的 `model_messages` 和 `base_instructions`，以及 `shell_type: "shell_command"`、Responses Lite、Code Mode Only、多代理 v2、`comp_hash: "3000"` 和 reasoning effort 更新能力。两者默认 effort 为 `low`，支持 `low`、`medium`、`high`、`xhigh`、`max` 和客户端 `ultra`（原生 `xhigh`）。Sol 默认工作窗口为 `500000`，Astra 为 `272000`，最大窗口均为 `872000`；压缩阈值保留 `null`。Sol 保留 `text`、`image`、`audio` 输入声明及 Fast、Ultrafast 服务档位，Astra 保留 `text`、`image` 和 Fast。只删除两个公开源码未定义的 `false` 布尔字段、一个 `null` 字段及一个公开源码目录未出现的方案名，处理方式记在各自的 `adjustments`。使用现有 Responses adapter，配置示例见 [ChatGPT＋Claude](../examples/chatgpt-claude.json)。
+每个模型采用所选来源的完整条目，保留提示词、默认与可选 effort、摘要、窗口、输入模态、服务档位、工具和多代理配置。`adjustments` 记录公开审查及相对来源的改动。本地缓存文件的身份标识等外层元数据不会进入目录。订阅条目采用下发的 `unified_exec`。GPT-6.2 Sol、GPT-6.1 Sol 和 GPT-6.1 Terra 的默认工作窗口为 `500000`，最大窗口为 `872000`。GPT-6.2 Astra 的默认工作窗口为 `272000`，最大窗口为 `872000`。GPT-6.2 Sol 和 Astra 的输入声明为文本和图片。
 
-GPT 的 `model` 对象以对应源码或订阅目录的完整条目为基础，包括各自的提示词、默认 effort、摘要设置、服务档位和多代理设置。11 个源码中的 GPT 模型保留各自的 `shell_type: "shell_command"` 和窗口值，优先保持源码表达，减少独立精调。GPT-5.5 另有下述 Lite 调整；审查专用及订阅条目的明确调整单独记录。GPT-5.6 Terra 保留原生多代理 v2；GPT-5.6 Luna 按用户选择跟随上游保留 v1，不额外添加 `ultra` 档位。运行时从各自的 `supported_reasoning_levels` 推导普通档位；`ultra` 是客户端模式，按 `multi_agent_reasoning_effort` 解析，源条目未指定时使用 `max`，不会把 `ultra` 直接作为 GPT 原生 effort。不能用 GPT-6.1 Sol 的默认值覆盖 Luna 或其他 GPT 的差异。
+GPT-5.5 保留公开源码的窗口、工具模式、多代理和 `comp_hash`，并按项目约定启用 Responses Lite。两个 Daybreak key 各自有独立条目和路由。GPT-Reserve 使用订阅目录里的回退模型条目。别名的显示名、排序和可见性由配置决定，将 `visibility` 设为 `"hide"` 可在选择器中隐藏它。
 
-GPT-5.5 按用户选择将 `use_responses_lite` 从 `false` 改为 `true`，统一工具声明传输；其他字段完整保留上游值，包括未指定的工具模式与多代理版本、272K 窗口和 `comp_hash: "2911"`，不套用 GPT-5.6 的整份配置。多代理版本由客户端配置和 feature 决定，不强制 v2。Daybreak Blue 保留 Lite、多代理 v2 和 272K/872K 窗口；Daybreak Red 为 Lite、多代理 v2 和 372K 窗口。Codex Auto Review 保留 Lite、多代理 v1 和 272K/872K 窗口，`shell_type` 按其 `adjustments` 使用 `unified_exec`。两个旧 Daybreak key 继续按独立模型路由；新版 Codex 的 `access_programs.cyber` 请求参数也由 Responses adapter 原样转发，不把二者自动互换。模型、Lite 或访问模式是否可用由具体上游和账号决定，错误直接返回。
+运行时根据 `supported_reasoning_levels` 推导普通档位。客户端的 `ultra` 优先采用条目的 `multi_agent_reasoning_effort`，未设置时选择 `max` 或目录中最后一个普通档位。GPT-6.2 Sol 保留订阅的 Fast 与 Ultrafast，GPT-6.2 Astra 保留 Fast。当前订阅条目省略 `default_service_tier`，包括 GPT-6 Sol 和 GPT-6 Luna。具体服务档位的可用性由部署端点决定。配置示例见 [ChatGPT＋Claude](../examples/chatgpt-claude.json)。
 
-GPT-6.1 Terra 使用 `rust-v0.165.0` 的同名源码条目，完整保留字段和专属提示词：默认工作窗口为 `500000`，最大窗口为 `872000`，`shell_type` 为 `shell_command`。默认 effort 为 `low`，支持 `low` 到 `max` 及客户端 `ultra`（原生 `xhigh`）；保留 Responses Lite、Code Mode Only、多代理 v2、`default_reasoning_summary: "none"`、图片 `original` 能力和 `comp_hash: "3000"`。`auto_compact_token_limit: null` 由客户端按窗口计算，省略的 `effective_context_window_percent` 使用 Codex 默认值 `95`。配置 `catalog: "gpt-6.1-terra"` 并指定实际部署名即可使用；具体端点和账号的可用性由上游决定。
+## 第三方条目
 
-`0.165.0` 审阅：Terra 从此前订阅快照转为公开 tag，便于固定版本和复现导入；提示词差异集中在 Apps / Plugins 段落，采用源码中分开的连接器与插件规则，同时保留源码显式默认值和可空字段。其余 11 个源码模型条目与 `0.164.0` 完全一致，GPT-6.1 Sol 模板也没有变化，因此保留这些条目已有的来源记录，以及 Claude / DeepSeek 的现有精调。
+Claude、DeepSeek 和 Gemini 使用同一份已审阅的 GPT-6.2 Sol 订阅条目作为模板，按各自 JSON 中的 `adjustments` 调整。提示词首句的底层模型身份改为 `Claude model`、`DeepSeek model` 或 `Gemini model`，保留 Codex 的代理角色和其余客户端指令。沿用 `unified_exec`、Responses Lite、Code Mode Only、多代理元数据和 `default_reasoning_summary: "none"`。输入声明保留文本和图片，服务档位仅用标准档。
 
-GPT-Reserve 是客户端在普通额度用尽、后端授权后切换的回退模型。Codex 源码目录没有 `gpt-reserve` 条目，客户端只在 TUI 中按这个模型名处理额度回退和模型选择器。因此该条目取自 ChatGPT 订阅端点 `/models` 的同名条目，`source` 记录端点、请求时的客户端版本和取得日期，不记录 tag 与 commit。其 `shell_type` 按 `adjustments` 使用 `unified_exec`，其他字段顺序和取值原样保留，包括 `visibility: "hide"`、`upgrade: null`、`model_messages.auto_review: null`、`base_instructions` 和 `available_access_programs`；提示词、Lite、多代理 v1、272K/872K 窗口、reasoning 和 `comp_hash` 与 GPT-5.6 Luna 一致。只删除公开源码未出现的名称：两个值为 `false` 的布尔字段，以及 `available_in_plans` 中的两个方案名；客户端不读取这些字段。导入脚本不处理订阅端点，更新时需手动取得条目并重新审阅。与其他条目一样，客户端目录中的 slug、展示名、排序和可见性由别名配置决定；要在选择器中隐藏，需在别名上设置 `visibility: "hide"`。
+| 家族 | 默认工作窗口 | 最大窗口 | 默认值的考虑 |
+| --- | ---: | ---: | --- |
+| Claude | 400000 | 1000000 | 同一任务通常比 GPT 消耗更多 token，预留 400K，兼顾上下文与单任务成本 |
+| DeepSeek | 400000 | 1000000 | 分词效率比 Claude 更接近 GPT，单任务成本较低，采用 400K 保留更多历史 |
+| Gemini | 272000 | 1048576 | 分词效率与 GPT 接近，沿用常用的 272K 工作预算以控制单任务成本 |
 
-Claude、DeepSeek 和 Gemini 从 GPT-6.1 Sol 的完整条目开始，只做各自 JSON 中列出的修改：底层模型与展示信息、工作窗口、reasoning 档位，以及当前 adapter 尚未转换的参数和 GPT 专属的服务展示信息。`shell_type` 沿用源码模板的 `shell_command`。提示词仅将首句的 `based on GPT-6` 换成 `based on Claude model`、`based on DeepSeek model` 或 `based on Gemini model`，使底层模型身份明确；`You are Codex`、`As Codex` 和其余客户端指令保留。`default_reasoning_summary` 保持源条目的 `none`，由用户在 codeks 中选择摘要展示方式。
-
-预算默认值遵循与 GPT-6.1 Sol 模板对齐的维护原则：仅保留模板已有字段，或为上游必填参数补充默认值；公布的能力上限本身不要求新增默认配置。窗口字段沿用模板结构：Claude 和 DeepSeek 的默认 `context_window` 为 `400000`，Gemini 为 `272000`；`max_context_window` 保留各自能力上限，Claude 和 DeepSeek 为 `1000000`，Gemini 为 `1048576`。这些默认值是项目的工作预算，不是官方能力上限。压缩阈值保留模板的 `auto_compact_token_limit: null`，由客户端按窗口计算。Claude Messages 要求 `max_tokens`，因此 Claude 条目提供 `128000` 默认预算；GPT、DeepSeek 和 Gemini 的输出预算由请求、用户配置或上游默认值决定。
+模板省略了 `auto_compact_token_limit`，第三方条目沿用这一设置。客户端按窗口计算压缩阈值。Claude Messages 要求 `max_tokens`，目录为此提供 `128000` 的默认输出预算。GPT、DeepSeek 和 Gemini 根据请求、模型配置或上游默认值确定输出预算。
 
 依据：[Sonnet 模型规格](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)、[Haiku 模型规格](https://platform.claude.com/docs/en/models/haiku-5-5/overview)、[Messages 必填参数](https://platform.claude.com/docs/en/api/messages/create)、[DeepSeek 模型规格](https://api-docs.deepseek.com/quick_start/pricing/)。这些是第三方精调的依据，`source` 仍记录 Codex 模板来源。
 
 Fable 5.2 按 Claude API 默认使用 `high`，其余 Claude 条目默认使用 `medium`。Claude 目录提供 `low`、`medium`、`high`、`xhigh`、`max` 和客户端 `ultra`。DeepSeek 默认 `high`，目录提供原生 `low`、`high`、`max` 和客户端 `ultra`。[Fable 5.2 规格](https://platform.claude.com/docs/en/models/fable-5-2/overview)、[DeepSeek thinking 参数](https://api-docs.deepseek.com/guides/thinking_mode/)
 
-第三方条目的档位说明沿用 GPT-6.1 Sol 同名档位对速度、推理深度和自动分工的描述，帮助用户选择。说明文字与 `effort_map` 分开维护；相同说明不表示不同上游的原生 effort、推理预算或效果相同。
+第三方条目的档位说明沿用 GPT-6.2 Sol 同名档位对速度、推理深度和自动分工的描述。说明文字与 `effort_map` 分开维护，实际推理参数按对应上游的原生档位确定。
 
 Fable 5.2 与 Opus 5.5 始终启用 adaptive thinking。Sonnet 5.5 的最低模式 `between_tools` 仍保留工具之间的思考，因此这些目录从 `low` 开始。需要 Sonnet 的这一模式时，使用 [Messages 原生 options](../docs/backends-anthropic.md#历史与-thinking) 显式配置。目录列出的档位应与已审阅模型匹配；未列出的显式请求值仍交给上游裁决。[Claude thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)
 
 `ultra` 保留 Codex 的自动分工提示词和档位说明：Fable 5.2 与 Opus 5.5 使用原生 `xhigh`，Sonnet 5.5、Haiku 5.5 与 DeepSeek Flash 使用 `max`；各条目的 `multi_agent_reasoning_effort` 与映射一致。
 
-Gemini 3.8 Flash、Gemini 4 Argon 与 Gemini 4 Carbon 使用原生 `streamGenerateContent`，默认 `medium`，普通档位为 `low`、`medium`、`high`，`ultra` 使用原生 `high`；不把 `minimal` 或 `none` 列入目录。Argon 与 Carbon 的请求均发送 `thinkingLevel`。默认工作窗口为 `272000`，`max_context_window` 为官方公布的 `1048576`：Flash 是输入上限，Argon 与 Carbon 是输入与输出共用的上下文上限。原生接口不要求输出预算，目录不额外设置 `max_output_tokens`；请求和配置可以覆盖。Gemini 保留图片输入、关闭 `original` 声明，并默认使用文字压缩。Carbon 与 Argon 使用同一原生协议，通过独立目录条目维护能力，不按模型名新增 adapter 分支。[Flash 规格](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash)、[Argon 规格](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon)、[Carbon 规格](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-carbon)、[原生 thinking 参数](https://ai.google.dev/gemini-api/docs/generate-content/thinking)、[适配说明](../docs/backends-gemini.md)
+Gemini 共用原生 `streamGenerateContent` 转换。3.8 Flash、4 Argon 和 4 Carbon 默认 `medium`，普通档位为 `low`、`medium`、`high`，`ultra` 映射到原生 `HIGH`。4 Hydrogen 和 4 Neon 默认 `high`，普通档位另含 `xhigh`，`ultra` 映射到原生 `XHIGH`。Gemini 4 各条目的最大窗口由输入和输出共用。3.8 Flash 的最大窗口对应输入上限。所有 Gemini 条目默认使用文字压缩。 [原生 thinking 档位](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/thinking#supported-thinking-levels-by-model) · [Hydrogen 规格](https://aistudio.google.com/docs/models/gemini-4-hydrogen) · [Neon 规格](https://aistudio.google.com/docs/models/gemini-4-neon) · [适配说明](../docs/backends-gemini.md)
 
 这些源模型都明确设置 `supports_search_tool: true`，本目录保持原值。Code Mode Only 如何暴露工具由客户端源码决定，不能因为没有独立的外层 `tool_search` 就把此字段改为 false。网页搜索和图片生成有各自的客户端设置，不通过这个字段控制。
 
@@ -77,14 +81,14 @@ Gemini 3.8 Flash、Gemini 4 Argon 与 Gemini 4 Carbon 使用原生 `streamGenera
 
 ## 更新流程
 
-先取得明确版本的 Codex 源码，再导入需要检查的单个模型，输出到独立候选文件：
+先从已取得的 ChatGPT 订阅缓存中提取同名模型条目，在仓库外生成候选，记录端点、客户端版本和日期。审查全部字段和提示词是否适合公开，订阅账号、设备和缓存标识不写入候选。若订阅快照缺少该模型，取得明确版本的 Codex 源码，用导入脚本将同名条目写到独立候选文件。
 
 ```sh
 node scripts/import-catalog.ts \
   --source /path/to/codex/codex-rs/models-manager/models.json \
-  --tag rust-v0.165.0 \
-  --model gpt-6.1-sol \
-  --output /path/to/review/gpt-6.1-sol.candidate.json
+  --tag rust-v0.172.0 \
+  --model gpt-5.5 \
+  --output /path/to/review/gpt-5.5.candidate.json
 ```
 
 脚本验证源文件与指定 tag 的内容一致，并记录实际 commit。输出文件必须尚不存在，因此不会覆盖已审阅文件。导入结果默认使用 `gpt-responses`，保留源条目自身的 reasoning 设置，不添加独立的 `effort_map`；第三方条目仍需人工或 Agent 根据模板变化重新精调。

@@ -32,9 +32,11 @@ Lite 仍调用 `/responses` 并返回 Responses SSE。完整工具 schema 位于
 
 ## 有限目录与显式精调
 
-项目只支持明确列出的模型。`catalog/` 保存每个模型的完整条目及来源；GPT 分别使用 Codex 源码中各自的版本，优先保留提示词、默认 effort、摘要、窗口和工具元数据的差异，包括源码的 `shell_type: "shell_command"`。GPT-5.5 的 Lite 调整、审查专用及订阅条目的明确例外记录在各自的 `adjustments`。源码尚未收录的 GPT-6.2 Sol、GPT-6.2 Astra 和 GPT-Reserve 使用取得并审阅的订阅目录快照，记录端点、取得日期与客户端版本；具体来源与公开信息处理见[模型目录](../catalog/README.md)。
+项目只支持明确列出的模型。`catalog/` 保存每个模型的完整条目及来源。GPT 优先使用经过公开信息审查的 ChatGPT 订阅目录快照，订阅快照缺项时使用对应模型在指定 Codex tag 和 commit 中的公开源码条目。所选来源同时决定提示词、窗口、reasoning、服务档位和工具元数据。GPT-5.5 的 Lite 调整等例外记在相应条目的 `adjustments` 中。订阅条目记录端点、日期和客户端版本。具体来源及审查规则见[模型目录](../catalog/README.md)。
 
-Claude、DeepSeek 与 Gemini 从 GPT-6.1 Sol 模板开始，`shell_type` 沿用 `shell_command`，默认工作窗口为 Claude / DeepSeek `400000`、Gemini `272000`，最大窗口保留各自能力上限。提示词只替换底层模型身份（如 `You are Codex, an agent based on Claude model.`），保留 Codex 代理角色及 `As Codex` 人格说明。reasoning 档位说明参考源码 Sol 同名档位的含义，原生 effort 映射独立维护；参数和确有差异的能力逐项精调，记录在条目的 `adjustments`。摘要默认值继续使用模板的 `none`，是否展示由客户端配置决定，不为第三方模型强制打开。
+Claude、DeepSeek 与 Gemini 以 GPT-6.2 Sol 的订阅条目为模板。提示词将底层模型身份替换为对应家族（如 `You are Codex, an agent based on Claude model.`），保留 Codex 代理角色及 `As Codex` 人格说明。客户端工具设置沿用模板，包括 `shell_type: "unified_exec"`。目录只声明 adapter 能表达的输入能力，服务档位使用标准档。Reasoning 档位说明参考模板同名档位，原生 effort 映射独立维护。调整逐项记在 `adjustments`，摘要默认值沿用模板的 `none`，展示由客户端配置决定。
+
+默认工作窗口为 Claude 和 DeepSeek `400000`、Gemini `272000`。Gemini 的选值沿用 GPT 常用的 272K 工作预算，考虑了接近的分词效率和较高的单任务成本。Claude 在同一任务中通常需要更多 token，因此预留了 400K。DeepSeek 的任务成本较低，也使用 400K 以留出更多历史空间。最大窗口按模型规格独立保留。Bridge 按目录暴露 token 预算，实际计数及限制由各模型决定。
 
 导入脚本只生成独立候选文件，供人或 Agent 对比审阅。运行时使用已提交的完整条目，不自动导入、不猜测未知模型，也不从 ChatGPT 订阅获取目录。这样更新仍有工具辅助，同时提示词和能力变化可审查、可追踪。来源及更新步骤见[模型目录](../catalog/README.md)。
 

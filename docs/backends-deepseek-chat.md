@@ -24,7 +24,7 @@
 
 ## Reasoning 与参数
 
-思考从 `delta.reasoning_content` 读取，作为 `reasoning.text.v1` 的字符串 data 保存。下次请求把允许来源的文本恢复到 assistant 的 `reasoning_content`。`reasoning.summary` 为 `auto`、`concise` 或 `detailed` 时，将原生 reasoning 文本作为可见摘要输出；缺省或 `none` 时不展示，但仍保存和回放载荷，不关闭 thinking。目录沿用 GPT-6.1 Sol 的摘要默认值 `none`；可在 codeks 中设置 `model_reasoning_summary = "auto"`。是否同模型、是否同上游都由来源策略决定，不能只凭文本格式推断应该共享。[复用配置](reasoning.md)
+思考从 `delta.reasoning_content` 读取，作为 `reasoning.text.v1` 的字符串 data 保存。下次请求把允许来源的文本恢复到 assistant 的 `reasoning_content`。`reasoning.summary` 为 `auto`、`concise` 或 `detailed` 时，将原生 reasoning 文本作为可见摘要输出。缺省或 `none` 时仍启用 thinking，保存并回放载荷。目录沿用 GPT-6.2 Sol 的摘要默认值 `none`，可在 codeks 中设置 `model_reasoning_summary = "auto"` 打开显示。跨模型或上游的回放由来源策略决定。 [复用配置](reasoning.md)
 
 没有可恢复 reasoning 的 assistant 历史使用 `reasoning_content: ""`，不编造思考。它使带有其他目标历史的工具循环仍具备 DeepSeek 要求的字段。
 

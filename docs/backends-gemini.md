@@ -1,6 +1,6 @@
 # Gemini 原生接口
 
-模型选择 `catalog: "gemini-3.8-flash"`、`"gemini-4-argon"` 或 `"gemini-4-carbon"`，条目指定 `gemini-native` adapter。bridge 将 Responses 请求转换为 `POST <base_url>/models/<model>:streamGenerateContent?alt=sse`，使用原生 `contents` / `parts` 协议；不经过 Chat Completions 兼容接口。`model` 是实际部署名，目录 key 只选择已经审阅的能力与默认值。
+可选目录条目为 `gemini-3.8-flash`、`gemini-4-argon`、`gemini-4-carbon`、`gemini-4-hydrogen` 和 `gemini-4-neon`。它们共用 `gemini-native` adapter，将 Responses 请求转为 `POST <base_url>/models/<model>:streamGenerateContent?alt=sse`，使用原生 `contents` / `parts` 协议。`model` 是实际部署名，`catalog` 选择已审阅的能力与默认值。
 
 ```json
 {
@@ -25,20 +25,35 @@
       "upstream": "gemini",
       "catalog": "gemini-4-carbon",
       "model": "gemini-4-carbon"
+    },
+    "hydrogen": {
+      "upstream": "gemini",
+      "catalog": "gemini-4-hydrogen",
+      "model": "gemini-4-hydrogen"
+    },
+    "neon": {
+      "upstream": "gemini",
+      "catalog": "gemini-4-neon",
+      "model": "gemini-4-neon"
     }
   }
 }
 ```
 
-官方 Developer API 连接使用 `x-goog-api-key`；其他连接可通过现有 `headers`、`auth_header` 和凭据命令配置鉴权。`base_url` 包含版本及部署前缀，不包含具体模型和操作名。Carbon 需要端点和账号已开通该模型；Google 也向 Gemini API 付费项目提供该模型。[官方发布](https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-carbon-now-available/)。客户端继续使用 bridge 的 Responses Lite、Code Mode Only 和多代理工具。
+官方 Developer API 连接使用 `x-goog-api-key`。其他连接可通过 `headers`、`auth_header` 和凭据命令配置鉴权。`base_url` 包含版本及部署前缀。端点和账号需要具备对应模型的访问权限。客户端沿用 Responses Lite、Code Mode Only 和多代理工具。 [Carbon 发布说明](https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-carbon-now-available/) · [Hydrogen](https://aistudio.google.com/docs/models/gemini-4-hydrogen) · [Neon](https://aistudio.google.com/docs/models/gemini-4-neon)
 
 ## 目录与 thinking
 
-三个条目默认 `medium`；`low`、`medium`、`high` 对应 `generationConfig.thinkingConfig.thinkingLevel` 的 `LOW`、`MEDIUM`、`HIGH`。codeks 的 `ultra` 仍启用客户端的自动分工提示词，原生 effort 使用 `HIGH`。请求显式发送目录默认值，不依赖上游默认档位；不支持的 `minimal` 和关闭 thinking 的 `none` 不列入目录。未映射的显式 effort 由上游裁决，不静默替换为另一个档位。[原生 thinking 文档](https://ai.google.dev/gemini-api/docs/generate-content/thinking)、[Carbon 开发指南](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-carbon)
+| 条目 | 默认 effort | 普通档位对应的原生 `thinkingLevel` | `ultra` 的原生值 |
+| --- | --- | --- | --- |
+| 3.8 Flash、4 Argon、4 Carbon | `medium` | `LOW`、`MEDIUM`、`HIGH` | `HIGH` |
+| 4 Hydrogen、4 Neon | `high` | `LOW`、`MEDIUM`、`HIGH`、`XHIGH` | `XHIGH` |
 
-`reasoning.summary` 为 `auto`、`concise` 或 `detailed` 时请求 `includeThoughts: true`，将上游标记 `thought: true` 的文本作为可见摘要。缺省或 `none` 不展示摘要；这不等于关闭 thinking，也不应丢失签名。目录沿用 Sol 的摘要默认值 `none`，可在 codeks 中设置 `model_reasoning_summary = "auto"`。
+普通档位使用小写键，在请求中转换为 `generationConfig.thinkingConfig.thinkingLevel` 对应的大写值。codeks 的 `ultra` 启用自动分工提示词。目录默认值会显式写入请求，`minimal` 和 `none` 不列入目录。未映射的显式 effort 由上游裁决。 [各模型的原生 thinking 档位](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/thinking#supported-thinking-levels-by-model)
 
-默认工作窗口为 `272000`，与多数 GPT 条目的工作预算一致；三个条目的最大窗口为 `1048576`。Flash 的官方限制是输入 token 上限，Argon 与 Carbon 则是输入与输出共用的窗口，不能把后者理解成可以在 1M 输入之后再输出 1M。官方标准流式输出上限为 `65536` token；Gemini 4 的更长输出需要另一种后台 long decode 路径。本 adapter 不设置额外默认输出预算或压缩阈值。显式预算从请求或模型配置取得，再接受原生 options 覆盖。[Flash 规格](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash)、[Argon 规格](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon)、[Carbon 开发指南](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-carbon)
+`reasoning.summary` 为 `auto`、`concise` 或 `detailed` 时请求 `includeThoughts: true`，将上游标记 `thought: true` 的文本作为可见摘要。缺省或 `none` 时仍启用 thinking 并保存签名。目录沿用 GPT-6.2 Sol 的摘要默认值 `none`，可在 codeks 中设置 `model_reasoning_summary = "auto"` 打开显示。
+
+默认工作窗口为 `272000`，最大窗口为 `1048576`。Flash 的最大窗口对应输入上限，Gemini 4 则在输入和输出之间共用这一窗口。标准前台生成的输出上限为 `65536` token。Gemini 4 提供更长输出的 long decode 路径，当前 adapter 实现单次前台流式响应。输出预算可从请求或模型配置显式指定，再由原生 options 覆盖。 [Flash 规格](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash) · [Argon 规格](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon) · [Carbon 规格](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-carbon) · [Hydrogen 规格](https://aistudio.google.com/docs/models/gemini-4-hydrogen) · [Neon 规格](https://aistudio.google.com/docs/models/gemini-4-neon)
 
 ## 消息、工具与图片
 
@@ -82,9 +97,9 @@ Gemini 4 Argon 与 Carbon 的官方隐式缓存要求共享前缀至少 `4096` t
 
 ## 范围
 
-本 adapter 面向文本回答、工具和图片输入；没有接入 Gemini 服务端搜索、代码执行、文件检索、音频、视频、图片生成、Live API 或后台 long decode。bridge 的独立订阅搜索和图片生成配置仍可与 Gemini 工作模型一起使用。官方文档可能以 Interactions API 为主；这里实现的是用户选择的 Generate Content 接口，两者的字段和流事件不能混用。
+本 adapter 面向 Generate Content 的文本回答、工具和图片输入。服务端搜索、代码执行、文件检索、音频、视频、图片生成、Live API、多段续接和后台 long decode 均在适配范围之外。bridge 的独立订阅搜索和图片生成配置仍可与 Gemini 工作模型一起使用。Interactions API 使用另一套字段和流事件。
 
-新模型不能只凭名称加入目录。更新时需要核对原生 thinking 档位、上下文语义、签名载荷及返回顺序、工具与结构化输出字段，并通过相应的真实请求验证。
+新增条目时核对原生 thinking 档位、上下文语义、签名载荷及返回顺序、工具与结构化输出字段。4 Hydrogen 和 4 Neon 按官方规格加入目录，复用现有前台流式转换。新增条目的验证范围为目录与合成请求参数，真实部署的访问权限和行为以端点为准。 [Hydrogen 原生接口指南](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-hydrogen) · [Neon 原生接口指南](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-4-neon)
 
 2026-10-27 的真实原生请求通过 Vertex AI 路由验证两个模型的 `MEDIUM`、thought 摘要、末尾空文本签名、工具签名回放、图片与 JSON Schema；Flash 省略输出预算也能成功。该记录验证实际收到的原生协议，不等同于已直连 Google AI Developer API，也不证明所有区域、缓存条件或跨模型签名兼容。适配器自身另以合成数据测试转换与客户端交付。
 
