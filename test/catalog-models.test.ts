@@ -1,14 +1,39 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { buildGeminiRequest } from "../src/backends/gemini.ts";
 import { responsesBody } from "../src/backends/responses.ts";
 import { buildCatalog } from "../src/catalog.ts";
 import { resolveModel, validateConfig } from "../src/config.ts";
 import { catalogKeys, getCatalogEntry } from "../src/model-catalog.ts";
 import { reasoningEffort } from "../src/profiles.ts";
 
-for (const [key, window, modalities, tiers] of [
-  ["gpt-6.2-sol", 500000, ["text", "image", "audio"], ["priority", "ultrafast"]],
-  ["gpt-6.2-astra", 272000, ["text", "image"], ["priority"]],
+test("GPT catalog entries record reviewed subscription or public source provenance", () => {
+  const fallback = new Set<string>(["gpt-5.5", "gpt-daybreak-red-latest"]);
+  for (const key of catalogKeys) {
+    const entry = getCatalogEntry(key);
+    if (entry.adapter !== "gpt-responses") continue;
+    const { source } = entry;
+    assert.equal(source.model, key);
+    if (fallback.has(key)) {
+      assert.ok("repository" in source, key);
+      assert.equal(source.repository, "https://github.com/openai/codex");
+      assert.match(source.tag, /^rust-v\d+\.\d+\.\d+$/);
+      assert.match(source.commit, /^[0-9a-f]{40}$/);
+      assert.equal(source.path, "codex-rs/models-manager/models.json");
+    } else {
+      assert.ok("endpoint" in source, key);
+      assert.deepEqual(Object.keys(source).sort(), ["client_version", "endpoint", "model", "retrieved"]);
+      assert.equal(source.endpoint, "https://chatgpt.com/backend-api/codex/models");
+      assert.match(source.client_version, /^\d+\.\d+\.\d+$/);
+      assert.match(source.retrieved, /^\d{4}-\d{2}-\d{2}$/);
+      assert.equal(entry.model.shell_type, "unified_exec", key);
+    }
+  }
+});
+
+for (const [key, window, tiers] of [
+  ["gpt-6.2-sol", 500000, ["priority", "ultrafast"]],
+  ["gpt-6.2-astra", 272000, ["priority"]],
 ] as const) {
   test(`${key} preserves its subscription capabilities and routes Ultra to xhigh`, () => {
     const original = getCatalogEntry(key);
@@ -19,9 +44,9 @@ for (const [key, window, modalities, tiers] of [
     const [entry] = buildCatalog(config).models;
     assert.equal(entry.context_window, window);
     assert.equal(entry.max_context_window, 872000);
-    assert.equal(entry.auto_compact_token_limit, null);
+    assert.equal(entry.auto_compact_token_limit, undefined);
     assert.equal(entry.supports_reasoning_effort_updates, true);
-    assert.deepEqual(entry.input_modalities, modalities);
+    assert.deepEqual(entry.input_modalities, ["text", "image"]);
     assert.deepEqual(entry.service_tiers.map((tier: { id: string }) => tier.id), tiers);
     assert.deepEqual(entry.model_messages, original.model.model_messages);
     assert.equal(entry.base_instructions, original.model.base_instructions);
@@ -42,9 +67,15 @@ for (const [key, window, modalities, tiers] of [
   });
 }
 
-for (const key of ["gemini-3.8-flash", "gemini-4-argon", "gemini-4-carbon"]) {
+for (const [key, defaultEffort, ultra, levels] of [
+  ["gemini-3.8-flash", "medium", "high", ["low", "medium", "high", "ultra"]],
+  ["gemini-4-argon", "medium", "high", ["low", "medium", "high", "ultra"]],
+  ["gemini-4-carbon", "medium", "high", ["low", "medium", "high", "ultra"]],
+  ["gemini-4-hydrogen", "high", "xhigh", ["low", "medium", "high", "xhigh", "ultra"]],
+  ["gemini-4-neon", "high", "xhigh", ["low", "medium", "high", "xhigh", "ultra"]],
+] as const) {
   test(`${key} keeps the reviewed working budget and exposes native thinking levels`, () => {
-    const template = getCatalogEntry("gpt-6.1-sol").model;
+    const template = getCatalogEntry("gpt-6.2-sol");
     const config = validateConfig({
       upstreams: { test: { base_url: "https://generativelanguage.googleapis.com/v1beta" } },
       models: { gemini: { catalog: key, upstream: "test", model: "gemini-deployment" } },
@@ -55,26 +86,41 @@ for (const key of ["gemini-3.8-flash", "gemini-4-argon", "gemini-4-carbon"]) {
     assert.equal(entry.tool_mode, "code_mode_only");
     assert.equal(entry.multi_agent_version, "v2");
     assert.equal(entry.use_responses_lite, true);
-    assert.equal(entry.shell_type, "shell_command");
+    assert.equal(entry.shell_type, "unified_exec");
     assert.equal(entry.default_reasoning_summary, "none");
     assert.equal(entry.supports_image_detail_original, false);
     assert.deepEqual(entry.input_modalities, ["text", "image"]);
-    assert.deepEqual(entry.supported_reasoning_levels.map((level: { effort: string }) => level.effort), ["low", "medium", "high", "ultra"]);
-    const expectedMessages = structuredClone(template.model_messages);
+    assert.deepEqual(entry.service_tiers, []);
+    assert.deepEqual(entry.additional_speed_tiers, []);
+    assert.equal(entry.default_service_tier ?? null, null);
+    assert.equal(entry.available_access_programs, undefined);
+    assert.equal(entry.auto_compact_token_limit, template.model.auto_compact_token_limit);
+    assert.deepEqual(getCatalogEntry(key).source, template.source);
+    assert.deepEqual(entry.supported_reasoning_levels.map((level: { effort: string }) => level.effort), levels);
+    const expectedMessages = structuredClone(template.model.model_messages);
     expectedMessages.instructions_template = expectedMessages.instructions_template.replace("based on GPT-6", "based on Gemini model");
     assert.deepEqual(entry.model_messages, expectedMessages);
     assert.match(entry.model_messages.instructions_template, /^You are Codex, an agent based on Gemini model\./);
     for (const level of entry.supported_reasoning_levels) {
-      assert.deepEqual(level, template.supported_reasoning_levels.find((source: { effort: string }) => source.effort === level.effort));
+      assert.deepEqual(level, template.model.supported_reasoning_levels.find((source: { effort: string }) => source.effort === level.effort));
     }
     const route = resolveModel(config, "gemini");
     assert.equal(route.profile.id, "gemini-native");
     assert.equal(route.profile.api, "gemini");
     assert.equal(route.profile.max_output_tokens, undefined);
     assert.equal(route.compaction.mode, "summary");
-    assert.equal(reasoningEffort(route), "medium");
-    assert.equal(reasoningEffort(route, "ultra"), "high");
+    assert.equal(reasoningEffort(route), defaultEffort);
+    assert.equal(reasoningEffort(route, "ultra"), ultra);
     assert.equal(reasoningEffort(route, "minimal"), "minimal");
+    const context = { route, request: { model: "gemini", input: "Hello" }, signal: new AbortController().signal };
+    const defaults = buildGeminiRequest(context).body.generationConfig;
+    assert.deepEqual(defaults.thinkingConfig, { thinkingLevel: defaultEffort.toUpperCase(), includeThoughts: false });
+    assert.equal(defaults.maxOutputTokens, undefined);
+    const { generationConfig } = buildGeminiRequest({
+      ...context, request: { ...context.request, reasoning: { effort: "ultra", summary: "auto" }, max_output_tokens: 4096 },
+    }).body;
+    assert.deepEqual(generationConfig.thinkingConfig, { thinkingLevel: ultra.toUpperCase(), includeThoughts: true });
+    assert.equal(generationConfig.maxOutputTokens, 4096);
   });
 }
 
@@ -87,12 +133,12 @@ test("GPT-6.1 Terra keeps its reviewed window and resolves Ultra through xhigh",
   const [entry] = buildCatalog(config).models;
   assert.equal(entry.context_window, 500000);
   assert.equal(entry.max_context_window, 872000);
-  assert.equal(entry.shell_type, "shell_command");
+  assert.equal(entry.shell_type, "unified_exec");
   assert.equal(entry.tool_mode, "code_mode_only");
   assert.equal(entry.multi_agent_version, "v2");
   assert.equal(entry.use_responses_lite, true);
   assert.deepEqual(entry.model_messages, original.model.model_messages);
-  assert.equal(entry.auto_compact_token_limit, null);
+  assert.equal(entry.auto_compact_token_limit, undefined);
   assert.equal(entry.default_reasoning_summary, "none");
   assert.equal(entry.supports_image_detail_original, true);
   const route = resolveModel(config, "terra");
@@ -115,9 +161,8 @@ test("legacy GPT catalogs retain their protocol, window, and reasoning differenc
   for (const [key, lite, multiAgent, window, maxWindow, compHash, defaultEffort, highestEffort] of cases) {
     const entry = catalog.find(entry => entry.slug === key)!;
     const original = getCatalogEntry(key);
-    assert.equal("tag" in original.source && original.source.tag, "rust-v0.164.0");
-    if (key === "gpt-5.5") assert.match(original.adjustments[0], /Responses Lite/);
-    assert.equal(entry.shell_type, key === "codex-auto-review" ? "unified_exec" : "shell_command");
+    if (key === "gpt-5.5") assert.match(original.adjustments.join("\n"), /Responses Lite/);
+    assert.equal(entry.shell_type, "endpoint" in original.source ? "unified_exec" : "shell_command");
     assert.deepEqual(entry.model_messages, original.model.model_messages);
     assert.equal(entry.use_responses_lite, lite);
     assert.equal(entry.tool_mode, key === "gpt-5.5" ? null : "code_mode_only");
@@ -134,23 +179,10 @@ test("legacy GPT catalogs retain their protocol, window, and reasoning differenc
   }
 });
 
-test("GPT-Reserve keeps the subscription entry without names absent from public sources", () => {
+test("GPT-Reserve keeps the subscription entry and routes as a hidden alias", () => {
   const reserve = getCatalogEntry("gpt-reserve");
-  const luna = getCatalogEntry("gpt-5.6-luna");
-  assert.deepEqual(reserve.source, {
-    endpoint: "https://chatgpt.com/backend-api/codex/models", client_version: "0.164.0", retrieved: "2026-10-25", model: "gpt-reserve",
-  });
   assert.equal(reserve.adapter, "gpt-responses");
   assert.equal(reserve.model.shell_type, "unified_exec");
-  const subscriptionOnly = Object.keys(reserve.model).filter(key => !Object.hasOwn(luna.model, key));
-  assert.deepEqual(subscriptionOnly, ["base_instructions", "available_access_programs"]);
-  const publicPlans = new Set(catalogKeys.map(getCatalogEntry).filter(entry => "tag" in entry.source)
-    .flatMap(entry => entry.model.available_in_plans ?? []));
-  assert.deepEqual(reserve.model.available_in_plans.filter((plan: string) => !publicPlans.has(plan)), []);
-  for (const key of ["context_window", "max_context_window", "comp_hash", "multi_agent_version", "supported_reasoning_levels"]) {
-    assert.deepEqual(reserve.model[key], luna.model[key], key);
-  }
-  assert.equal(reserve.model.model_messages.instructions_template, luna.model.model_messages.instructions_template);
   assert.equal(reserve.model.visibility, "hide");
   assert.equal(reserve.model.upgrade, null);
 

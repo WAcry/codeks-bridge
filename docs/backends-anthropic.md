@@ -12,7 +12,7 @@ Fable 5.2 默认 effort 为 `high`，其余 Claude 条目为 `medium`。普通�
 
 Fable 5.2 与 Opus 5.5 始终启用 adaptive thinking。Sonnet 5.5 的最低模式是 `between_tools`，关闭回复前的思考，但仍在工具之间返回带签名的进度说明。这些模型都拒绝 `thinking.type: "disabled"`，因此目录不把 `none` 作为可选档位。Sonnet 的 `between_tools` 只接受 `high` 或以下 effort，且 `thinking` 对象中不能附带 `display`、`budget_tokens` 等字段。[官方 thinking 规则](https://platform.claude.com/docs/en/build-with-claude/thinking)、[Sonnet 5.5 变更说明](https://platform.claude.com/docs/en/models/sonnet-5-5/whats-new-sonnet-5-5)
 
-`reasoning.summary` 缺省或为 `none` 时选择 `display: "omitted"`；`auto`、`concise`、`detailed` 选择 `summarized`，不保证上游区分摘要长度。目录默认值与 GPT-6.1 Sol 一样为 `none`；要显示摘要，在 codeks 配置中设置 `model_reasoning_summary = "auto"`。显示开关不关闭 thinking 或载荷回放。
+`reasoning.summary` 缺省或为 `none` 时选择 `display: "omitted"`。`auto`、`concise`、`detailed` 选择 `summarized`，摘要长度由上游决定。目录沿用 GPT-6.2 Sol 的默认值 `none`。要显示摘要，在 codeks 配置中设置 `model_reasoning_summary = "auto"`。thinking 和载荷回放独立于显示开关。
 
 `reasoning.effort_map` 可以替换映射，`options.thinking` 和 `options.output_config` 可以覆盖完整原生对象。例如以下 Sonnet 模型条目固定使用 `between_tools` 与 `low` effort；options 优先于客户端请求中推导的模式、effort 和 display，无需新增转换接口：
 

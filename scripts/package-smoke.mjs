@@ -53,7 +53,7 @@ const config = {
     fable: { upstream: "synthetic", catalog: "claude-fable-5-2", model: "synthetic-fable" },
     flash: { upstream: "synthetic", catalog: "deepseek-flash", model: "synthetic-flash" },
     memory: { upstream: "synthetic", catalog: "gpt-5.6-luna", model: "synthetic-memory", visibility: "hide" },
-    ...Object.fromEntries(["gpt-6.2-sol", "gpt-6.2-astra", "gpt-6.1-terra", "gpt-5.5", "gpt-daybreak-blue-latest", "gpt-daybreak-red-latest", "codex-auto-review", "gpt-reserve", "gemini-3.8-flash", "gemini-4-argon", "gemini-4-carbon"].map(key => [
+    ...Object.fromEntries(["gpt-6.2-sol", "gpt-6.2-astra", "gpt-6.1-terra", "gpt-5.5", "gpt-daybreak-blue-latest", "gpt-daybreak-red-latest", "codex-auto-review", "gpt-reserve", "gemini-3.8-flash", "gemini-4-argon", "gemini-4-carbon", "gemini-4-hydrogen", "gemini-4-neon"].map(key => [
       key, { upstream: "synthetic", catalog: key, model: key, visibility: "hide" },
     ])),
   },

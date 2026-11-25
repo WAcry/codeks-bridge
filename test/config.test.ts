@@ -161,13 +161,13 @@ test("service tier overrides keep aliases independent and reconcile legacy choic
   const [original, standard, custom] = buildCatalog(c).models;
   assert.deepEqual(original.service_tiers, source.service_tiers);
   assert.deepEqual(original.additional_speed_tiers, source.additional_speed_tiers);
-  assert.equal(original.default_service_tier, "priority");
+  assert.equal(original.default_service_tier, undefined);
   assert.deepEqual(standard.service_tiers, []);
   assert.deepEqual(standard.additional_speed_tiers, []);
   assert.equal(standard.default_service_tier, null);
   assert.deepEqual(custom.service_tiers, tiers);
   assert.deepEqual(custom.additional_speed_tiers, []);
-  assert.equal(custom.default_service_tier, "priority");
+  assert.equal(custom.default_service_tier, null);
   assert.deepEqual(resolveModel(c, "standard").origin, resolveModel(c, "original").origin);
   custom.service_tiers[1].metadata!.label = "modified output";
   assert.equal(tiers[1].metadata!.label, "preserved");
@@ -366,24 +366,26 @@ test("curated GPT entries preserve each model's instructions and reasoning choic
     models: Object.fromEntries(keys.map(key => [key, { catalog: key, upstream: "a", model: `deployment/${key}` }])),
   });
   const entries = buildCatalog(c).models;
-  for (const entry of entries) {
+  for (const [priority, entry] of entries.entries()) {
     const curated = getCatalogEntry(entry.slug).model;
-    assert.deepEqual(entry.model_messages, curated.model_messages);
-    assert.deepEqual(entry.supported_reasoning_levels, curated.supported_reasoning_levels);
-    assert.equal(entry.default_reasoning_level, curated.default_reasoning_level);
-    assert.equal(entry.multi_agent_reasoning_effort, curated.multi_agent_reasoning_effort);
-    assert.equal(entry.context_window, curated.context_window);
-    assert.equal(entry.max_context_window, curated.max_context_window);
-    assert.equal(entry.shell_type, "shell_command");
+    assert.equal(entry.shell_type, "unified_exec");
     assert.equal(entry.tool_mode, "code_mode_only");
     assert.equal(entry.use_responses_lite, true);
     const route = resolveModel(c, entry.slug);
     assert.equal(reasoningEffort(route), entry.default_reasoning_level);
     assert.equal(route.profile.id, "gpt-responses");
+    assert.deepEqual(entry, {
+      ...curated, slug: entry.slug, display_name: entry.slug, priority, visibility: "list", supported_in_api: true,
+    });
   }
   const sol = entries.find(entry => entry.slug === "gpt-6.1-sol")!;
+  const gpt6 = entries.find(entry => entry.slug === "gpt-6-sol")!;
   const luna = entries.find(entry => entry.slug === "gpt-6-luna")!;
   const previous = entries.find(entry => entry.slug === "gpt-5.6-sol")!;
+  assert.equal(sol.context_window, 500000);
+  assert.equal(sol.max_context_window, 872000);
+  assert.equal(gpt6.default_service_tier, undefined);
+  assert.equal(luna.default_service_tier, undefined);
   assert.equal(sol.default_reasoning_level, "low");
   assert.equal(luna.default_reasoning_level, "medium");
   assert(sol.supported_reasoning_levels.some((level: any) => level.effort === "ultra"));
@@ -459,35 +461,45 @@ test("client snippets use the HTTP catalog by default and permit a static catalo
 });
 
 test("third-party defaults retain the Codex role and provide model-specific Ultra and budgets", () => {
-  const template = getCatalogEntry("gpt-6.1-sol").model;
-  for (const [key, vendor, ultra, output] of [
-    ["claude-opus-5-5", "Claude", "xhigh", 128000],
-    ["claude-sonnet-5-5", "Claude", "max", 128000],
-    ["claude-haiku-5-5", "Claude", "max", 128000],
-    ["deepseek-flash", "DeepSeek", "max", undefined],
+  const template = getCatalogEntry("gpt-6.2-sol");
+  for (const [key, vendor, defaultEffort, ultra, output] of [
+    ["claude-fable-5-2", "Claude", "high", "xhigh", 128000],
+    ["claude-opus-5-5", "Claude", "medium", "xhigh", 128000],
+    ["claude-sonnet-5-5", "Claude", "medium", "max", 128000],
+    ["claude-haiku-5-5", "Claude", "medium", "max", 128000],
+    ["deepseek-flash", "DeepSeek", "high", "max", undefined],
   ] as const) {
     const c = validateConfig({ upstreams: { a: { base_url: "https://example.com/v1" } }, models: {
       selected: { catalog: key, upstream: "a", model: "deployment" },
     } });
     const info = buildCatalog(c).models[0];
-    const expectedMessages = structuredClone(template.model_messages);
+    const expectedMessages = structuredClone(template.model.model_messages);
     expectedMessages.instructions_template = expectedMessages.instructions_template.replace("based on GPT-6", `based on ${vendor} model`);
     assert.deepEqual(info.model_messages, expectedMessages);
     assert.ok(info.model_messages.instructions_template.startsWith(`You are Codex, an agent based on ${vendor} model.`));
     for (const level of info.supported_reasoning_levels) {
-      assert.deepEqual(level, template.supported_reasoning_levels.find((source: { effort: string }) => source.effort === level.effort));
+      assert.deepEqual(level, template.model.supported_reasoning_levels.find((source: { effort: string }) => source.effort === level.effort));
     }
-    assert.equal(info.default_reasoning_summary, template.default_reasoning_summary);
-    assert.equal(info.shell_type, "shell_command");
+    assert.deepEqual(getCatalogEntry(key).source, template.source);
+    assert.equal(info.default_reasoning_summary, template.model.default_reasoning_summary);
+    assert.equal(info.shell_type, "unified_exec");
+    assert.deepEqual(info.service_tiers, []);
+    assert.deepEqual(info.additional_speed_tiers, []);
+    assert.equal(info.default_service_tier ?? null, null);
+    assert.equal(info.available_access_programs, undefined);
+    assert.equal(info.auto_compact_token_limit, template.model.auto_compact_token_limit);
     assert.equal(info.context_window, 400000);
     assert.equal(info.max_context_window, 1000000);
     assert.equal(info.multi_agent_reasoning_effort, ultra);
     assert(info.supported_reasoning_levels.some((level: any) => level.effort === "ultra"));
     const route = resolveModel(c, "selected");
+    assert.equal(reasoningEffort(route), defaultEffort);
     assert.equal(reasoningEffort(route, "ultra"), ultra);
     const build = key === "deepseek-flash" ? buildDeepSeekRequest : buildAnthropicRequest;
     const ctx = { route, request: { model: "selected", input: "Hello" }, signal: new AbortController().signal };
-    assert.equal(build(ctx).body.max_tokens, output);
+    const { body } = build(ctx);
+    assert.equal(body.max_tokens, output);
+    assert.equal(key === "deepseek-flash" ? body.reasoning_effort : body.output_config.effort, defaultEffort);
     c.models.selected.max_output_tokens = 8192;
     ctx.route = resolveModel(c, "selected");
     assert.equal(build(ctx).body.max_tokens, 8192);
